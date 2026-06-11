@@ -1,0 +1,4051 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perceval : la quête du Contrat Sacré</title>
+<style>
+  /* ==================== STYLES GÉNÉRAUX ==================== */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#cfeaff;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif; user-select:none; }
+  canvas#game { display:block; }
+
+  /* ==================== ÉCRAN TITRE ==================== */
+  #title {
+    position:fixed; inset:0; z-index:50; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:linear-gradient(180deg, rgba(40,53,129,0.25) 0%, rgba(40,53,129,0.55) 100%);
+  }
+  #title h1 {
+    font-size:clamp(34px, 6vw, 72px); color:#fff; letter-spacing:2px;
+    text-shadow:0 4px 24px rgba(40,53,129,0.9), 0 2px 0 #283581;
+  }
+  #title h2 { font-size:clamp(16px, 2.2vw, 26px); color:#dfe6ff; margin-top:8px; font-weight:400;
+    text-shadow:0 2px 12px rgba(40,53,129,0.9); }
+  #title .controls {
+    margin-top:28px; color:#eef1ff; background:rgba(40,53,129,0.78); border-radius:14px;
+    padding:14px 26px; font-size:14px; line-height:1.8; box-shadow:0 8px 30px rgba(0,0,0,0.25);
+  }
+  #playBtn {
+    margin-top:30px; font-size:24px; font-weight:700; color:#283581; background:#fff;
+    border:none; border-radius:999px; padding:14px 64px; cursor:pointer;
+    box-shadow:0 8px 24px rgba(40,53,129,0.55), inset 0 -3px 0 #c9d0f5; transition:transform .15s;
+  }
+  #playBtn:hover { transform:scale(1.06); }
+
+  /* ==================== HUD ==================== */
+  .panel { background:rgba(40,53,129,0.78); border-radius:14px; color:#fff;
+    box-shadow:0 4px 18px rgba(0,0,0,0.25); backdrop-filter:blur(3px); }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; display:none; }
+
+  /* Portrait + barres de vie/mana */
+  #playerFrame { position:absolute; top:14px; left:14px; display:flex; gap:10px; padding:10px 14px 10px 10px; align-items:center; }
+  #portrait { width:54px; height:54px; border-radius:50%; flex:none;
+    background:radial-gradient(circle at 35% 30%, #6a73d8, #283581);
+    border:2px solid #fff; display:flex; align-items:center; justify-content:center;
+    font-size:26px; font-weight:800; color:#fff; }
+  #playerBars { width:190px; }
+  #playerName { font-size:13px; font-weight:700; margin-bottom:4px; letter-spacing:0.5px; }
+  .barOuter { height:14px; background:rgba(10,14,40,0.7); border-radius:7px; overflow:hidden; margin-bottom:5px; position:relative; }
+  .barInner { height:100%; border-radius:7px; transition:width .15s; }
+  #hpFill { width:100%; background:linear-gradient(90deg,#48c75c,#7ce98c); }
+  #mpFill { width:100%; background:linear-gradient(90deg,#4C53BD,#7d84ec); }
+  .barTxt { position:absolute; inset:0; font-size:10px; text-align:center; line-height:14px; color:#fff; text-shadow:0 1px 2px #000; }
+
+  /* Barre d'action */
+  #actionbar { position:absolute; bottom:26px; left:50%; transform:translateX(-50%);
+    display:flex; gap:10px; padding:8px; }
+  .slot { width:56px; height:56px; border-radius:12px; background:rgba(15,20,55,0.85);
+    border:2px solid #4C53BD; position:relative; display:flex; align-items:center; justify-content:center;
+    font-size:26px; }
+  .slot .key { position:absolute; top:2px; left:5px; font-size:10px; color:#cdd3ff; font-weight:700; }
+  .slot .cd { position:absolute; left:0; bottom:0; width:100%; height:0%; background:rgba(10,12,35,0.82); border-radius:0 0 9px 9px; }
+  .slot .cdTxt { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:800; color:#fff; text-shadow:0 1px 3px #000; visibility:hidden; }
+
+  /* Journal de quêtes */
+  #questPanel { position:absolute; top:14px; right:172px; width:250px; pointer-events:auto; overflow:hidden; }
+  #questHeader { padding:9px 14px; font-weight:700; font-size:14px; cursor:pointer; display:flex; justify-content:space-between; }
+  #questBody { padding:0 14px 12px; font-size:13px; line-height:1.45; }
+  #questTitle { color:#ffd44d; font-weight:700; margin-bottom:3px; }
+  #questObj { color:#e8ecff; }
+  #questProg { color:#9ff0a4; font-weight:700; margin-top:3px; }
+
+  /* Mini-carte */
+  #minimapWrap { position:absolute; top:14px; right:14px; width:144px; height:144px; border-radius:50%;
+    border:3px solid #283581; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.3); background:#86d177; }
+  #minimap { width:100%; height:100%; }
+
+  /* Barre d'XP */
+  #xpWrap { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); width:min(640px,70vw);
+    height:15px; background:rgba(10,14,40,0.7); border-radius:8px; overflow:hidden; }
+  #xpFill { height:100%; width:0%; background:linear-gradient(90deg,#b39aff,#4C53BD); border-radius:8px; transition:width .2s; }
+  #xpTxt { position:absolute; inset:0; font-size:10px; color:#fff; text-align:center; line-height:15px;
+    text-shadow:0 1px 3px #000; white-space:nowrap; }
+
+  /* Dialogue PNJ */
+  #dialogue { position:absolute; bottom:108px; left:50%; transform:translateX(-50%);
+    width:min(560px, 86vw); padding:14px 18px; display:none; pointer-events:auto; }
+  #dlgName { color:#ffd44d; font-weight:800; font-size:14px; margin-bottom:4px; }
+  #dlgText { font-size:15px; line-height:1.5; }
+  #dlgHint { font-size:11px; color:#aab2e8; margin-top:7px; }
+
+  /* Indication d'interaction */
+  #interactHint { position:absolute; bottom:170px; left:50%; transform:translateX(-50%);
+    padding:7px 16px; font-size:14px; font-weight:600; display:none; }
+  #interactHint b { color:#ffd44d; }
+
+  /* Toasts (annonces) */
+  #toast { position:absolute; top:22%; left:50%; transform:translateX(-50%); text-align:center;
+    font-size:22px; font-weight:800; color:#fff; text-shadow:0 2px 14px rgba(40,53,129,1), 0 1px 2px #000;
+    opacity:0; transition:opacity .4s; white-space:pre-line; pointer-events:none; }
+
+  /* Dégâts subis (vignette) */
+  #vignette { position:absolute; inset:0; pointer-events:none; opacity:0;
+    box-shadow:inset 0 0 140px 40px rgba(200,30,30,0.55); transition:opacity .3s; }
+  #lvlFlash { position:absolute; inset:0; pointer-events:none; opacity:0;
+    background:radial-gradient(circle, rgba(255,215,80,0.35), transparent 70%); transition:opacity .5s; }
+
+  /* Textes de dégâts flottants */
+  #labels { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  .dmg { position:absolute; font-weight:800; font-size:18px; text-shadow:0 2px 4px rgba(0,0,0,0.7);
+    transform:translate(-50%,-50%); pointer-events:none; }
+
+  /* Aide caméra */
+  #helpHint { position:absolute; bottom:14px; left:14px; font-size:11px; color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,0.8); opacity:0.85; line-height:1.6; }
+
+  /* Contrôles tactiles (mobile) */
+  canvas#game { touch-action:none; }
+  #touchUI { display:none; }
+  #joy { position:absolute; left:20px; bottom:98px; width:130px; height:130px; border-radius:50%;
+    background:rgba(40,53,129,0.35); border:2px solid rgba(255,255,255,0.5);
+    pointer-events:auto; touch-action:none; }
+  #joyKnob { position:absolute; left:50%; top:50%; width:56px; height:56px; border-radius:50%;
+    background:rgba(255,255,255,0.85); box-shadow:0 2px 8px rgba(0,0,0,0.35);
+    transform:translate(-50%,-50%); }
+  #touchBtns { position:absolute; right:16px; bottom:92px; display:flex; flex-direction:column;
+    gap:12px; pointer-events:auto; }
+  #touchBtns button { width:62px; height:62px; border-radius:50%; border:2px solid #4C53BD;
+    background:rgba(15,20,55,0.8); font-size:25px; color:#fff; font-weight:700; touch-action:manipulation; }
+
+  /* ==================== ÉCRANS MORT / VICTOIRE ==================== */
+  .overlayScreen { position:fixed; inset:0; z-index:40; display:none; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; background:rgba(20,25,60,0.72); }
+  .overlayScreen h1 { color:#fff; font-size:clamp(28px,5vw,52px); text-shadow:0 3px 16px #283581; }
+  .overlayScreen p { color:#dfe6ff; font-size:18px; margin-top:14px; max-width:560px; line-height:1.6; }
+  .overlayScreen button { margin-top:28px; font-size:19px; font-weight:700; color:#283581; background:#fff;
+    border:none; border-radius:999px; padding:12px 46px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+  .overlayScreen button:hover { transform:scale(1.05); }
+  #dragonScreen h1 { color:#ffd44d; }
+  #dragonScreen .slogan { font-size:clamp(20px,3.4vw,32px); font-weight:800; color:#fff; margin-top:10px;
+    text-shadow:0 0 30px #4C53BD, 0 2px 6px #000; }
+</style>
+</head>
+<body>
+
+<!-- ==================== ÉCRAN TITRE ==================== -->
+<div id="title">
+  <h1>⚔️ Perceval</h1>
+  <h2>la quête du Contrat Sacré</h2>
+  <div class="controls">
+    <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut<br>
+    <b>Clic droit maintenu</b> : caméra &nbsp;·&nbsp; <b>Molette</b> : zoom<br>
+    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier de Perceval &nbsp;·&nbsp; <b>E</b> : parler
+  </div>
+  <button id="playBtn">Jouer</button>
+</div>
+
+<!-- ==================== HUD ==================== -->
+<div id="hud">
+  <div id="playerFrame" class="panel">
+    <div id="portrait">P</div>
+    <div id="playerBars">
+      <div id="playerName">Perceval — Niveau <span id="lvlTxt">1</span></div>
+      <div class="barOuter"><div id="hpFill" class="barInner"></div><div id="hpTxt" class="barTxt"></div></div>
+      <div class="barOuter"><div id="mpFill" class="barInner"></div><div id="mpTxt" class="barTxt"></div></div>
+    </div>
+  </div>
+
+  <div id="actionbar" class="panel">
+    <div class="slot" id="slot1"><span class="key">1</span>⚔️<div class="cd"></div><div class="cdTxt"></div></div>
+    <div class="slot" id="slot2"><span class="key">2</span>🛡️<div class="cd"></div><div class="cdTxt"></div></div>
+  </div>
+
+  <div id="questPanel" class="panel">
+    <div id="questHeader"><span>📜 Journal de quêtes</span><span id="questToggle">▾</span></div>
+    <div id="questBody">
+      <div id="questTitle"></div>
+      <div id="questObj"></div>
+      <div id="questProg"></div>
+    </div>
+  </div>
+
+  <div id="minimapWrap"><canvas id="minimap" width="144" height="144"></canvas></div>
+
+  <div id="xpWrap"><div id="xpFill"></div><div id="xpTxt">Niveau 1 — 0 / 110 XP</div></div>
+
+  <div id="interactHint" class="panel"><b>E</b> — <span id="interactTxt"></span></div>
+  <div id="dialogue" class="panel">
+    <div id="dlgName"></div>
+    <div id="dlgText"></div>
+    <div id="dlgHint">E pour continuer · s'éloigner pour fermer</div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="vignette"></div>
+  <div id="lvlFlash"></div>
+  <div id="labels"></div>
+  <div id="helpHint">Clic droit : caméra · Molette : zoom · E : parler aux habitants</div>
+  <div id="touchUI">
+    <div id="joy"><div id="joyKnob"></div></div>
+    <div id="touchBtns">
+      <button id="tbA">⚔️</button>
+      <button id="tbB">🛡️</button>
+      <button id="tbJ">⤒</button>
+      <button id="tbE">E</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ÉCRANS DE FIN ==================== -->
+<div id="deathScreen" class="overlayScreen">
+  <h1>Perceval est tombé…</h1>
+  <p>« Même les chevaliers ont droit à une seconde chance. »</p>
+  <button id="respawnBtn">Renaître au village</button>
+</div>
+
+<div id="dragonScreen" class="overlayScreen">
+  <h1>🐉 Le Dragon Modul'r des Oubliettes est vaincu !</h1>
+  <div class="slogan">« Jetez aux oubliettes ce que vous pensiez savoir des assurances »</div>
+  <p>Le Contrat Sacré est entre vos mains. Rapportez-le au château pour achever votre quête.</p>
+  <button id="dragonBtn">Continuer</button>
+</div>
+
+<div id="victoryScreen" class="overlayScreen">
+  <h1>👑 Victoire !</h1>
+  <div class="slogan" style="font-size:24px;color:#ffd44d;font-weight:800;margin-top:8px;">Le Contrat Sacré est rapporté au château.</div>
+  <p>« Jetez aux oubliettes ce que vous pensiez savoir des assurances. »<br>Le royaume est protégé, et cette fois, tout est écrit en grandes lignes.</p>
+  <button id="replayBtn">Rejouer</button>
+</div>
+
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/GammaCorrectionShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/objects/Water.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script>
+'use strict';
+/* ============================================================
+   PERCEVAL : LA QUÊTE DU CONTRAT SACRÉ
+   Un action-RPG façon WoW, en un seul fichier.
+   Sections : AUDIO · MOTEUR · MONDE · JOUEUR · PNJ · ENNEMIS ·
+              QUÊTES · ENTRÉES · HUD · BOUCLE PRINCIPALE
+   ============================================================ */
+
+/* ==================== COULEURS DE LA CHARTE ==================== */
+const BLEU      = 0x283581;   // bleu foncé principal
+const BLEU_CLAIR= 0x4C53BD;   // bleu clair / violet magique
+const CREME     = 0xfdf8ee;
+const BLANC     = 0xffffff;
+const VERT_PRE  = 0x8fd98a;
+const CIEL      = 0xcfeaff;
+
+/* ==================== AUDIO (Web Audio API) ==================== */
+let audioCtx = null;
+function initAudio(){
+  if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+}
+function tone(f, dur, type='sine', vol=0.18, delay=0, f2=null){
+  if(!audioCtx) return;
+  const t0 = audioCtx.currentTime + delay;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t0);
+  if(f2) o.frequency.exponentialRampToValueAtTime(Math.max(20,f2), t0+dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0008, t0+dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(t0); o.stop(t0+dur+0.05);
+}
+function noiseBurst(dur=0.12, vol=0.1, delay=0){
+  if(!audioCtx) return;
+  const t0 = audioCtx.currentTime + delay;
+  const n = Math.floor(audioCtx.sampleRate*dur);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * (1-i/n);
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const g = audioCtx.createGain(); g.gain.value = vol;
+  src.connect(g); g.connect(audioCtx.destination); src.start(t0);
+}
+const SFX = {
+  swing(){ noiseBurst(0.12, 0.07); tone(620, 0.13, 'sine', 0.05, 0, 180); },
+  hit(){ tone(160, 0.1, 'square', 0.13, 0, 70); noiseBurst(0.06, 0.08); },
+  hurt(){ tone(120, 0.22, 'sawtooth', 0.12, 0, 60); },
+  pickup(){ tone(880, 0.12, 'sine', 0.14); tone(1320, 0.18, 'sine', 0.1, 0.08); },
+  quest(){ tone(659, 0.16, 'sine', 0.15); tone(880, 0.22, 'sine', 0.15, 0.13); },
+  level(){ [523,659,784,1047].forEach((f,i)=>tone(f, 0.22, 'triangle', 0.16, i*0.1)); },
+  shield(){ tone(330, 0.35, 'sine', 0.13, 0, 660); },
+  death(){ tone(220, 0.5, 'sawtooth', 0.12, 0, 55); },
+  victory(){ [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f, 0.28, 'triangle', 0.15, i*0.16)); },
+  growl(){ tone(70, 0.6, 'sawtooth', 0.16, 0, 45); noiseBurst(0.4, 0.07); },
+};
+
+/* ==================== ASSETS 3D (KayKit & Quaternius, licence CC0) ==================== */
+const ASSETS = {};
+const mixers = [];
+let assetsReady = false;
+const assetsPromise = (async()=>{
+  const loader = new THREE.GLTFLoader();
+  const defs = {
+    knight:      'assets/Knight.glb',
+    mage:        'assets/Mage.glb',
+    barbarian:   'assets/Barbarian.glb',
+    rogue:       'assets/Rogue.glb',
+    rogueHooded: 'assets/Rogue_Hooded.glb',
+    female:      'assets/Female.glb',
+    skelMinion:  'assets/Skeleton_Minion.glb',
+    skelMage:    'assets/Skeleton_Mage.glb',
+    skelWarrior: 'assets/Skeleton_Warrior.glb',
+    skelRogue:   'assets/Skeleton_Rogue.glb',
+    dragon:      'assets/Dragon.glb',
+    horse:       'assets/Horse.glb',
+    tree1:       'assets/Tree_Birch.glb',
+    tree2:       'assets/Tree_Round.glb',
+    tree3:       'assets/Tree_Pine.glb',
+    rock1:       'assets/Rock_Large.glb',
+    bush1:       'assets/Bush.glb',
+  };
+  await Promise.all(Object.entries(defs).map(([k, url])=>new Promise((res)=>{
+    loader.load(url, (g)=>{ ASSETS[k] = g; res(); }, undefined,
+      (e)=>{ console.warn('Asset introuvable (repli procédural) :', url); res(); });
+  })));
+  assetsReady = true;
+})();
+// clone un modèle riggé, le met à l'échelle (hauteur cible) et prépare son mixer
+function spawnModel(key, targetHeight){
+  const src = ASSETS[key];
+  if(!src) return null;
+  const obj = THREE.SkeletonUtils.clone(src.scene);
+  obj.traverse(o=>{ if(o.isMesh || o.isSkinnedMesh){ o.castShadow = true; o.frustumCulled = false; } });
+  const box = new THREE.Box3().setFromObject(obj);
+  const h = Math.max(0.001, box.max.y - box.min.y);
+  const s = targetHeight/h;
+  obj.scale.setScalar(s);
+  obj.position.y = -box.min.y*s;
+  const wrap = new THREE.Group();
+  wrap.add(obj);
+  const mixer = new THREE.AnimationMixer(obj);
+  const actions = {};
+  for(const clip of src.animations) actions[clip.name] = mixer.clipAction(clip);
+  return { wrap, obj, mixer, actions, scale:s };
+}
+function collectMeshes(obj){
+  const arr = [];
+  obj.traverse(o=>{ if(o.isMesh || o.isSkinnedMesh){ o.material = o.material.clone(); arr.push(o); } });
+  return arr;
+}
+function pickClip(actions, ...patterns){
+  const keys = Object.keys(actions);
+  for(const p of patterns){                       // correspondance exacte d'abord
+    const exact = keys.find(n=>n.toLowerCase() === p);
+    if(exact) return exact;
+  }
+  for(const p of patterns){
+    const k = keys.find(n=>n.toLowerCase().includes(p));
+    if(k) return k;
+  }
+  return null;
+}
+function makeEnemyAnim(m){
+  const map = {
+    idle:   pickClip(m.actions, 'idle'),
+    walk:   pickClip(m.actions, 'walking_a', 'walking', 'walk', 'running', 'flying', 'fly'),
+    attack: pickClip(m.actions, 'slice', 'chop', 'attack_melee', 'bite', 'breath', 'headbutt', 'punch', 'attack', 'cast'),
+  };
+  mixers.push(m.mixer);
+  const st = { mixer:m.mixer, actions:m.actions, map, current:null };
+  m.mixer.addEventListener('finished', ()=>{ st.current = null; enemyAnim(st, 'walk'); });
+  enemyAnim(st, 'idle');
+  return st;
+}
+function enemyAnim(g, name, force=false){
+  if(!g || !g.map[name]) return;
+  const key = g.map[name];
+  if(g.current === key && !force) return;
+  if(g.current && g.actions[g.current]) g.actions[g.current].fadeOut(0.18);
+  const a = g.actions[key];
+  a.reset().fadeIn(0.15).play();
+  if(name === 'attack'){ a.setLoop(THREE.LoopOnce, 1); }
+  else { a.setLoop(THREE.LoopRepeat, Infinity); }
+  g.current = key;
+}
+
+/* ==================== MOTEUR : SCÈNE / CAMÉRA / LUMIÈRES ==================== */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(CIEL);
+scene.fog = new THREE.Fog(CIEL, 95, 260);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.domElement.id = 'game';
+document.body.appendChild(renderer.domElement);
+
+/* --- post-processing : bloom féérique + correction gamma + FXAA --- */
+const composer = new THREE.EffectComposer(renderer);
+composer.setPixelRatio(renderer.getPixelRatio());
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.38, 0.45, 0.85);
+composer.addPass(bloomPass);
+// étalonnage cinéma : gamma + saturation + contraste + teal&orange + vignette + grain
+const GradeShader = {
+  uniforms: { tDiffuse:{ value:null }, uTime:{ value:0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime;
+    varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      c.rgb = pow(max(c.rgb, 0.0), vec3(1.0/2.2));                       // gamma
+      float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+      c.rgb = mix(vec3(l), c.rgb, 1.16);                                  // saturation
+      c.rgb = (c.rgb - 0.5)*1.07 + 0.5;                                   // contraste doux
+      c.rgb += vec3(-0.018, 0.004, 0.028) * (1.0 - smoothstep(0.0, 0.55, l)); // ombres bleutées
+      c.rgb += vec3(0.030, 0.016, -0.018) * smoothstep(0.55, 1.0, l);     // hautes lumières dorées
+      vec2 d = vUv - 0.5;
+      c.rgb *= 1.0 - dot(d, d)*0.5;                                       // vignette
+      float g = fract(sin(dot(vUv + fract(uTime), vec2(12.9898, 78.233))) * 43758.5453);
+      c.rgb += (g - 0.5)*0.018;                                           // grain de film
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), c.a);
+    }`
+};
+const gradePass = new THREE.ShaderPass(GradeShader);
+composer.addPass(gradePass);
+const fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
+function setFxaaRes(){
+  const pr = renderer.getPixelRatio();
+  fxaaPass.material.uniforms['resolution'].value.set(1/(innerWidth*pr), 1/(innerHeight*pr));
+}
+setFxaaRes();
+composer.addPass(fxaaPass);
+
+const hemi = new THREE.HemisphereLight(0xdcecff, 0x8fbd8a, 0.22);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe5b8, 1.45);
+sun.position.set(62, 54, 26);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.camera.left = -120; sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120;   sun.shadow.camera.bottom = -120;
+sun.shadow.camera.far = 250;
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+const AMB_BASE = 0.22, SUN_BASE = 1.35;
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  setFxaaRes();
+});
+
+/* ==================== UTILITAIRES ==================== */
+const V3 = (x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
+const rand = (a,b)=>a+Math.random()*(b-a);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+function lerpAngle(a, b, t){
+  let d = (b-a) % (Math.PI*2);
+  if(d > Math.PI) d -= Math.PI*2;
+  if(d < -Math.PI) d += Math.PI*2;
+  return a + d*t;
+}
+function mat(color, opts={}){ return new THREE.MeshStandardMaterial(Object.assign({color, roughness:0.82, metalness:0.0}, opts)); }
+function fmat(color, opts={}){ return new THREE.MeshStandardMaterial(Object.assign({color, flatShading:true, roughness:0.78, metalness:0.0}, opts)); }
+
+/* ==================== TEXTURES PROCÉDURALES (canvas) ==================== */
+function canvasTex(size, draw, repX=1, repY=1){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  draw(ctx, size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repX, repY);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = 4;
+  return t;
+}
+function noiseOn(ctx, s, n, alpha, light=true){
+  for(let i=0;i<n;i++){
+    const v = Math.floor(rand(0,255));
+    ctx.fillStyle = light
+      ? `rgba(255,255,255,${rand(0,alpha)})`
+      : `rgba(${v*0.2},${v*0.18},${v*0.15},${rand(0,alpha)})`;
+    ctx.fillRect(rand(0,s), rand(0,s), rand(1,3), rand(1,3));
+  }
+}
+const TEX = {};
+// crépi clair (murs de maisons / château)
+TEX.plaster = canvasTex(512, (ctx,s)=>{
+  ctx.fillStyle = '#f6efe2'; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<3400;i++){
+    ctx.fillStyle = `rgba(${rand(200,235)|0},${rand(190,225)|0},${rand(170,205)|0},${rand(0.05,0.25)})`;
+    ctx.fillRect(rand(0,s), rand(0,s), rand(1,4), rand(1,4));
+  }
+});
+// pierre taillée (château, tours)
+TEX.stone = canvasTex(512, (ctx,s)=>{
+  ctx.fillStyle = '#ece8df'; ctx.fillRect(0,0,s,s);
+  const rows = 6, bh = s/rows;
+  for(let r=0;r<rows;r++){
+    const off = (r%2)*s/6;
+    for(let x=-1;x<4;x++){
+      const bx = x*s/3 + off, w = s/3;
+      ctx.fillStyle = `rgba(${rand(210,238)|0},${rand(205,232)|0},${rand(195,222)|0},1)`;
+      ctx.fillRect(bx+2, r*bh+2, w-4, bh-4);
+    }
+  }
+  ctx.strokeStyle = 'rgba(150,142,128,0.55)'; ctx.lineWidth = 5;
+  for(let r=0;r<=rows;r++){ ctx.beginPath(); ctx.moveTo(0,r*bh); ctx.lineTo(s,r*bh); ctx.stroke(); }
+  noiseOn(ctx, s, 1600, 0.1, false);
+}, 2, 2);
+// tuiles de toit (param couleur)
+function roofTex(c1, c2){
+  return canvasTex(256, (ctx,s)=>{
+    ctx.fillStyle = c1; ctx.fillRect(0,0,s,s);
+    const rows = 8, th = s/rows;
+    for(let r=0;r<rows;r++){
+      const off = (r%2)*s/8;
+      for(let x=-1;x<5;x++){
+        const tx = x*s/4 + off;
+        ctx.fillStyle = Math.random()<0.5 ? c1 : c2;
+        ctx.beginPath();
+        ctx.arc(tx+s/8, r*th+th, s/8-1, Math.PI, 0);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+  }, 3, 3);
+}
+TEX.roofBlue = roofTex('#2d3a8c', '#3a47a8');
+TEX.roofClay = roofTex('#b46b4a', '#c47e5a');
+TEX.roofSlate = roofTex('#5a6070', '#6a7080');
+// bois (planches verticales)
+TEX.wood = canvasTex(512, (ctx,s)=>{
+  ctx.fillStyle = '#9a7350'; ctx.fillRect(0,0,s,s);
+  for(let p=0;p<6;p++){
+    ctx.fillStyle = `rgba(${rand(120,165)|0},${rand(85,115)|0},${rand(50,75)|0},0.55)`;
+    ctx.fillRect(p*s/6+1, 0, s/6-3, s);
+  }
+  ctx.strokeStyle = 'rgba(60,40,25,0.5)';
+  for(let i=0;i<48;i++){
+    ctx.lineWidth = rand(0.5,1.6);
+    ctx.beginPath();
+    const x = rand(0,s);
+    ctx.moveTo(x, 0); ctx.bezierCurveTo(x+rand(-7,7), s*0.33, x+rand(-7,7), s*0.66, x+rand(-9,9), s);
+    ctx.stroke();
+  }
+});
+// pavés (place du village, pont)
+TEX.cobble = canvasTex(512, (ctx,s)=>{
+  ctx.fillStyle = '#7e7869'; ctx.fillRect(0,0,s,s);
+  for(let y=0;y<10;y++) for(let x=0;x<10;x++){
+    const px = x*s/10 + (y%2)*s/20, py = y*s/10;
+    const v = rand(150,190)|0;
+    ctx.fillStyle = `rgb(${v},${v-5|0},${v-16|0})`;
+    ctx.beginPath();
+    ctx.ellipse(px+s/20, py+s/20, s/20.6, s/22.5, 0, 0, 7);
+    ctx.fill();
+  }
+  noiseOn(ctx, s, 900, 0.14, false);
+}, 6, 6);
+// herbe au sol
+TEX.grassGround = canvasTex(512, (ctx,s)=>{
+  ctx.fillStyle = '#79ad6c'; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<5200;i++){
+    ctx.fillStyle = `rgba(${rand(75,135)|0},${rand(150,200)|0},${rand(80,120)|0},${rand(0.1,0.4)})`;
+    ctx.fillRect(rand(0,s), rand(0,s), rand(1,4), rand(1,4));
+  }
+  // plaques de terre et trèfles, pour casser l'uniformité
+  for(let i=0;i<46;i++){
+    ctx.fillStyle = `rgba(${rand(135,160)|0},${rand(115,135)|0},${rand(75,95)|0},${rand(0.08,0.2)})`;
+    ctx.beginPath(); ctx.ellipse(rand(0,s), rand(0,s), rand(6,22), rand(4,14), rand(0,3), 0, 7); ctx.fill();
+  }
+  for(let i=0;i<60;i++){
+    ctx.fillStyle = `rgba(60,110,60,${rand(0.08,0.22)})`;
+    ctx.beginPath(); ctx.arc(rand(0,s), rand(0,s), rand(3,9), 0, 7); ctx.fill();
+  }
+  for(let i=0;i<50;i++){
+    ctx.fillStyle = `rgba(244,238,170,${rand(0.04,0.12)})`;
+    ctx.beginPath(); ctx.arc(rand(0,s), rand(0,s), rand(2,7), 0, 7); ctx.fill();
+  }
+}, 22, 22);
+// écorce
+TEX.bark = canvasTex(128, (ctx,s)=>{
+  ctx.fillStyle = '#8a6b4c'; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<40;i++){
+    ctx.strokeStyle = `rgba(${rand(50,90)|0},${rand(35,65)|0},${rand(20,40)|0},${rand(0.3,0.8)})`;
+    ctx.lineWidth = rand(1,4);
+    const x = rand(0,s);
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.quadraticCurveTo(x+rand(-8,8), s/2, x+rand(-6,6), s); ctx.stroke();
+  }
+}, 1, 2);
+// eau
+TEX.water = canvasTex(256, (ctx,s)=>{
+  ctx.fillStyle = '#5fb8e8'; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<60;i++){
+    ctx.strokeStyle = `rgba(255,255,255,${rand(0.06,0.22)})`;
+    ctx.lineWidth = rand(1,3);
+    const y = rand(0,s);
+    ctx.beginPath(); ctx.moveTo(0,y);
+    ctx.bezierCurveTo(s*0.3, y+rand(-9,9), s*0.6, y+rand(-9,9), s, y+rand(-6,6));
+    ctx.stroke();
+  }
+}, 8, 2);
+TEX.water.encoding = THREE.sRGBEncoding;
+// brins d'herbe (alpha)
+TEX.grassBlade = (()=>{
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  // touffe dense aux teintes proches du sol (vert-jaune doux)
+  for(let i=0;i<16;i++){
+    const x = 6 + i*7.6 + rand(-3,3);
+    const g = ctx.createLinearGradient(0,128,0,rand(14,48));
+    const hue = rand(88,108);
+    g.addColorStop(0, `hsl(${hue},38%,40%)`);
+    g.addColorStop(0.7, `hsl(${hue},45%,52%)`);
+    g.addColorStop(1, `hsl(${hue+8},48%,60%)`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = rand(4.5,7);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, 132);
+    ctx.quadraticCurveTo(x+rand(-9,9), 75, x+rand(-16,16), rand(14,48));
+    ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+})();
+// picto officiel Perceval (mark isométrique violet/marine)
+function drawPicto(ctx, x, y, s, vCol='#4C53BD', nCol='#283581'){
+  const poly = (pts, col)=>{
+    ctx.fillStyle = col; ctx.beginPath();
+    pts.forEach(([px,py], i)=> i ? ctx.lineTo(x+px*s, y+py*s) : ctx.moveTo(x+px*s, y+py*s));
+    ctx.closePath(); ctx.fill();
+  };
+  // pans violets supérieurs
+  poly([[0.04,0.21],[0.40,0.02],[0.40,0.26],[0.04,0.45]], vCol);
+  poly([[0.50,0.02],[0.86,0.21],[0.50,0.40]], vCol);
+  // panse du P (chevron marine, à droite)
+  poly([[0.50,0.46],[0.86,0.27],[0.86,0.51],[0.50,0.70]], nCol);
+  // fût du P (deux pans marine, à gauche)
+  poly([[0.04,0.51],[0.40,0.32],[0.40,0.56],[0.04,0.75]], nCol);
+  poly([[0.04,0.81],[0.40,0.62],[0.40,0.86],[0.04,1.05]], nCol);
+}
+function pictoDataURL(vCol, nCol){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  drawPicto(ctx, 24, 4, 230, vCol, nCol);
+  return c.toDataURL();
+}
+const PICTO_LIGHT = pictoDataURL('#9aa2ff', '#ffffff');   // pour fonds sombres (HUD, titre)
+// bannière Perceval (champ crème + picto)
+TEX.banner = (()=>{
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#f6f2e6'; ctx.fillRect(0,0,128,256);
+  ctx.strokeStyle = '#d8c46a'; ctx.lineWidth = 8; ctx.strokeRect(6,6,116,244);
+  drawPicto(ctx, 16, 70, 96);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+})();
+// le picto remplace la lettre du portrait et l'emoji du titre
+{
+  const p = document.getElementById('portrait');
+  p.textContent = '';
+  p.style.background = `url(${PICTO_LIGHT}) center/64% no-repeat, radial-gradient(circle at 35% 30%, #6a73d8, #283581)`;
+  const h1 = document.querySelector('#title h1');
+  h1.innerHTML = `<img src="${PICTO_LIGHT}" alt="" style="height:0.92em;vertical-align:-0.08em;filter:drop-shadow(0 3px 10px rgba(20,25,60,0.7))"> Perceval`;
+}
+// si le VRAI logo est fourni (fichier assets/logo.png), il remplace le picto dessiné partout
+{
+  const img = new Image();
+  img.onload = ()=>{
+    const c = TEX.banner.image, ctx = c.getContext('2d');
+    ctx.fillStyle = '#f6f2e6'; ctx.fillRect(0,0,128,256);
+    ctx.strokeStyle = '#d8c46a'; ctx.lineWidth = 8; ctx.strokeRect(6,6,116,244);
+    const ratio = img.width/img.height;
+    let w = 94, h = w/ratio;
+    if(h > 148){ h = 148; w = h*ratio; }
+    ctx.drawImage(img, 64 - w/2, 128 - h/2, w, h);
+    TEX.banner.needsUpdate = true;
+    document.getElementById('portrait').style.background =
+      `url(assets/logo.png) center/60% no-repeat, radial-gradient(circle at 35% 30%, #ffffff, #c9d2f0)`;
+    const im2 = document.querySelector('#title h1 img');
+    if(im2){
+      im2.src = 'assets/logo.png';
+      im2.style.background = '#fff';
+      im2.style.borderRadius = '10px';
+      im2.style.padding = '3px 6px';
+      im2.style.filter = 'none';
+    }
+  };
+  img.src = 'assets/logo.png';
+}
+// particule douce (halo radial)
+const softTex = (()=>{
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(0.4,'rgba(255,255,255,0.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+})();
+
+/* ==================== NORMAL MAPS PROCÉDURALES (relief) ==================== */
+function normalFromHeight(size, drawHeight, strength=2.2, repX=1, repY=1){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#808080'; ctx.fillRect(0,0,size,size);
+  drawHeight(ctx, size);
+  const img = ctx.getImageData(0,0,size,size).data;
+  const h = (x,y)=>{ x=(x+size)%size; y=(y+size)%size; return img[(y*size+x)*4]/255; };
+  const out = ctx.createImageData(size,size);
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const dx = (h(x+1,y)-h(x-1,y))*strength;
+    const dy = (h(x,y+1)-h(x,y-1))*strength;
+    const inv = 1/Math.sqrt(dx*dx+dy*dy+1);
+    const i = (y*size+x)*4;
+    out.data[i]   = (-dx*inv*0.5+0.5)*255;
+    out.data[i+1] = ( dy*inv*0.5+0.5)*255;
+    out.data[i+2] = inv*255;
+    out.data[i+3] = 255;
+  }
+  ctx.putImageData(out,0,0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repX, repY);
+  return t;
+}
+const NTEX = {};
+// pierre : blocs en relief, joints creusés
+NTEX.stone = normalFromHeight(256, (ctx,s)=>{
+  const rows = 6, bh = s/rows;
+  for(let r=0;r<rows;r++){
+    const off = (r%2)*s/6;
+    for(let x=-1;x<4;x++){
+      const v = 165+Math.random()*45|0;
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(x*s/3+off+3, r*bh+3, s/3-6, bh-6);
+    }
+  }
+}, 2.6, 2, 2);
+// pavés bombés
+NTEX.cobble = normalFromHeight(256, (ctx,s)=>{
+  for(let y=0;y<10;y++) for(let x=0;x<10;x++){
+    const px = x*s/10 + (y%2)*s/20, py = y*s/10;
+    const g = ctx.createRadialGradient(px+s/20, py+s/20, 2, px+s/20, py+s/20, s/20);
+    g.addColorStop(0, '#d8d8d8'); g.addColorStop(0.8, '#a0a0a0'); g.addColorStop(1, '#3a3a3a');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(px+s/20, py+s/20, s/20.6, s/22.5, 0, 0, 7); ctx.fill();
+  }
+}, 2.2, 6, 6);
+// planches rainurées
+NTEX.wood = normalFromHeight(256, (ctx,s)=>{
+  for(let p=0;p<6;p++){
+    const v = 120+Math.random()*30|0;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(p*s/6+2, 0, s/6-4, s);
+  }
+}, 2.0);
+// tuiles bombées
+NTEX.roof = normalFromHeight(256, (ctx,s)=>{
+  const rows = 8, th = s/rows;
+  for(let r=0;r<rows;r++){
+    const off = (r%2)*s/8;
+    for(let x=-1;x<5;x++){
+      const tx = x*s/4 + off;
+      const g = ctx.createRadialGradient(tx+s/8, r*th+th, 2, tx+s/8, r*th+th, s/8);
+      g.addColorStop(0, '#cccccc'); g.addColorStop(1, '#404040');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(tx+s/8, r*th+th, s/8-1, Math.PI, 0); ctx.fill();
+    }
+  }
+}, 2.4, 3, 3);
+// crépi granuleux
+NTEX.plaster = normalFromHeight(256, (ctx,s)=>{
+  for(let i=0;i<2400;i++){
+    const v = 110+Math.random()*50|0;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(Math.random()*s, Math.random()*s, 1+Math.random()*2.5, 1+Math.random()*2.5);
+  }
+}, 1.2);
+// écailles de dragon
+NTEX.scales = normalFromHeight(256, (ctx,s)=>{
+  const rows = 10;
+  for(let r=0;r<rows;r++){
+    const off = (r%2)*s/12;
+    for(let i=-1;i<7;i++){
+      const px = i*s/6 + off, py = r*s/10;
+      const g = ctx.createRadialGradient(px+s/12, py+s/10, 2, px+s/12, py+s/10, s/11);
+      g.addColorStop(0, '#d0d0d0'); g.addColorStop(1, '#383838');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(px+s/12, py+s/10, s/11, Math.PI*0.05, Math.PI*0.95); ctx.fill();
+    }
+  }
+}, 2.2, 3, 3);
+// vagues d'eau (tuilable, pour les réflexions de la rivière)
+NTEX.water = (()=>{
+  const size = 256, TAU = Math.PI*2;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const hF = (x,y)=> 0.5
+    + 0.22*Math.sin(TAU*(3*x/size + 2*y/size))
+    + 0.16*Math.sin(TAU*(7*x/size - 4*y/size) + 1.7)
+    + 0.12*Math.sin(TAU*(2*x/size + 6*y/size) + 4.1)
+    + 0.08*Math.sin(TAU*(11*x/size + 9*y/size) + 2.3);
+  const str = 1.6;
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const dx = (hF(x+1,y)-hF(x-1,y))*str;
+    const dy = (hF(x,y+1)-hF(x,y-1))*str;
+    const inv = 1/Math.sqrt(dx*dx+dy*dy+1);
+    const i = (y*size+x)*4;
+    img.data[i] = (-dx*inv*0.5+0.5)*255;
+    img.data[i+1] = (dy*inv*0.5+0.5)*255;
+    img.data[i+2] = inv*255;
+    img.data[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+})();
+
+/* ==================== AIDES DE CONSTRUCTION ==================== */
+function addMesh(parent, geo, material, x=0, y=0, z=0, shadow=true){
+  const m = new THREE.Mesh(geo, material);
+  m.position.set(x,y,z);
+  m.castShadow = shadow; m.receiveShadow = false;
+  parent.add(m);
+  return m;
+}
+const bx = (p,w,h,d,m,x,y,z,s)=>addMesh(p, new THREE.BoxGeometry(w,h,d), m, x,y,z, s);
+const cy = (p,r1,r2,h,seg,m,x,y,z,s)=>addMesh(p, new THREE.CylinderGeometry(r1,r2,h,seg), m, x,y,z, s);
+const sp = (p,r,m,x,y,z,seg=10)=>addMesh(p, new THREE.SphereGeometry(r,seg,Math.max(6,seg-2)), m, x,y,z);
+const cn = (p,r,h,seg,m,x,y,z)=>addMesh(p, new THREE.ConeGeometry(r,h,seg), m, x,y,z);
+// rocher / canopée organique : icosaèdre déformé
+function blobGeo(radius, detail, amount, seed=1){
+  const g = new THREE.IcosahedronGeometry(radius, detail);
+  const pos = g.attributes.position;
+  const v = V3();
+  for(let i=0;i<pos.count;i++){
+    v.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const n = Math.sin(v.x*3.1+seed)*Math.cos(v.y*2.7+seed*2)*Math.sin(v.z*3.7+seed*3);
+    v.multiplyScalar(1 + n*amount);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ==================== OCCLUSION AMBIANTE AU SOL (décals) ==================== */
+const aoTex = (()=>{
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,8,64,64,64);
+  g.addColorStop(0,'rgba(0,0,0,0.85)');
+  g.addColorStop(0.55,'rgba(0,0,0,0.42)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+})();
+const aoMatShared = new THREE.MeshBasicMaterial({ map:aoTex, transparent:true, opacity:0.42,
+  depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2 });
+function addAO(x, z, r, opacity=0.42, y=0.045){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(r*2, r*2),
+    opacity===0.42 ? aoMatShared : new THREE.MeshBasicMaterial({ map:aoTex, transparent:true, opacity,
+      depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2 }));
+  m.rotation.x = -Math.PI/2;
+  m.position.set(x, y, z);
+  m.renderOrder = 1;
+  scene.add(m);
+  return m;
+}
+
+/* ==================== FUMÉES & BRUMES (sprites) ==================== */
+const puffs = [];
+function spawnPuff(pos, { color=0xffffff, scale=0.6, growth=0.9, rise=0.9, life=2.2, opacity=0.42, drift=0.15 }={}){
+  const m = new THREE.SpriteMaterial({ map:softTex, color, transparent:true, opacity, depthWrite:false });
+  const s = new THREE.Sprite(m);
+  s.position.copy(pos);
+  s.scale.setScalar(scale);
+  scene.add(s);
+  puffs.push({ s, growth, rise, life, maxLife:life, opacity, dx:rand(-drift,drift), dz:rand(-drift,drift) });
+}
+function updatePuffs(dt){
+  for(let i=puffs.length-1;i>=0;i--){
+    const p = puffs[i];
+    p.life -= dt;
+    if(p.life <= 0){
+      scene.remove(p.s); p.s.material.dispose();
+      puffs.splice(i,1); continue;
+    }
+    p.s.position.y += p.rise*dt;
+    p.s.position.x += p.dx*dt;
+    p.s.position.z += p.dz*dt;
+    const k = p.life/p.maxLife;
+    p.s.scale.addScalar(p.growth*dt);
+    p.s.material.opacity = p.opacity*k;
+  }
+}
+
+// --- colliders statiques (cercles au sol) ---
+const colliders = [];
+function addCollider(x, z, r){ colliders.push({x, z, r}); }
+function resolveCollision(pos, r, isFloating=false){
+  for(const c of colliders){
+    const dx = pos.x-c.x, dz = pos.z-c.z, rr = c.r+r;
+    const d2 = dx*dx+dz*dz;
+    if(d2 < rr*rr && d2 > 1e-6){
+      const d = Math.sqrt(d2);
+      pos.x = c.x + dx/d*rr; pos.z = c.z + dz/d*rr;
+    }
+  }
+  // gros ennemis = obstacles vivants
+  for(const e of enemies){
+    if(!e.alive || (e.type!=='golem' && e.type!=='dragon')) continue;
+    const er = e.type==='dragon' ? 2.6 : 1.7;
+    const dx = pos.x-e.group.position.x, dz = pos.z-e.group.position.z, rr = er+r;
+    const d2 = dx*dx+dz*dz;
+    if(d2 < rr*rr && d2 > 1e-6){
+      const d = Math.sqrt(d2);
+      pos.x = e.group.position.x + dx/d*rr; pos.z = e.group.position.z + dz/d*rr;
+    }
+  }
+  // rivière infranchissable (sauf le pont en x = -40, et les spectres qui flottent)
+  if(!isFloating && pos.z > 51.6 && pos.z < 58.4 && Math.abs(pos.x + 40) > 2.5){
+    pos.z = (pos.z < 55) ? 51.6 : 58.4;
+  }
+  pos.x = clamp(pos.x, -106, 106);
+  pos.z = clamp(pos.z, -106, 106);
+}
+// hauteur du sol : 0 partout, sauf le tablier du pont (avec rampes aux extrémités)
+function getGroundY(x, z){
+  if(Math.abs(x + 40) < 2.7 && z > 49 && z < 61){
+    const dz = Math.abs(z - 55);
+    return 0.78 * clamp((5.8 - dz)/1.4, 0, 1);
+  }
+  return 0;
+}
+
+// --- particules (jets éphémères) ---
+const particleBursts = [];
+function burst(pos, color, count=14, speed=4, size=0.18, life=0.7, gravity=-6, spread=1){
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count*3);
+  const vels = [];
+  for(let i=0;i<count;i++){
+    positions[i*3] = pos.x; positions[i*3+1] = pos.y; positions[i*3+2] = pos.z;
+    vels.push(V3(rand(-1,1)*spread, rand(0.2,1.2), rand(-1,1)*spread).normalize().multiplyScalar(rand(speed*0.4, speed)));
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const m = new THREE.PointsMaterial({ color, size:size*1.6, map:softTex, transparent:true, opacity:0.95,
+    depthWrite:false, blending:THREE.AdditiveBlending });
+  const pts = new THREE.Points(geo, m);
+  scene.add(pts);
+  particleBursts.push({ pts, vels, life, maxLife:life, gravity });
+}
+function updateBursts(dt){
+  for(let i=particleBursts.length-1;i>=0;i--){
+    const b = particleBursts[i];
+    b.life -= dt;
+    const arr = b.pts.geometry.attributes.position.array;
+    for(let j=0;j<b.vels.length;j++){
+      b.vels[j].y += b.gravity*dt;
+      arr[j*3]   += b.vels[j].x*dt;
+      arr[j*3+1] += b.vels[j].y*dt;
+      arr[j*3+2] += b.vels[j].z*dt;
+      if(arr[j*3+1] < 0.05) arr[j*3+1] = 0.05;
+    }
+    b.pts.geometry.attributes.position.needsUpdate = true;
+    b.pts.material.opacity = Math.max(0, b.life/b.maxLife);
+    if(b.life <= 0){
+      scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose();
+      particleBursts.splice(i,1);
+    }
+  }
+}
+
+// --- textes flottants (dégâts) ---
+const labelsDiv = document.getElementById('labels');
+const floatTexts = [];
+function addFloatText(worldPos, text, color='#ffd44d', big=false){
+  const el = document.createElement('div');
+  el.className = 'dmg'; el.textContent = text; el.style.color = color;
+  if(big) el.style.fontSize = '26px';
+  labelsDiv.appendChild(el);
+  floatTexts.push({ el, pos: worldPos.clone(), t:0 });
+}
+function updateFloatTexts(dt){
+  const v = V3();
+  for(let i=floatTexts.length-1;i>=0;i--){
+    const f = floatTexts[i];
+    f.t += dt;
+    if(f.t > 1){ f.el.remove(); floatTexts.splice(i,1); continue; }
+    v.copy(f.pos); v.y += 0.8 + f.t*1.6;
+    v.project(camera);
+    if(v.z > 1){ f.el.style.display='none'; continue; }
+    f.el.style.display='block';
+    f.el.style.left = ((v.x*0.5+0.5)*innerWidth)+'px';
+    f.el.style.top  = ((-v.y*0.5+0.5)*innerHeight)+'px';
+    f.el.style.opacity = String(1 - Math.max(0, f.t-0.55)/0.45);
+  }
+}
+
+// --- sprites texte (noms des PNJ) & barres de vie ---
+function makeTextSprite(text, color='#ffffff', scale=3.4){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.font = '700 46px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(22,28,70,0.92)';
+  ctx.strokeText(text, 256, 64);
+  ctx.fillStyle = color; ctx.fillText(text, 256, 64);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false }));
+  sp.scale.set(scale, scale/4, 1);
+  return sp;
+}
+function makeHPBar(w=1.7){
+  const c = document.createElement('canvas'); c.width = 64; c.height = 10;
+  const ctx = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false }));
+  sp.scale.set(w, 0.22, 1);
+  function update(f){
+    ctx.clearRect(0,0,64,10);
+    ctx.fillStyle = 'rgba(8,10,30,0.85)'; ctx.fillRect(0,0,64,10);
+    ctx.fillStyle = f>0.5 ? '#5ad65a' : (f>0.25 ? '#e8c33f' : '#e85a5a');
+    ctx.fillRect(1,1,Math.max(0,62*f),8);
+    tex.needsUpdate = true;
+  }
+  update(1);
+  return { sprite:sp, update };
+}
+
+/* ============================================================
+   LE MONDE — vallée, château, village, forêt, Oubliettes
+   ============================================================ */
+
+// --- ciel : dôme dégradé + soleil ---
+let skyUniforms;
+{
+  const skyGeo = new THREE.SphereGeometry(420, 24, 14);
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, fog:false, depthWrite:false,
+    uniforms: {
+      topColor:     { value: new THREE.Color(0x8ec8f5) },
+      horizonColor: { value: new THREE.Color(0xeef6ff) },
+      warmColor:    { value: new THREE.Color(0xfdeecb) },
+    },
+    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `
+      varying vec3 vDir;
+      uniform vec3 topColor, horizonColor, warmColor;
+      void main(){
+        float h = clamp(vDir.y, 0.0, 1.0);
+        vec3 col = mix(horizonColor, topColor, smoothstep(0.0, 0.45, h));
+        float sunSide = max(0.0, dot(normalize(vDir.xz), normalize(vec2(0.55, 0.35))));
+        col = mix(col, warmColor, (1.0-smoothstep(0.0,0.25,h)) * sunSide * 0.55);
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(sky);
+  skyUniforms = skyMat.uniforms;
+  // disque solaire éclatant (le bloom fait le halo)
+  const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:softTex, color:0xfff3cf, transparent:true, opacity:1, fog:false, depthWrite:false }));
+  sunSprite.scale.set(90, 90, 1);
+  sunSprite.position.set(210, 250, 130);
+  scene.add(sunSprite);
+}
+
+// --- environnement IBL : ciel équirectangulaire procédural, réfléchi par les matériaux PBR ---
+{
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, '#5d9fe0');   // zénith
+  grad.addColorStop(0.42, '#bcdcf5');
+  grad.addColorStop(0.5, '#f2f7ff');   // horizon
+  grad.addColorStop(0.56, '#cfe3c2');
+  grad.addColorStop(1.0, '#79b173');   // sol herbeux
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 256);
+  // soleil chaud (côté est)
+  const sg = ctx.createRadialGradient(150, 70, 4, 150, 70, 60);
+  sg.addColorStop(0, 'rgba(255,247,220,1)');
+  sg.addColorStop(0.18, 'rgba(255,238,190,0.9)');
+  sg.addColorStop(1, 'rgba(255,238,190,0)');
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, 512, 256);
+  // atténuation globale : l'IBL doit rester un appoint, pas la source principale
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = '#8a8f99'; ctx.fillRect(0, 0, 512, 256);
+  ctx.globalCompositeOperation = 'source-over';
+  const envTex = new THREE.CanvasTexture(c);
+  envTex.mapping = THREE.EquirectangularReflectionMapping;
+  envTex.encoding = THREE.sRGBEncoding;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromEquirectangular(envTex).texture;
+  pmrem.dispose();
+}
+
+// --- montagnes en toile de fond ---
+{
+  const mtnMat = fmat(0x9aa8b8);
+  const snowMat = fmat(0xf4f8ff);
+  for(let i=0;i<11;i++){
+    const a = i/11*Math.PI*2 + rand(-0.1,0.1);
+    const dist = rand(150, 195);
+    const h = rand(34, 62), r = rand(26, 42);
+    const geo = blobGeo(1, 1, 0.18, i*3.7);
+    const mtn = new THREE.Mesh(geo, mtnMat);
+    mtn.scale.set(r, h, r);
+    mtn.position.set(Math.sin(a)*dist, -h*0.25, Math.cos(a)*dist);
+    scene.add(mtn);
+    const cap = new THREE.Mesh(blobGeo(1, 1, 0.15, i*5.1), snowMat);
+    cap.scale.set(r*0.4, h*0.32, r*0.4);
+    cap.position.set(mtn.position.x, h*0.52, mtn.position.z);
+    scene.add(cap);
+  }
+}
+
+// --- sol : plaine vallonnée aux couleurs variées ---
+{
+  const geo = new THREE.PlaneGeometry(224, 224, 72, 72);
+  const colAttr = [];
+  const c = new THREE.Color();
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x = pos.getX(i), y = pos.getY(i);
+    const n = Math.sin(x*0.12+1)*Math.cos(y*0.09+2)*0.5 + Math.sin(x*0.05)*0.5;
+    c.setHSL(0.29 + n*0.02, 0.42, 0.52 + n*0.06);
+    colAttr.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colAttr, 3));
+  const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map:TEX.grassGround, vertexColors:true }));
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+}
+
+// --- rivière animée + berges + pont de pierre ---
+let riverWater;
+{
+  // lit de la rivière (sable sombre)
+  const bed = new THREE.Mesh(new THREE.PlaneGeometry(224, 9), mat(0x8a9a7a));
+  bed.rotation.x = -Math.PI/2;
+  bed.position.set(0, 0.01, 55);
+  scene.add(bed);
+  // eau à réflexions réelles (miroir plan + vagues en normal map)
+  riverWater = new THREE.Water(new THREE.PlaneGeometry(224, 7), {
+    textureWidth: 384, textureHeight: 384,
+    waterNormals: NTEX.water,
+    sunDirection: V3(0.5, 0.7, 0.3).normalize(),
+    sunColor: 0xffeac4,
+    waterColor: 0x1e6a8e,
+    distortionScale: 2.2,
+    fog: true,
+  });
+  riverWater.rotation.x = -Math.PI/2;
+  riverWater.position.set(0, 0.16, 55);
+  scene.add(riverWater);
+  // berges sablonneuses
+  for(const dz of [-4.6, 4.6]){
+    const bank = new THREE.Mesh(new THREE.PlaneGeometry(224, 1.6),
+      new THREE.MeshLambertMaterial({ color:0xdacf9f, polygonOffset:true, polygonOffsetFactor:-1 }));
+    bank.rotation.x = -Math.PI/2;
+    bank.position.set(0, 0.025, 55+dz);
+    bank.receiveShadow = true;
+    scene.add(bank);
+  }
+  // pont : tablier pavé, arches, piliers, lanternes
+  const bridge = new THREE.Group();
+  const stoneMat = new THREE.MeshStandardMaterial({ map:TEX.stone, normalMap:NTEX.stone, color:0xf2ead8, roughness:0.88 });
+  const deck = bx(bridge, 5.4, 0.5, 11, new THREE.MeshStandardMaterial({ map:TEX.cobble, normalMap:NTEX.cobble, roughness:0.85 }), 0, 0.5, 0);
+  deck.receiveShadow = true;
+  for(const sxx of [-2.55, 2.55]){
+    bx(bridge, 0.4, 0.85, 11, stoneMat, sxx, 1.05, 0);
+    bx(bridge, 0.5, 0.12, 11.2, mat(0xe6dcc4), sxx, 1.5, 0);   // main courante
+    // arche sous le tablier
+    const arch = cy(bridge, 1.9, 1.9, 0.5, 14, stoneMat, sxx, 0.15, 0);
+    arch.rotation.z = Math.PI/2;
+    arch.scale.y = 0.9;
+  }
+  for(const [px, pz] of [[-2.55,-5.2],[2.55,-5.2],[-2.55,5.2],[2.55,5.2]]){
+    bx(bridge, 0.7, 1.6, 0.7, stoneMat, px, 0.95, pz);
+    cn(bridge, 0.5, 0.5, 4, mat(0x4C53BD), px, 2.0, pz).rotation.y = Math.PI/4;
+  }
+  bridge.position.set(-40, 0, 55);
+  scene.add(bridge);
+}
+
+// --- chemins (décals clairs) ---
+function addPath(x1,z1,x2,z2,w=3.4){
+  const dx = x2-x1, dz = z2-z1;
+  const len = Math.sqrt(dx*dx+dz*dz);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, len),
+    new THREE.MeshLambertMaterial({ color:0xe7dcc3, polygonOffset:true, polygonOffsetFactor:-1 }));
+  p.rotation.x = -Math.PI/2;
+  p.rotation.z = -Math.atan2(dx, dz);
+  p.position.set((x1+x2)/2, 0.02, (z1+z2)/2);
+  p.receiveShadow = true;
+  scene.add(p);
+}
+addPath(0, 14, 0, -64);      // village -> château
+addPath(0, 16, -38, 50);     // village -> pont
+addPath(-40, 60, -70, 72);   // pont -> Oubliettes
+addPath(2, 16, 48, 4);       // village -> forêt
+
+// --- herbe instanciée : touffes de brins croisés, vent dans le vertex shader ---
+let grassUniforms = null;
+function inKeepOutZone(x, z){
+  if(x*x + (z-15)*(z-15) < 190) return true;            // place du village
+  if(z > 48.5 && z < 61.5) return true;                  // rivière + berges
+  if(z < -58 && Math.abs(x) < 32) return true;           // cour du château
+  if((x+75)*(x+75) + (z-78)*(z-78) < 260) return true;   // Oubliettes
+  return false;
+}
+function windMaterial(opts, strength=0.25){
+  const m = new THREE.MeshLambertMaterial(opts);
+  m.onBeforeCompile = (shader)=>{
+    shader.uniforms.uTime = grassUniforms ? grassUniforms.uTime : { value:0 };
+    if(!grassUniforms) grassUniforms = shader.uniforms;
+    shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+       #ifdef USE_INSTANCING
+         float wx = instanceMatrix[3][0]; float wz = instanceMatrix[3][2];
+         float sway = sin(uTime*1.7 + wx*0.6 + wz*0.45) + sin(uTime*2.9 + wx*1.3)*0.4;
+         transformed.x += sway * ${strength.toFixed(2)} * max(0.0, position.y);
+       #endif`
+    );
+  };
+  return m;
+}
+{
+  // géométrie : deux quads croisés
+  const q1 = new THREE.PlaneGeometry(0.85, 0.85);
+  q1.translate(0, 0.42, 0);
+  const q2 = q1.clone(); q2.rotateY(Math.PI/2);
+  const geo = new THREE.BufferGeometry();
+  const posArr = [...q1.attributes.position.array, ...q2.attributes.position.array];
+  const uvArr  = [...q1.attributes.uv.array, ...q2.attributes.uv.array];
+  const nArr   = [...q1.attributes.normal.array, ...q2.attributes.normal.array];
+  const off = q1.attributes.position.count;
+  const idxArr = [...q1.index.array, ...Array.from(q2.index.array, i=>i+off)];
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nArr, 3));
+  geo.setIndex(idxArr);
+  const gm = windMaterial({ map:TEX.grassBlade, alphaTest:0.4, side:THREE.DoubleSide, color:0xffffff }, 0.22);
+  const N = 5200;
+  const grass = new THREE.InstancedMesh(geo, gm, N);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = V3(), p = V3();
+  const col = new THREE.Color();
+  let placed = 0, guard = 0;
+  while(placed < N && guard++ < N*30){
+    const x = rand(-105,105), z = rand(-105,105);
+    if(inKeepOutZone(x,z)) continue;
+    p.set(x, 0, z); q.setFromAxisAngle(V3(0,1,0), rand(0,Math.PI));
+    const sc = rand(0.5, 1.0); s.set(sc*1.35, sc*rand(0.55,0.85), sc*1.35);
+    m4.compose(p, q, s);
+    grass.setMatrixAt(placed, m4);
+    col.setHSL(0.27 + rand(-0.02,0.025), 0.42, rand(0.55,0.72));
+    grass.setColorAt(placed, col);
+    placed++;
+  }
+  grass.count = placed;
+  if(grass.instanceColor) grass.instanceColor.needsUpdate = true;
+  scene.add(grass);
+}
+
+// --- fleurs des prés ---
+{
+  const N = 420;
+  const stem = new THREE.PlaneGeometry(0.16, 0.3);
+  stem.translate(0, 0.15, 0);
+  const head = new THREE.SphereGeometry(0.07, 6, 5);
+  head.translate(0, 0.34, 0);
+  const geo = new THREE.BufferGeometry();
+  const posArr = [...stem.attributes.position.array, ...head.attributes.position.array];
+  const nArr = [...stem.attributes.normal.array, ...head.attributes.normal.array];
+  const off = stem.attributes.position.count;
+  const idxArr = [...stem.index.array, ...Array.from(head.index.array, i=>i+off)];
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nArr, 3));
+  geo.setIndex(idxArr);
+  const fm = windMaterial({ color:0xffffff, side:THREE.DoubleSide }, 0.18);
+  const flowers = new THREE.InstancedMesh(geo, fm, N);
+  const palette = [0xffffff, 0xffd9e8, 0xfff3b0, 0xc9c4ff, 0xffb3c8, 0x9fd8ff];
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+  let placed = 0, guard = 0;
+  while(placed < N && guard++ < N*30){
+    const x = rand(-100,100), z = rand(-100,100);
+    if(inKeepOutZone(x,z)) continue;
+    q.setFromAxisAngle(V3(0,1,0), rand(0,Math.PI*2));
+    const sc = rand(0.8, 1.6);
+    m4.compose(V3(x,0,z), q, V3(sc,sc,sc));
+    flowers.setMatrixAt(placed, m4);
+    col.setHex(palette[(Math.random()*palette.length)|0]);
+    flowers.setColorAt(placed, col);
+    placed++;
+  }
+  flowers.count = placed;
+  if(flowers.instanceColor) flowers.instanceColor.needsUpdate = true;
+  scene.add(flowers);
+}
+
+// --- papillons ---
+const butterflies = [];
+for(let i=0;i<6;i++){
+  const g = new THREE.Group();
+  const wmat = new THREE.MeshBasicMaterial({
+    color:[0xffd9e8,0xfff3b0,0xc9c4ff,0xbfe8ff][(Math.random()*4)|0],
+    side:THREE.DoubleSide, transparent:true, opacity:0.95 });
+  const wL = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.16), wmat);
+  wL.position.x = -0.11;
+  const pivL = new THREE.Group(); pivL.add(wL); g.add(pivL);
+  const wR = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.16), wmat);
+  wR.position.x = 0.11;
+  const pivR = new THREE.Group(); pivR.add(wR); g.add(pivR);
+  g.position.set(rand(-30,30), rand(0.8,2), rand(-10,40));
+  scene.add(g);
+  butterflies.push({ g, pivL, pivR, target:null, t:rand(0,9), speed:rand(0.8,1.6) });
+}
+function updateButterflies(dt, t){
+  for(const b of butterflies){
+    b.t -= dt;
+    if(b.t <= 0 || !b.target){
+      b.t = rand(3,7);
+      b.target = V3(b.g.position.x + rand(-12,12), rand(0.7,2.4), b.g.position.z + rand(-12,12));
+      b.target.x = clamp(b.target.x, -100, 100);
+      b.target.z = clamp(b.target.z, -100, 100);
+    }
+    const dir = V3().subVectors(b.target, b.g.position);
+    if(dir.length() > 0.3){
+      dir.normalize();
+      b.g.position.addScaledVector(dir, b.speed*dt);
+      b.g.rotation.y = Math.atan2(dir.x, dir.z);
+    }
+    b.g.position.y += Math.sin(t*7 + b.speed*9)*0.012;
+    const flap = Math.sin(t*16 + b.speed*5)*1.0;
+    b.pivL.rotation.z = flap;
+    b.pivR.rotation.z = -flap;
+  }
+}
+
+// --- oiseaux en vol ---
+const birds = [];
+for(let i=0;i<4;i++){
+  const g = new THREE.Group();
+  const bmat = new THREE.MeshBasicMaterial({ color:0x44507a, side:THREE.DoubleSide });
+  const wL = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.34), bmat); wL.position.x = -0.55;
+  const pivL = new THREE.Group(); pivL.add(wL); g.add(pivL);
+  const wR = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.34), bmat); wR.position.x = 0.55;
+  const pivR = new THREE.Group(); pivR.add(wR); g.add(pivR);
+  scene.add(g);
+  birds.push({ g, pivL, pivR, a:rand(0,6.3), r:rand(24,60), h:rand(26,40), w:rand(0.05,0.1), cx:rand(-30,30), cz:rand(-40,20) });
+}
+function updateBirds(dt, t){
+  for(const b of birds){
+    b.a += b.w*dt*8;
+    b.g.position.set(b.cx + Math.sin(b.a)*b.r, b.h + Math.sin(t*0.7+b.r)*2, b.cz + Math.cos(b.a)*b.r);
+    b.g.rotation.y = b.a + Math.PI/2;
+    const flap = Math.sin(t*9 + b.r)*0.55;
+    b.pivL.rotation.z = flap;
+    b.pivR.rotation.z = -flap;
+  }
+}
+
+// --- arbres instanciés (forêt enchantée à l'est + bosquets) ---
+const treeSpots = [];
+const procNature = [];      // meshes procéduraux remplacés par les modèles Quaternius au chargement
+const scatterSpots = [];    // buissons et rochers épars
+let natureSwapped = false;
+{
+  for(let i=0;i<64;i++) treeSpots.push([rand(42,98), rand(-48,46)]);       // forêt est
+  for(let i=0;i<14;i++) treeSpots.push([rand(-100,-30), rand(-90,-10)]);   // bosquets ouest
+  for(let i=0;i<8;i++)  treeSpots.push([rand(-20,30), rand(70,100)]);      // sud
+  // troncs texturés écorce, légèrement évasés
+  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.45, 2.6, 7);
+  trunkGeo.translate(0, 1.3, 0);
+  const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ map:TEX.bark, roughness:0.9 }), treeSpots.length);
+  // canopées organiques : 3 variantes d'icosaèdres déformés
+  const variants = [
+    blobGeo(1.9, 1, 0.3, 1.3),
+    blobGeo(1.7, 1, 0.36, 4.7),
+    blobGeo(2.1, 1, 0.26, 8.1),
+  ];
+  const folMat = new THREE.MeshPhongMaterial({ color:0xffffff, flatShading:true, shininess:4 });
+  const canopies = variants.map(g=>new THREE.InstancedMesh(g, folMat, treeSpots.length));
+  const counts = [0,0,0];
+  const aoList = [];
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+  treeSpots.forEach(([x,z], i)=>{
+    const sc = rand(0.8, 1.5);
+    q.setFromAxisAngle(V3(0,1,0), rand(0,Math.PI));
+    m4.compose(V3(x,0,z), q, V3(sc, sc*rand(0.9,1.15), sc));
+    trunks.setMatrixAt(i, m4);
+    const v = (Math.random()*3)|0;
+    col.setHSL(0.31 + rand(-0.05,0.035), 0.48, rand(0.4,0.52));
+    // canopée principale
+    m4.compose(V3(x + rand(-0.2,0.2), 3.1*sc, z + rand(-0.2,0.2)), q, V3(sc, sc*rand(0.85,1.1), sc));
+    canopies[v].setMatrixAt(counts[v], m4);
+    canopies[v].setColorAt(counts[v], col);
+    counts[v]++;
+    // touffe secondaire décalée
+    const v2 = (v+1)%3;
+    col.offsetHSL(rand(-0.02,0.02), 0, rand(0.02,0.06));
+    m4.compose(V3(x + rand(-0.7,0.7), (3.9+rand(0,0.7))*sc, z + rand(-0.7,0.7)), q, V3(sc*0.55, sc*0.5, sc*0.55));
+    canopies[v2].setMatrixAt(counts[v2], m4);
+    canopies[v2].setColorAt(counts[v2], col);
+    counts[v2]++;
+    addCollider(x, z, 0.7*sc);
+    aoList.push([x, z, sc]);
+  });
+  trunks.castShadow = true;
+  trunks.count = treeSpots.length;
+  scene.add(trunks);
+  procNature.push(trunks);
+  canopies.forEach((cnp, k)=>{
+    cnp.count = counts[k];
+    cnp.castShadow = true;
+    if(cnp.instanceColor) cnp.instanceColor.needsUpdate = true;
+    scene.add(cnp);
+    procNature.push(cnp);
+  });
+  // tache d'occlusion ambiante sous chaque arbre
+  {
+    const treeAO = new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1), aoMatShared, aoList.length);
+    const qFlat = new THREE.Quaternion().setFromAxisAngle(V3(1,0,0), -Math.PI/2);
+    aoList.forEach(([x,z,sc], i)=>{
+      m4.compose(V3(x, 0.04, z), qFlat, V3(4.6*sc, 4.6*sc, 1));
+      treeAO.setMatrixAt(i, m4);
+    });
+    treeAO.renderOrder = 1;
+    scene.add(treeAO);
+  }
+  // buissons et rochers épars
+  const bushMat = fmat(0x6db368);
+  const rockMat = fmat(0xb9b4a6);
+  for(let i=0;i<40;i++){
+    const x = rand(-102,102), z = rand(-102,102);
+    if(inKeepOutZone(x,z)) continue;
+    if(Math.random() < 0.55){
+      const b = new THREE.Mesh(blobGeo(rand(0.5,1.0), 1, 0.3, i*2.3), bushMat);
+      b.position.set(x, 0.3, z);
+      b.scale.y = 0.75;
+      b.castShadow = true;
+      scene.add(b);
+      procNature.push(b);
+      scatterSpots.push({ x, z, kind:'bush', h:rand(0.8,1.5) });
+    } else {
+      const r = new THREE.Mesh(blobGeo(rand(0.35,0.9), 0, 0.25, i*3.1), rockMat);
+      r.position.set(x, 0.15, z);
+      r.rotation.y = rand(0,3);
+      r.castShadow = true;
+      scene.add(r);
+      procNature.push(r);
+      scatterSpots.push({ x, z, kind:'rock', h:rand(0.5,1.3) });
+    }
+  }
+}
+
+// --- bascule vers la végétation Quaternius (appelée quand les assets sont chargés) ---
+function instancedFromGLB(key, items, makeMatrix){
+  const src = ASSETS[key];
+  if(!src || !items.length) return null;
+  const meshes = [];
+  src.scene.updateMatrixWorld(true);
+  src.scene.traverse(o=>{ if(o.isMesh) meshes.push(o); });
+  if(!meshes.length) return null;
+  const box = new THREE.Box3().setFromObject(src.scene);
+  const rawH = Math.max(0.001, box.max.y - box.min.y);
+  const group = new THREE.Group();
+  for(const mesh of meshes){
+    const geo = mesh.geometry.clone();
+    geo.applyMatrix4(mesh.matrixWorld);
+    geo.translate(0, -box.min.y, 0);   // pied au sol
+    const im = new THREE.InstancedMesh(geo, mesh.material, items.length);
+    const m4 = new THREE.Matrix4();
+    items.forEach((it, i)=>{ makeMatrix(it, m4, rawH); im.setMatrixAt(i, m4); });
+    im.castShadow = true;
+    group.add(im);
+  }
+  scene.add(group);
+  return group;
+}
+function swapNature(){
+  if(natureSwapped || !ASSETS.tree1) return;
+  natureSwapped = true;
+  for(const o of procNature) scene.remove(o);
+  // Galopin, le cheval de Mathias, version sculptée et animée
+  if(ASSETS.horse && horseProc){
+    const hm = spawnModel('horse', 2.1);
+    if(hm){
+      hm.wrap.position.set(9, 0, -39);
+      hm.wrap.rotation.y = -0.6;
+      scene.add(hm.wrap);
+      makeEnemyAnim(hm);   // Idle en boucle
+      scene.remove(horseProc);
+    }
+  }
+  // trois essences d'arbres réparties sur les emplacements existants
+  const lots = [[],[],[]];
+  treeSpots.forEach((s, i)=>lots[i%3].push(s));
+  const q = new THREE.Quaternion(), up = V3(0,1,0);
+  ['tree1','tree2','tree3'].forEach((k, gi)=>{
+    instancedFromGLB(k, lots[gi], ([x, z], m4, rawH)=>{
+      const targetH = rand(6.5, 10.5);
+      const sc = targetH/rawH;
+      q.setFromAxisAngle(up, rand(0, Math.PI*2));
+      m4.compose(V3(x, 0, z), q, V3(sc, sc*rand(0.92,1.1), sc));
+    });
+  });
+  // rochers et buissons sculptés
+  instancedFromGLB('rock1', scatterSpots.filter(s=>s.kind==='rock'), (it, m4, rawH)=>{
+    const sc = it.h/rawH;
+    q.setFromAxisAngle(up, rand(0, Math.PI*2));
+    m4.compose(V3(it.x, 0, it.z), q, V3(sc*rand(0.9,1.6), sc, sc*rand(0.9,1.6)));
+  });
+  instancedFromGLB('bush1', scatterSpots.filter(s=>s.kind==='bush'), (it, m4, rawH)=>{
+    const sc = it.h/rawH;
+    q.setFromAxisAngle(up, rand(0, Math.PI*2));
+    m4.compose(V3(it.x, 0, it.z), q, V3(sc, sc, sc));
+  });
+}
+
+// --- particules lumineuses de la forêt enchantée ---
+let forestSparkles, sparkleBase;
+{
+  const N = 160;
+  const pos = new Float32Array(N*3);
+  sparkleBase = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    pos[i*3] = rand(44,96); pos[i*3+1] = rand(0.5,5); pos[i*3+2] = rand(-46,44);
+    sparkleBase[i*3]=pos[i*3]; sparkleBase[i*3+1]=pos[i*3+1]; sparkleBase[i*3+2]=pos[i*3+2];
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  forestSparkles = new THREE.Points(geo, new THREE.PointsMaterial({
+    color:0xffe9a0, size:0.45, map:softTex, transparent:true, opacity:0.95,
+    depthWrite:false, blending:THREE.AdditiveBlending }));
+  scene.add(forestSparkles);
+}
+
+// --- le château blanc (au nord) ---
+const flags = [];
+function buildFlag(x, y, z){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.2,5), mat(0xd9d4c8));
+  pole.position.y = 1.1; g.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.8, 6, 1),
+    new THREE.MeshLambertMaterial({ color:BLEU, side:THREE.DoubleSide }));
+  flag.position.set(0.7, 1.8, 0);
+  g.add(flag);
+  g.position.set(x, y, z);
+  scene.add(g);
+  flags.push({ flag, phase: rand(0, Math.PI*2) });
+  return g;
+}
+{
+  const castle = new THREE.Group();
+  const wallMat = new THREE.MeshStandardMaterial({ map:TEX.stone, normalMap:NTEX.stone, color:0xfdf9f0, roughness:0.88 });
+  const trimMat = mat(0xe8e0cc);
+  const glassMat = new THREE.MeshStandardMaterial({ color:0x9fd4ff, emissive:0x3a6aa0, emissiveIntensity:0.6, metalness:0.4, roughness:0.08 });
+  const goldMat = new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:1.0, roughness:0.25 });
+
+  // cour pavée
+  const court = new THREE.Mesh(new THREE.CylinderGeometry(17, 17, 0.14, 30), new THREE.MeshStandardMaterial({ map:TEX.cobble, normalMap:NTEX.cobble, roughness:0.85 }));
+  court.position.set(0, 0.07, 4);
+  court.receiveShadow = true;
+  castle.add(court);
+
+  // donjon central : deux niveaux + pilastres + balcon + toit de tuiles
+  const keep = bx(castle, 16, 11, 12, wallMat, 0, 5.5, -2);
+  keep.receiveShadow = true;
+  bx(castle, 13, 5.5, 9.5, wallMat, 0, 13.7, -2);
+  for(const px of [-7.7, 7.7]) for(const pz of [3.7, -7.7]){
+    bx(castle, 1.1, 11.6, 1.1, trimMat, px, 5.5, pz-2+0.0);
+  }
+  // balcon avant + porte du donjon
+  bx(castle, 6, 0.4, 2.2, trimMat, 0, 6.2, 5.2);
+  for(let i=-2;i<=2;i++) bx(castle, 0.18, 0.8, 0.18, trimMat, i*1.3, 6.8, 6.1);
+  const keepDoor = bx(castle, 2.6, 3.6, 0.4, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 1.8, 4.1);
+  cy(castle, 1.3, 1.3, 0.42, 12, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 3.6, 4.1).rotation.x = Math.PI/2;
+  // fenêtres lumineuses du donjon
+  for(const [wx, wy] of [[-4.5,7],[4.5,7],[-4.5,3.5],[4.5,3.5],[-2,9.5],[2,9.5],[0,14]]){
+    bx(castle, 0.85, 1.5, 0.2, glassMat, wx, wy, 4.06, false);
+    bx(castle, 1.05, 0.22, 0.24, trimMat, wx, wy+0.85, 4.06, false);
+  }
+  // toit du donjon
+  const keepRoof = cn(castle, 10.2, 6.5, 4, new THREE.MeshStandardMaterial({ map:TEX.roofBlue, normalMap:NTEX.roof, roughness:0.6 }), 0, 19.6, -2);
+  keepRoof.rotation.y = Math.PI/4;
+  sp(castle, 0.5, goldMat, 0, 23.2, -2);
+  // grande bannière « P » sur la façade
+  const ban = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 6.4), new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }));
+  ban.position.set(0, 9.6, 4.45);
+  castle.add(ban);
+
+  // murailles avant avec porte + herse
+  for(const [wx, ww] of [[-11.5, 13], [11.5, 13]]){
+    const wall = bx(castle, ww, 7, 1.8, wallMat, wx, 3.5, 13);
+    wall.receiveShadow = true;
+    bx(castle, ww, 0.5, 2.2, trimMat, wx, 7, 13);
+  }
+  bx(castle, 10, 2, 2, wallMat, 0, 7.4, 13);
+  // porte en bois entrouverte + barreaux
+  const gateL = bx(castle, 2.4, 5.6, 0.3, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), -2.0, 2.8, 13.3);
+  gateL.rotation.y = 0.5;
+  const gateR = bx(castle, 2.4, 5.6, 0.3, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 2.0, 2.8, 13.3);
+  gateR.rotation.y = -0.5;
+  for(let i=-2;i<=2;i++) cy(castle, 0.07, 0.07, 2.2, 5, mat(0x4a4a55), i*0.9, 5.3, 13);
+  // bannières murales de part et d'autre de la porte
+  for(const bxx of [-7, 7]){
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 3.4), new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }));
+    b.position.set(bxx, 4.4, 14.0);
+    castle.add(b);
+  }
+
+  // créneaux instanciés (murailles + tours)
+  const merlonGeo = new THREE.BoxGeometry(0.9, 1.0, 0.7);
+  const merlonSpots = [];
+  for(let i=0;i<7;i++){ merlonSpots.push([-16.5+i*1.7, 7.9, 13, 0]); merlonSpots.push([6.3+i*1.7, 7.9, 13, 0]); }
+  for(const [tx, tz] of [[-14, 13], [14, 13], [-14, -10], [14, -10]]){
+    for(let i=0;i<8;i++){
+      const a = i/8*Math.PI*2;
+      merlonSpots.push([tx+Math.sin(a)*2.9, 13.6, tz+Math.cos(a)*2.9, a]);
+    }
+  }
+  const merlons = new THREE.InstancedMesh(merlonGeo, trimMat, merlonSpots.length);
+  const mm4 = new THREE.Matrix4(), mq = new THREE.Quaternion();
+  merlonSpots.forEach(([x,y,z,a], i)=>{
+    mq.setFromAxisAngle(V3(0,1,0), a);
+    mm4.compose(V3(x,y,z), mq, V3(1,1,1));
+    merlons.setMatrixAt(i, mm4);
+  });
+  merlons.castShadow = true;
+  castle.add(merlons);
+
+  // 4 tours : fût de pierre, encorbellement, toit de tuiles bleues, fleuron doré, drapeau
+  for(const [tx, tz] of [[-14, 13], [14, 13], [-14, -10], [14, -10]]){
+    const tower = cy(castle, 2.6, 3.1, 12.6, 12, wallMat, tx, 6.3, tz);
+    tower.receiveShadow = true;
+    cy(castle, 3.3, 2.7, 1.3, 12, trimMat, tx, 12.6, tz);                 // encorbellement
+    const roof = cn(castle, 3.3, 5.4, 12, new THREE.MeshLambertMaterial({ map:TEX.roofSlate }), tx, 15.9, tz);
+    roof.material = new THREE.MeshStandardMaterial({ map:TEX.roofBlue, normalMap:NTEX.roof, roughness:0.6 });
+    sp(castle, 0.32, goldMat, tx, 18.8, tz);
+    // meurtrières lumineuses
+    for(const my of [4, 8]) bx(castle, 0.4, 1.1, 0.2, glassMat, tx, my, tz+3.0, false);
+    buildFlag(tx, 18.9, tz - 82);
+    addAO(tx, tz - 82, 4.8, 0.45, 0.16);
+  }
+  castle.position.set(0, 0, -82);
+  scene.add(castle);
+  // colliders du château
+  addCollider(0, -84, 10.5);
+  addCollider(-14, -69, 3.6); addCollider(14, -69, 3.6);
+  addCollider(-14, -92, 3.6); addCollider(14, -92, 3.6);
+  addCollider(-11.5, -69, 6.2); addCollider(11.5, -69, 6.2);
+}
+
+// --- le village (maisons à colombages + fontaine) ---
+const chimneys = [];
+function buildHouse(x, z, rotY, w=5, d=4.5, roofColor=0xb46b4a){
+  const g = new THREE.Group();
+  const beamMat = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0xb08a60, roughness:0.8 });
+  const plasterMat = new THREE.MeshStandardMaterial({ map:TEX.plaster, normalMap:NTEX.plaster, roughness:0.92 });
+  const roofMap = roofColor === 0x4C53BD || roofColor === 0x8a6bb4 ? TEX.roofBlue
+                : roofColor === 0x555a66 ? TEX.roofSlate : TEX.roofClay;
+  const roofMat = new THREE.MeshStandardMaterial({ map:roofMap, normalMap:NTEX.roof, roughness:0.62 });
+  // soubassement de pierre
+  const base = bx(g, w+0.2, 0.7, d+0.2, new THREE.MeshStandardMaterial({ map:TEX.stone, normalMap:NTEX.stone, roughness:0.9 }), 0, 0.35, 0);
+  base.receiveShadow = true;
+  // corps en crépi, étage légèrement en surplomb
+  const body = bx(g, w, 1.6, d, plasterMat, 0, 1.5, 0);
+  body.receiveShadow = true;
+  const floor2 = bx(g, w+0.5, 1.4, d+0.5, plasterMat, 0, 3.0, 0);
+  floor2.receiveShadow = true;
+  // colombages : sablières, poteaux et croix de Saint-André sur la façade
+  const fz = d/2+0.28;
+  bx(g, w+0.56, 0.18, 0.12, beamMat, 0, 2.32, fz);
+  bx(g, w+0.56, 0.18, 0.12, beamMat, 0, 3.68, fz);
+  for(const px of [-w/2-0.1, -w/6, w/6, w/2+0.1]) bx(g, 0.16, 1.4, 0.12, beamMat, px, 3.0, fz);
+  for(const s of [-1, 1]){
+    const brace = bx(g, 0.13, 1.55, 0.1, beamMat, s*w/3, 3.0, fz);
+    brace.rotation.z = s*0.42;
+  }
+  // toit : tuiles + débord + pignon
+  const roof = cn(g, Math.max(w,d)*0.86, 2.6, 4, roofMat, 0, 5.0, 0);
+  roof.rotation.y = Math.PI/4;
+  roof.scale.set(w/Math.max(w,d), 1, d/Math.max(w,d));
+  // cheminée fumante
+  const chx = w*0.28, chz = -d*0.15;
+  bx(g, 0.55, 1.6, 0.55, new THREE.MeshStandardMaterial({ map:TEX.stone, normalMap:NTEX.stone, roughness:0.9 }), chx, 5.6, chz);
+  bx(g, 0.75, 0.18, 0.75, mat(0x9a9486), chx, 6.45, chz);
+  const cw = new THREE.Vector3(chx, 6.6, chz).applyAxisAngle(V3(0,1,0), rotY).add(V3(x,0,z));
+  chimneys.push({ pos:cw, t:rand(0,0.6) });
+  // porte cintrée + lanterne
+  const door = bx(g, 0.95, 1.5, 0.14, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 1.15, d/2+0.1);
+  const archD = cy(g, 0.48, 0.48, 0.14, 10, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 1.9, d/2+0.1);
+  archD.rotation.x = Math.PI/2;
+  bx(g, 1.3, 0.12, 0.3, beamMat, 0, 2.18, d/2+0.12);
+  const lant = bx(g, 0.22, 0.3, 0.22, mat(0xffd98a, { emissive:0xffb84d, emissiveIntensity:2.2 }), w/2-0.5, 2.6, d/2+0.25, false);
+  bx(g, 0.3, 0.06, 0.3, mat(0x4a4038), w/2-0.5, 2.8, d/2+0.25, false);
+  // fenêtres à croisillons + jardinières fleuries
+  for(const wx of [-w/4, w/4]){
+    bx(g, 0.78, 0.78, 0.1, mat(0xbfe3f5, { emissive:0x4a7a9e, emissiveIntensity:0.7 }), wx, 3.0, fz+0.02, false);
+    bx(g, 0.92, 0.1, 0.14, beamMat, wx, 3.42, fz+0.03, false);
+    bx(g, 0.92, 0.1, 0.14, beamMat, wx, 2.58, fz+0.03, false);
+    bx(g, 0.1, 0.78, 0.14, beamMat, wx-0.42, 3.0, fz+0.03, false);
+    bx(g, 0.1, 0.78, 0.14, beamMat, wx+0.42, 3.0, fz+0.03, false);
+    bx(g, 0.08, 0.78, 0.12, beamMat, wx, 3.0, fz+0.04, false);
+    bx(g, 0.78, 0.08, 0.12, beamMat, wx, 3.0, fz+0.04, false);
+    // jardinière
+    bx(g, 0.8, 0.18, 0.24, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), wx, 2.5, fz+0.12, false);
+    for(let f=0; f<3; f++){
+      sp(g, 0.07, mat([0xff7a9a, 0xffd44d, 0xff9a5a, 0xc9c4ff][(Math.random()*4)|0]), wx-0.25+f*0.25, 2.64, fz+0.16, 6);
+    }
+  }
+  // fenêtre du rez-de-chaussée
+  bx(g, 0.7, 0.6, 0.1, mat(0xbfe3f5, { emissive:0x4a7a9e, emissiveIntensity:0.7 }), -w/4, 1.5, d/2+0.04, false);
+  g.position.set(x, 0, z);
+  g.rotation.y = rotY;
+  scene.add(g);
+  addCollider(x, z, Math.max(w,d)*0.74);
+  addAO(x, z, Math.max(w,d)*1.05, 0.45);
+  return g;
+}
+function updateChimneys(dt){
+  for(const c of chimneys){
+    c.t -= dt;
+    if(c.t <= 0){
+      c.t = rand(0.35, 0.7);
+      spawnPuff(c.pos, { color:0xe8e4dc, scale:rand(0.3,0.5), growth:0.55, rise:rand(0.6,0.9), life:rand(2.5,3.5), opacity:0.3, drift:0.3 });
+    }
+  }
+}
+buildHouse(-12, 8,  Math.PI/2.2);
+buildHouse( 12, 9, -Math.PI/2.3, 5.5, 5);
+buildHouse(-11, 22, Math.PI/3,   4.6, 4.2, 0x8a6bb4);
+buildHouse( 13, 22, -Math.PI/2.8, 5, 4.5);
+buildHouse( -6, 39, Math.PI,     6, 5, 0x4C53BD);
+buildHouse( 11, 37, Math.PI+0.4, 4.4, 4);
+// la forge de Jojo
+buildHouse(-14, 15, Math.PI/2, 4.5, 4, 0x555a66);
+
+// place du village pavée + fontaine à jets + mobilier
+let fountainWater, fountainJet;
+{
+  const plaza = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 0.12, 36), new THREE.MeshStandardMaterial({ map:TEX.cobble, normalMap:NTEX.cobble, color:0xcfc7b6, roughness:0.85 }));
+  plaza.position.set(0, 0.06, 15); plaza.receiveShadow = true;
+  scene.add(plaza);
+  // anneau décoratif
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(10.7, 0.18, 6, 40), mat(0xcfc6b2));
+  ring.rotation.x = -Math.PI/2; ring.position.set(0, 0.13, 15);
+  scene.add(ring);
+  // fontaine : bassin sculpté, eau, colonne, orbe magique
+  const fg = new THREE.Group();
+  const stoneW = new THREE.MeshStandardMaterial({ map:TEX.stone, normalMap:NTEX.stone, color:0xfdf8ee, roughness:0.88 });
+  cy(fg, 2.55, 2.75, 0.95, 18, stoneW, 0, 0.48, 0);
+  cy(fg, 2.85, 2.85, 0.22, 18, mat(0xe8e0cc), 0, 1.0, 0);
+  fountainWater = addMesh(fg, new THREE.CylinderGeometry(2.3, 2.3, 0.16, 18),
+    new THREE.MeshStandardMaterial({ map:TEX.water, normalMap:NTEX.water, color:0xbfe8ff, transparent:true,
+      opacity:0.92, roughness:0.06, metalness:0.1, emissive:0x1c5070, envMapIntensity:1.5 }),
+    0, 0.95, 0, false);
+  cy(fg, 0.55, 0.75, 0.5, 12, stoneW, 0, 1.2, 0);
+  cy(fg, 0.28, 0.4, 1.5, 10, stoneW, 0, 2.1, 0);
+  cy(fg, 0.9, 0.7, 0.25, 12, mat(0xe8e0cc), 0, 2.9, 0);
+  const orb = sp(fg, 0.42, mat(0x3a41a8, { emissive:BLEU_CLAIR, emissiveIntensity:0.85 }), 0, 3.5, 0, 14);
+  fg.position.set(0, 0, 15);
+  scene.add(fg);
+  addCollider(0, 15, 3.0);
+  addAO(0, 15, 3.8, 0.4, 0.135);
+  // jet d'eau : particules cycliques
+  {
+    const N = 70;
+    const posArr = new Float32Array(N*3);
+    const drops = [];
+    for(let i=0;i<N;i++){
+      drops.push({ p:V3(0, 3.4, 15), v:V3(rand(-0.7,0.7), rand(2.4,3.6), rand(-0.7,0.7)), life: rand(0,1) });
+      posArr[i*3+1] = 3.4;
+    }
+    const geoJ = new THREE.BufferGeometry();
+    geoJ.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+    const jet = new THREE.Points(geoJ, new THREE.PointsMaterial({
+      color:0xcfeaff, size:0.22, map:softTex, transparent:true, opacity:0.85,
+      depthWrite:false, blending:THREE.AdditiveBlending }));
+    scene.add(jet);
+    fountainJet = { jet, drops };
+  }
+  // lampadaires autour de la place
+  for(const a of [0.6, 2.2, 4.0, 5.6]){
+    const lx = Math.sin(a)*9.2, lz = 15 + Math.cos(a)*9.2;
+    const lp = new THREE.Group();
+    cy(lp, 0.09, 0.13, 3.0, 7, mat(0x3a3f4e), 0, 1.5, 0);
+    cy(lp, 0.16, 0.16, 0.1, 7, mat(0x3a3f4e), 0, 3.05, 0);
+    bx(lp, 0.34, 0.45, 0.34, mat(0xffd98a, { emissive:0xffc35a, emissiveIntensity:2.4 }), 0, 3.35, 0, false);
+    cn(lp, 0.3, 0.3, 4, mat(0x3a3f4e), 0, 3.75, 0);
+    lp.position.set(lx, 0, lz);
+    scene.add(lp);
+    addCollider(lx, lz, 0.35);
+  }
+  // étal de marché à auvent rayé
+  {
+    const st = new THREE.Group();
+    const stripes = canvasTex(128, (ctx,s)=>{
+      for(let i=0;i<8;i++){ ctx.fillStyle = i%2 ? '#ffffff' : '#4C53BD'; ctx.fillRect(i*s/8, 0, s/8, s); }
+    }, 2, 1);
+    bx(st, 2.6, 0.9, 1.3, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 0.45, 0);
+    bx(st, 2.8, 0.1, 1.5, mat(0xc9a87a), 0, 0.95, 0);
+    for(const [px,pz] of [[-1.25,-0.6],[1.25,-0.6],[-1.25,0.6],[1.25,0.6]]) cy(st, 0.05, 0.05, 2.3, 6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), px, 1.15, pz);
+    const awn = addMesh(st, new THREE.PlaneGeometry(3.0, 1.8), new THREE.MeshLambertMaterial({ map:stripes, side:THREE.DoubleSide }), 0, 2.45, 0);
+    awn.rotation.x = -Math.PI/2 + 0.25;
+    for(let i=0;i<5;i++) sp(st, 0.1, mat([0xe85a5a, 0xffd44d, 0x8fd98a][(i)%3]), -0.8+i*0.4, 1.1, 0.2, 7);
+    st.position.set(7.5, 0, 11);
+    st.rotation.y = -0.7;
+    scene.add(st);
+    addCollider(7.5, 11, 1.7);
+    addAO(7.5, 11, 2.3, 0.35, 0.135);
+  }
+  // tonneaux et caisses
+  for(const [bxx, bzz] of [[-8.5, 12], [-8.0, 13.2], [12.5, 17.5]]){
+    const barrel = new THREE.Group();
+    cy(barrel, 0.42, 0.36, 0.95, 10, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 0.48, 0);
+    for(const ry of [0.2, 0.75]){
+      const hoop = addMesh(barrel, new THREE.TorusGeometry(0.41, 0.03, 5, 12), mat(0x6a6f7a), 0, ry, 0, false);
+      hoop.rotation.x = Math.PI/2;
+    }
+    barrel.position.set(bxx, 0, bzz);
+    scene.add(barrel);
+    addCollider(bxx, bzz, 0.5);
+  }
+  bx(scene, 0.8, 0.8, 0.8, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 12.0, 0.4, 18.4);
+  bx(scene, 0.6, 0.6, 0.6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 12.7, 0.3, 17.6);
+}
+function updateFountain(dt){
+  if(!fountainJet) return;
+  const arr = fountainJet.jet.geometry.attributes.position.array;
+  fountainJet.drops.forEach((d, i)=>{
+    d.life -= dt;
+    d.v.y -= 9.5*dt;
+    d.p.addScaledVector(d.v, dt);
+    if(d.life <= 0 || d.p.y < 1.05){
+      d.p.set(0, 3.5, 15);
+      d.v.set(rand(-0.75,0.75), rand(2.4,3.7), rand(-0.75,0.75));
+      d.life = rand(0.8, 1.4);
+    }
+    arr[i*3] = d.p.x; arr[i*3+1] = d.p.y; arr[i*3+2] = d.p.z;
+  });
+  fountainJet.jet.geometry.attributes.position.needsUpdate = true;
+}
+
+// --- les Oubliettes (grotte sombre au sud-ouest) ---
+let torchFlames = [], wispPoints, wispBase;
+{
+  // amas de rocs déchiquetés
+  const cragMat = fmat(0x4a4c5a);
+  const cragMat2 = fmat(0x585a6a);
+  const cragDefs = [
+    [-78, 84, 13, 9, 1],   [-67, 92, 7.5, 6, 2],  [-86, 76, 6, 7, 3],
+    [-71, 86, 5, 8, 4],    [-62, 84, 4, 4.5, 5],  [-82, 90, 5.5, 5, 6],
+  ];
+  for(const [cx, cz, cr, ch, seed] of cragDefs){
+    const crag = new THREE.Mesh(blobGeo(1, 1, 0.32, seed*2.7), seed%2 ? cragMat : cragMat2);
+    crag.scale.set(cr, ch, cr*0.9);
+    crag.position.set(cx, ch*0.35, cz);
+    crag.rotation.y = seed;
+    crag.castShadow = true;
+    scene.add(crag);
+    addAO(cx, cz, cr*1.2, 0.5);
+  }
+  // pics rocheux autour de l'entrée
+  for(let i=0;i<7;i++){
+    const a = -0.6 + i*0.35;
+    const px = -71.5 + Math.sin(a)*6.5, pz = 76.5 + Math.cos(a)*4 - 4;
+    const spike = cn(scene, rand(0.5,0.9), rand(1.8,3.6), 5, cragMat, px, 0.9, pz);
+    spike.rotation.z = rand(-0.15, 0.15);
+  }
+  // bouche de la grotte : anneau de pierre + fond noir
+  const mouthRing = new THREE.Mesh(new THREE.TorusGeometry(3.4, 1.0, 8, 14), cragMat2);
+  mouthRing.position.set(-71.5, 2.4, 76.5);
+  mouthRing.rotation.x = 0.12;
+  scene.add(mouthRing);
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(3.4, 16),
+    new THREE.MeshBasicMaterial({ color:0x06070f }));
+  mouth.position.set(-71.5, 2.4, 76.6);
+  mouth.rotation.x = 0.12;
+  scene.add(mouth);
+  // torches de part et d'autre
+  for(const tx of [-76.2, -66.8]){
+    const tg = new THREE.Group();
+    cy(tg, 0.07, 0.1, 2.2, 6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 1.1, 0);
+    cy(tg, 0.16, 0.12, 0.3, 7, mat(0x3a3f4e), 0, 2.3, 0);
+    const flame = new THREE.Sprite(new THREE.SpriteMaterial({
+      map:softTex, color:0xffa83f, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
+    flame.position.y = 2.7; flame.scale.set(0.9, 1.3, 1);
+    tg.add(flame);
+    const core = new THREE.Sprite(new THREE.SpriteMaterial({
+      map:softTex, color:0xfff3c0, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
+    core.position.y = 2.62; core.scale.set(0.45, 0.7, 1);
+    tg.add(core);
+    tg.position.set(tx, 0, 78.5);
+    scene.add(tg);
+    torchFlames.push({ flame, core, phase:rand(0,6), pos:V3(tx, 2.7, 78.5) });
+  }
+  // lumière vacillante partagée
+  const torchLight = new THREE.PointLight(0xff9a3f, 1.1, 26, 2);
+  torchLight.position.set(-71.5, 3.5, 78.5);
+  scene.add(torchLight);
+  torchFlames.light = torchLight;
+  // brume violette qui s'échappe de la grotte
+  {
+    const N = 50;
+    const posArr = new Float32Array(N*3);
+    wispBase = [];
+    for(let i=0;i<N;i++){
+      const x = -71.5+rand(-7,7), y = rand(0.3,5), z = 76.5+rand(-4,10);
+      posArr[i*3]=x; posArr[i*3+1]=y; posArr[i*3+2]=z;
+      wispBase.push([x,y,z]);
+    }
+    const geoW = new THREE.BufferGeometry();
+    geoW.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+    wispPoints = new THREE.Points(geoW, new THREE.PointsMaterial({
+      color:0x8a6fd8, size:0.9, map:softTex, transparent:true, opacity:0.5,
+      depthWrite:false, blending:THREE.AdditiveBlending }));
+    scene.add(wispPoints);
+  }
+  // panneau « Les Oubliettes » sur poteau penché
+  const post = cy(scene, 0.08, 0.1, 2.4, 6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), -65, 1.2, 70);
+  post.rotation.z = 0.12;
+  bx(scene, 1.9, 0.5, 0.08, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), -64.8, 2.1, 70);
+  const sign = makeTextSprite('☠ Les Oubliettes', '#cfd2e8', 5);
+  sign.position.set(-71, 8.2, 76);
+  scene.add(sign);
+  addCollider(-78, 84, 12);
+  addCollider(-67, 92, 7);
+  addCollider(-86, 76, 6);
+  addCollider(-65, 70, 0.4);
+}
+function updateOubliettes(dt, t){
+  for(const f of torchFlames){
+    const fl = 1 + Math.sin(t*11 + f.phase)*0.18 + Math.sin(t*23 + f.phase*2)*0.1;
+    f.flame.scale.set(0.9*fl, 1.3*fl, 1);
+    f.core.scale.set(0.45*fl, 0.7*fl, 1);
+    if(Math.random() < dt*3) spawnPuff(f.pos, { color:0x55585f, scale:0.25, growth:0.4, rise:0.8, life:1.4, opacity:0.3, drift:0.1 });
+  }
+  if(torchFlames.light) torchFlames.light.intensity = 1.0 + Math.sin(t*13)*0.2 + Math.sin(t*29)*0.12;
+  if(wispPoints){
+    const arr = wispPoints.geometry.attributes.position.array;
+    for(let i=0;i<wispBase.length;i++){
+      arr[i*3]   = wispBase[i][0] + Math.sin(t*0.7 + i*2.1)*1.2;
+      arr[i*3+1] = wispBase[i][1] + Math.sin(t*0.5 + i*1.3)*0.8 + 0.5;
+      arr[i*3+2] = wispBase[i][2] + Math.cos(t*0.6 + i*1.7)*1.2;
+    }
+    wispPoints.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+// --- nuages qui dérivent ---
+const clouds = [];
+{
+  const cm = new THREE.MeshLambertMaterial({ color:0xffffff, transparent:true, opacity:0.88, emissive:0x9aa6c8, emissiveIntensity:0.25 });
+  for(let i=0;i<10;i++){
+    const g = new THREE.Group();
+    const n = 4 + (Math.random()*3|0);
+    for(let j=0;j<n;j++){
+      const puff = new THREE.Mesh(blobGeo(rand(2.2,4.5), 1, 0.22, i*7+j*3), cm);
+      puff.position.set(rand(-5.5,5.5), rand(-0.8,0.8), rand(-2.5,2.5));
+      puff.scale.y = rand(0.45,0.6);
+      g.add(puff);
+    }
+    g.position.set(rand(-130,130), rand(40,64), rand(-120,120));
+    g.scale.setScalar(rand(0.9,1.7));
+    scene.add(g);
+    clouds.push({ g, speed: rand(0.5,1.5) });
+  }
+}
+
+/* ============================================================
+   LE JOUEUR — Perceval, chevalier blanc et bleu
+   ============================================================ */
+function buildPerceval(){
+  const g = new THREE.Group();
+  const armorWhite = new THREE.MeshStandardMaterial({ color:0xe8ecf5, metalness:0.88, roughness:0.3 });
+  const armorBlue  = new THREE.MeshStandardMaterial({ color:BLEU, metalness:0.75, roughness:0.34 });
+  const goldTrim   = new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:1.0, roughness:0.28 });
+  const darkSteel  = new THREE.MeshStandardMaterial({ color:0x4a5068, metalness:0.9, roughness:0.42 });
+
+  const HIP = 1.02, SHO = 1.74;
+  // --- jambes articulées : cuisse (pivot hanche), genou (pivot), grève, botte ---
+  const legL = new THREE.Group(), legR = new THREE.Group();
+  const kneeL = new THREE.Group(), kneeR = new THREE.Group();
+  for(const [leg, knee, sx] of [[legL, kneeL, -0.155],[legR, kneeR, 0.155]]){
+    bx(leg, 0.2, 0.46, 0.22, armorWhite, 0, -0.24, 0);          // cuisse
+    bx(leg, 0.22, 0.1, 0.24, armorBlue, 0, -0.49, 0.01);        // genouillère
+    knee.position.set(0, -0.52, 0);
+    bx(knee, 0.17, 0.38, 0.19, armorBlue, 0, -0.19, 0);         // grève
+    bx(knee, 0.19, 0.11, 0.3, darkSteel, 0, -0.43, 0.05);       // botte
+    leg.add(knee);
+    leg.position.set(sx, HIP, 0);
+    g.add(leg);
+  }
+  // --- bassin, ceinture, jupe d'armure ---
+  bx(g, 0.42, 0.16, 0.27, armorBlue, 0, HIP+0.02, 0);
+  bx(g, 0.11, 0.1, 0.04, goldTrim, 0, HIP+0.02, 0.155);
+  bx(g, 0.46, 0.14, 0.3, armorWhite, 0, HIP+0.15, 0);
+  // --- torse en V : taille fine, poitrine large ---
+  bx(g, 0.38, 0.24, 0.24, armorWhite, 0, 1.3, 0);
+  const torso = bx(g, 0.5, 0.4, 0.29, armorWhite, 0, 1.56, 0);
+  bx(g, 0.34, 0.3, 0.06, armorWhite, 0, 1.58, 0.165);           // bombé du plastron
+  bx(g, 0.045, 0.46, 0.045, goldTrim, -0.22, 1.5, 0.15);
+  bx(g, 0.045, 0.46, 0.045, goldTrim, 0.22, 1.5, 0.15);
+  const crest = addMesh(g, new THREE.PlaneGeometry(0.19, 0.25),
+    new THREE.MeshLambertMaterial({ map:TEX.banner, transparent:true }), 0, 1.57, 0.2, false);
+  // --- gorgerin + cou ---
+  cy(g, 0.125, 0.155, 0.1, 10, armorBlue, 0, 1.79, 0);
+  cy(g, 0.065, 0.07, 0.12, 8, mat(0xf2c79a, { roughness:0.6 }), 0, 1.86, 0);
+  // --- épaulières profilées ---
+  for(const sx of [-0.31, 0.31]){
+    const pad = sp(g, 0.145, armorBlue, sx, SHO+0.05, 0, 10); pad.scale.y = 0.66;
+    sp(g, 0.038, goldTrim, sx*1.18, SHO+0.12, 0, 6);
+  }
+  // --- bras articulés : épaule (pivot), coude (pivot), gantelet ---
+  const armL = new THREE.Group(), armR = new THREE.Group();
+  const elbowL = new THREE.Group(), elbowR = new THREE.Group();
+  for(const [arm, elbow, sx] of [[armL, elbowL, -0.34],[armR, elbowR, 0.34]]){
+    bx(arm, 0.14, 0.34, 0.16, armorWhite, 0, -0.17, 0);
+    elbow.position.set(0, -0.35, 0);
+    bx(elbow, 0.15, 0.3, 0.17, armorBlue, 0, -0.13, 0);
+    sp(elbow, 0.085, darkSteel, 0, -0.32, 0.01, 8);
+    arm.add(elbow);
+    arm.rotation.z = sx>0 ? -0.06 : 0.06;
+    arm.position.set(sx, SHO, 0);
+    g.add(arm);
+  }
+  // --- tête aux proportions humaines + heaume ajusté ---
+  const head = sp(g, 0.165, mat(0xf2c79a, { roughness:0.6 }), 0, 2.06, 0, 14);
+  head.scale.y = 1.12;
+  bx(g, 0.21, 0.045, 0.05, mat(0x14182e), 0, 2.08, 0.135, false);  // fente de visière
+  const helm = new THREE.Mesh(new THREE.SphereGeometry(0.195, 14, 10, 0, Math.PI*2, 0, Math.PI*0.62), armorWhite);
+  helm.position.y = 2.1; helm.castShadow = true;
+  g.add(helm);
+  bx(g, 0.38, 0.045, 0.22, armorWhite, 0, 2.06, -0.03, false);     // couvre-nuque
+  for(const sx of [-0.18, 0.18]) bx(g, 0.04, 0.12, 0.13, armorBlue, sx, 2.02, 0.02, false);
+  bx(g, 0.035, 0.1, 0.26, goldTrim, 0, 2.27, -0.03);               // cimier doré
+  for(let i=0;i<3;i++){
+    const plume = cn(g, 0.045, 0.34-i*0.06, 6, mat(BLEU_CLAIR, { emissive:0x23276b, emissiveIntensity:0.6 }), 0, 2.37+i*0.04, -0.1-i*0.09);
+    plume.rotation.x = -0.55 - i*0.3;
+  }
+  // --- cape d'étoffe : trapèze haute résolution, ourlet doré, vraie simulation de tissu ---
+  const cape = new THREE.Group();
+  const capeGeo = new THREE.PlaneGeometry(0.5, 1.12, 8, 12);
+  {
+    const cpos = capeGeo.attributes.position;
+    const cols = [];
+    const ccol = new THREE.Color();
+    for(let i=0;i<cpos.count;i++){
+      const hang = (0.56 - cpos.getY(i))/1.12;       // 0 aux épaules → 1 à l'ourlet
+      cpos.setX(i, cpos.getX(i)*(1 + hang*0.9));     // évasement du trapèze
+      const trim = hang > 0.92;
+      ccol.setHex(trim ? 0xd8c46a : 0x2d3a8e);       // ourlet doré
+      if(!trim) ccol.offsetHSL(0, 0, -hang*0.05);    // ombre douce vers le bas
+      cols.push(ccol.r, ccol.g, ccol.b);
+    }
+    capeGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  }
+  const capeMesh = new THREE.Mesh(capeGeo, new THREE.MeshStandardMaterial({
+    color:0xffffff, vertexColors:true, side:THREE.DoubleSide, roughness:0.72, metalness:0.04 }));
+  capeMesh.position.y = -0.56;
+  capeMesh.castShadow = true;
+  cape.add(capeMesh);
+  // le bouclier est sanglé PAR-DESSUS la cape : il suit ses mouvements, plus de chevauchement
+  const backShield = new THREE.Group();
+  addMesh(backShield, new THREE.CircleGeometry(0.27, 18),
+    new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, -0.04, false);
+  addMesh(backShield, new THREE.TorusGeometry(0.27, 0.032, 8, 22), goldTrim, 0, 0, -0.03, false);
+  sp(backShield, 0.055, goldTrim, 0, 0, -0.07, 8);   // umbo central
+  backShield.rotation.y = Math.PI;
+  backShield.rotation.z = 0.15;
+  backShield.position.set(0, -0.38, -0.17);
+  cape.add(backShield);
+  cape.position.set(0, 1.78, -0.16);
+  g.add(cape);
+  const capeBase = Float32Array.from(capeGeo.attributes.position.array);
+  // attaches de cape dorées
+  for(const sx of [-0.18, 0.18]) sp(g, 0.045, goldTrim, sx, 1.78, 0.12, 6);
+  // --- épée runique lumineuse ---
+  const sword = new THREE.Group();
+  cy(sword, 0.045, 0.05, 0.28, 7, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x9a7350, roughness:0.8 }), 0, 0, 0);
+  sp(sword, 0.07, goldTrim, 0, -0.16, 0, 8);                    // pommeau
+  sp(sword, 0.045, mat(BLEU_CLAIR, { emissive:BLEU_CLAIR, emissiveIntensity:2.5 }), 0, -0.16, 0.05, 6); // gemme
+  const guard = bx(sword, 0.34, 0.06, 0.09, goldTrim, 0, 0.16, 0);
+  sp(sword, 0.045, goldTrim, -0.18, 0.16, 0, 6);
+  sp(sword, 0.045, goldTrim, 0.18, 0.16, 0, 6);
+  const blade = bx(sword, 0.11, 1.06, 0.028, new THREE.MeshStandardMaterial({ color:0xdfe5f2, metalness:0.95, roughness:0.12 }), 0, 0.72, 0);
+  bx(sword, 0.035, 1.0, 0.034, mat(0xbfc6ff, { emissive:BLEU_CLAIR, emissiveIntensity:2.6 }), 0, 0.72, 0, false); // cœur runique
+  cn(sword, 0.055, 0.12, 4, new THREE.MeshStandardMaterial({ color:0xdfe5f2, metalness:0.95, roughness:0.12 }), 0, 1.3, 0);
+  const glow = new THREE.PointLight(BLEU_CLAIR, 0.7, 5.5);
+  glow.position.y = 0.75;
+  sword.add(glow);
+  sword.position.set(0, -0.4, 0.05);
+  elbowR.add(sword);
+  // --- bulle du Bouclier de Perceval ---
+  const shieldBubble = new THREE.Mesh(new THREE.SphereGeometry(1.7, 20, 16),
+    new THREE.MeshPhongMaterial({ color:BLEU_CLAIR, transparent:true, opacity:0.34, emissive:BLEU_CLAIR,
+      emissiveIntensity:1.8, shininess:90, side:THREE.DoubleSide }));
+  shieldBubble.position.y = 1.2; shieldBubble.visible = false;
+  g.add(shieldBubble);
+  return { group:g, legL, legR, kneeL, kneeR, armL, armR, elbowL, elbowR, cape, capeMesh, capeBase, shieldBubble, blade };
+}
+
+const player = {
+  ...buildPerceval(),
+  hp: 100, maxhp: 100, mana: 100, maxmana: 100,
+  level: 1, xp: 0,
+  vy: 0, onGround: true,
+  speed: 8.5,
+  attackCd: 0, attackAnim: 0,
+  shieldCd: 0, shieldTime: 0,
+  dead: false, moving: false,
+  walkT: 0,
+};
+player.group.position.set(0, 0, 22);
+scene.add(player.group);
+function playerDamage(){ return 14 + (player.level-1)*3; }
+function xpNeeded(){ return 50 + player.level*60; }
+
+/* ==================== PERCEVAL VERSION CHEVALIER SCULPTÉ (KayKit) ==================== */
+function buildBrandSword(){
+  const goldT = new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:1.0, roughness:0.28 });
+  const sword = new THREE.Group();
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.28, 7),
+    new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x9a7350, roughness:0.8 }));
+  sword.add(grip);
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 7), goldT);
+  pommel.position.y = -0.16; sword.add(pommel);
+  const gem = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6),
+    mat(BLEU_CLAIR, { emissive:BLEU_CLAIR, emissiveIntensity:2.5 }));
+  gem.position.set(0, -0.16, 0.05); sword.add(gem);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.09), goldT);
+  guard.position.y = 0.16; sword.add(guard);
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.11, 1.06, 0.028),
+    new THREE.MeshStandardMaterial({ color:0xdfe5f2, metalness:0.95, roughness:0.12 }));
+  blade.position.y = 0.72; blade.castShadow = true; sword.add(blade);
+  const core = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.0, 0.034),
+    mat(0xbfc6ff, { emissive:BLEU_CLAIR, emissiveIntensity:2.6 }));
+  core.position.y = 0.72; sword.add(core);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.12, 4),
+    new THREE.MeshStandardMaterial({ color:0xdfe5f2, metalness:0.95, roughness:0.12 }));
+  tip.position.y = 1.3; sword.add(tip);
+  const glow = new THREE.PointLight(BLEU_CLAIR, 0.7, 5.5);
+  glow.position.y = 0.75; sword.add(glow);
+  return sword;
+}
+function upgradePlayerModel(){
+  if(player.glb || !ASSETS.knight) return;
+  const m = spawnModel('knight', 1.95);
+  if(!m) return;
+  // on retire le corps procédural ; le chevalier KayKit a déjà épée et bouclier
+  const keep = new Set([player.shieldBubble]);
+  [...player.group.children].forEach(c=>{ if(!keep.has(c)) player.group.remove(c); });
+  player.group.add(m.obj);
+  player.cape = null;            // la cape procédurale est remplacée par le modèle sculpté
+  // une seule épée + le bouclier à blason (les variantes du pack sont masquées)
+  const keepGearK = new Set(['1H_Sword', 'Badge_Shield']);
+  m.obj.traverse(o=>{
+    if((o.isMesh || o.isSkinnedMesh) && /sword|shield/i.test(o.name) && !keepGearK.has(o.name)) o.visible = false;
+  });
+  // blason Perceval (picto) porté dans le dos
+  const brand = new THREE.Group();
+  addMesh(brand, new THREE.CircleGeometry(0.26, 18),
+    new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, -0.035, false);
+  addMesh(brand, new THREE.TorusGeometry(0.26, 0.03, 8, 22),
+    new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:1.0, roughness:0.28 }), 0, 0, -0.025, false);
+  brand.rotation.y = Math.PI;
+  brand.rotation.z = 0.12;
+  brand.position.set(0, 1.32, -0.3);
+  player.group.add(brand);
+  // lueur de marque : l'épée du chevalier rayonne en bleu Perceval
+  const glow = new THREE.PointLight(BLEU_CLAIR, 0.65, 5.5);
+  glow.position.set(0.4, 1.0, 0.2);
+  player.group.add(glow);
+  player.glb = {
+    mixer: m.mixer, actions: m.actions, current: null,
+    map: {
+      idle:   pickClip(m.actions, 'idle'),
+      run:    pickClip(m.actions, 'running_a', 'running', 'run', 'walking_a', 'walk'),
+      attack: pickClip(m.actions, 'slice_diagonal', 'slice', 'chop', '1h_melee', 'attack'),
+      jump:   pickClip(m.actions, 'jump_full_short', 'jump_full', 'jump_idle', 'jump'),
+    },
+  };
+  mixers.push(m.mixer);
+}
+function setPlayerAnim(name, force=false){
+  const g = player.glb;
+  if(!g || !g.map[name]) return;
+  const key = g.map[name];
+  if(g.current === key && !force) return;
+  if(g.current && g.actions[g.current]) g.actions[g.current].fadeOut(0.14);
+  const a = g.actions[key];
+  a.reset().fadeIn(0.12).play();
+  if(name === 'attack'){
+    a.setLoop(THREE.LoopOnce, 1);
+    a.clampWhenFinished = false;
+    a.timeScale = a.getClip().duration/0.55;
+  } else {
+    a.setLoop(THREE.LoopRepeat, Infinity);
+    a.timeScale = 1;
+  }
+  g.current = key;
+}
+
+// --- effet de slash bleu : éventail lumineux balayé ---
+const slashTex = (()=>{
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const ctx = c.getContext('2d');
+  const gv = ctx.createLinearGradient(0,64,0,0);
+  gv.addColorStop(0,'rgba(255,255,255,0)');
+  gv.addColorStop(0.55,'rgba(255,255,255,0.25)');
+  gv.addColorStop(0.85,'rgba(255,255,255,1)');
+  gv.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = gv; ctx.fillRect(0,0,256,64);
+  ctx.globalCompositeOperation = 'destination-out';
+  const gh = ctx.createLinearGradient(0,0,256,0);
+  gh.addColorStop(0,'rgba(0,0,0,1)');
+  gh.addColorStop(0.22,'rgba(0,0,0,0)');
+  gh.addColorStop(0.78,'rgba(0,0,0,0)');
+  gh.addColorStop(1,'rgba(0,0,0,1)');
+  ctx.fillStyle = gh; ctx.fillRect(0,0,256,64);
+  return new THREE.CanvasTexture(c);
+})();
+const slashGeo = (()=>{
+  const segs = 18, radius = 2.3, angle = 2.1;
+  const verts = [0,0,0], uvs = [0.5,0], idx = [];
+  for(let i=0;i<=segs;i++){
+    const a = -angle/2 + (i/segs)*angle;
+    verts.push(Math.sin(a)*radius, 0, Math.cos(a)*radius);
+    uvs.push(i/segs, 1);
+  }
+  for(let i=1;i<=segs;i++) idx.push(0, i, i+1);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+})();
+const slashes = [];
+function spawnSlash(){
+  const m = new THREE.MeshBasicMaterial({ map:slashTex, color:0x9aa2ff, transparent:true, opacity:1,
+    side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending });
+  const s = new THREE.Mesh(slashGeo, m);
+  s.position.copy(player.group.position);
+  s.position.y = 1.3;
+  s.rotation.order = 'YXZ';
+  s.rotation.y = player.group.rotation.y + 0.5;   // départ du balayage
+  s.rotation.x = -0.22;
+  scene.add(s);
+  slashes.push({ mesh:s, t:0, baseY:player.group.rotation.y });
+}
+function updateSlashes(dt){
+  for(let i=slashes.length-1;i>=0;i--){
+    const s = slashes[i];
+    s.t += dt;
+    const k = s.t/0.24;
+    s.mesh.rotation.y = s.baseY + 0.5 - k*1.4;     // balayage de droite à gauche
+    s.mesh.material.opacity = 1 - k*k;
+    s.mesh.scale.setScalar(0.7 + k*0.7);
+    if(s.t > 0.24){
+      scene.remove(s.mesh); s.mesh.material.dispose();
+      slashes.splice(i,1);
+    }
+  }
+}
+
+/* ============================================================
+   PNJ — habitants du village et du château
+   ============================================================ */
+function buildVillager({ robe=0x9a86c9, skin=0xf2c79a, hat=null, hatColor=BLEU, accessory=null,
+                         beard=null, beardColor=0xe8e4dc, hair=null, hairColor=0x6e4f33, glasses=null }){
+  const g = new THREE.Group();
+  const robeMat = mat(robe, { roughness:0.88 });
+  const skinMat = mat(skin, { roughness:0.6 });
+  // jambes + chaussures
+  for(const sx of [-0.1, 0.1]){
+    bx(g, 0.12, 0.52, 0.13, mat(0x5a4a3a, { roughness:0.85 }), sx, 0.28, 0);
+    bx(g, 0.13, 0.09, 0.22, mat(0x3e342a), sx, 0.05, 0.04);
+  }
+  // tunique : jupe évasée + buste, ourlet et ceinture
+  cy(g, 0.21, 0.28, 0.62, 10, robeMat, 0, 0.84, 0);
+  cy(g, 0.185, 0.215, 0.44, 10, robeMat, 0, 1.34, 0);
+  cy(g, 0.29, 0.3, 0.07, 10, mat(0x4a4038), 0, 0.55, 0);          // ourlet
+  cy(g, 0.21, 0.22, 0.07, 10, mat(0x6e4f33), 0, 1.1, 0);          // ceinture
+  bx(g, 0.08, 0.06, 0.03, mat(0xd8c46a), 0, 1.1, 0.21, false);    // boucle
+  // épaules + bras avec coude plié naturel + mains
+  for(const sx of [-0.245, 0.245]){
+    sp(g, 0.085, robeMat, sx, 1.5, 0, 8);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.34, 7), robeMat);
+    arm.position.set(sx*1.18, 1.33, 0.01); arm.rotation.z = sx>0 ? -0.12 : 0.12;
+    arm.castShadow = true;
+    g.add(arm);
+    const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.054, 0.3, 7), robeMat);
+    fore.position.set(sx*1.36, 1.06, 0.07); fore.rotation.z = sx>0 ? -0.14 : 0.14; fore.rotation.x = -0.3;
+    fore.castShadow = true;
+    g.add(fore);
+    sp(g, 0.052, skinMat, sx*1.48, 0.93, 0.13, 6);                 // main
+  }
+  // cou + tête aux proportions humaines
+  cy(g, 0.055, 0.065, 0.1, 8, skinMat, 0, 1.58, 0);
+  const head = sp(g, 0.16, skinMat, 0, 1.74, 0, 14);
+  head.scale.y = 1.14;
+  // visage : yeux, sourcils, nez, bouche, oreilles, pommettes
+  for(const sx of [-0.058, 0.058]){
+    sp(g, 0.027, mat(0xffffff, { roughness:0.25 }), sx, 1.77, 0.135, 6);
+    sp(g, 0.014, mat(0x2a2433), sx, 1.77, 0.158, 6);
+    bx(g, 0.052, 0.013, 0.013, mat(hairColor), sx, 1.815, 0.145, false);
+    sp(g, 0.022, mat(skin, { roughness:0.55 }), sx*1.6, 1.71, 0.125, 5).scale.set(1,0.7,0.6); // pommette
+  }
+  const nose = sp(g, 0.024, skinMat, 0, 1.735, 0.165, 6);
+  nose.scale.set(0.85, 1.25, 1);
+  bx(g, 0.055, 0.013, 0.012, mat(0xb06a5a), 0, 1.675, 0.15, false); // bouche
+  for(const sx of [-0.158, 0.158]) sp(g, 0.03, skinMat, sx, 1.74, 0, 6);
+  // cheveux / barbe
+  const hairMat = mat(hairColor, { roughness:0.85 });
+  if(hair === 'cap' || (!hat && !hair)){
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.175, 12, 8, 0, Math.PI*2, 0, Math.PI*0.55), hairMat);
+    h.position.y = 1.77; g.add(h);
+  } else if(hair === 'long'){
+    // chevelure longue et ondulée jusqu'aux épaules
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8, 0, Math.PI*2, 0, Math.PI*0.6), hairMat);
+    h.position.y = 1.765; g.add(h);
+    for(const sx of [-0.135, 0.135]){
+      const strand = sp(g, 0.075, hairMat, sx, 1.6, -0.02, 8);
+      strand.scale.set(0.8, 2.2, 1);
+      const wave = sp(g, 0.06, hairMat, sx*1.15, 1.42, 0.0, 7);
+      wave.scale.set(0.7, 1.6, 0.9);
+    }
+    const back = sp(g, 0.13, hairMat, 0, 1.55, -0.1, 8);
+    back.scale.set(1.1, 2.0, 0.6);
+  }
+  // hair === 'bald' : rien, crâne nu
+  if(beard === 'long'){
+    const b = cn(g, 0.1, 0.36, 8, mat(beardColor, { roughness:0.9 }), 0, 1.6, 0.09);
+    b.rotation.x = 0.3;
+    bx(g, 0.13, 0.06, 0.04, mat(beardColor), 0, 1.69, 0.14, false); // moustache
+  } else if(beard === 'short'){
+    bx(g, 0.19, 0.11, 0.07, mat(beardColor, { roughness:0.9 }), 0, 1.655, 0.115, false);
+  } else if(beard === 'full'){
+    // barbe fournie qui enveloppe le bas du visage
+    const b = sp(g, 0.14, mat(beardColor, { roughness:0.95 }), 0, 1.65, 0.045, 9);
+    b.scale.set(1.08, 0.8, 0.95);
+    bx(g, 0.115, 0.045, 0.04, mat(beardColor), 0, 1.705, 0.15, false); // moustache
+  }
+  if(glasses === 'round'){
+    // fines lunettes rondes
+    const frameMat = new THREE.MeshStandardMaterial({ color:0x3a3530, metalness:0.6, roughness:0.4 });
+    for(const sx of [-0.058, 0.058]){
+      const lens = addMesh(g, new THREE.TorusGeometry(0.042, 0.009, 6, 14), frameMat, sx, 1.77, 0.155, false);
+    }
+    bx(g, 0.035, 0.008, 0.008, frameMat, 0, 1.77, 0.16, false);                    // pont
+    for(const sx of [-1, 1]){
+      const branchG = bx(g, 0.11, 0.008, 0.008, frameMat, sx*0.115, 1.77, 0.08, false);
+      branchG.rotation.y = sx*Math.PI/2.15;
+    }
+  } else if(glasses === 'sun'){
+    // lunettes de soleil aviateur
+    const dark = new THREE.MeshStandardMaterial({ color:0x14181f, metalness:0.5, roughness:0.15 });
+    const frameMat = new THREE.MeshStandardMaterial({ color:0x4a4540, metalness:0.8, roughness:0.3 });
+    for(const sx of [-0.058, 0.058]){
+      const lens = cy(g, 0.047, 0.047, 0.012, 12, dark, sx, 1.768, 0.152);
+      lens.rotation.x = Math.PI/2;
+    }
+    bx(g, 0.04, 0.01, 0.01, frameMat, 0, 1.785, 0.158, false);                     // pont
+    for(const sx of [-1, 1]){
+      const branchS = bx(g, 0.11, 0.009, 0.009, frameMat, sx*0.115, 1.775, 0.08, false);
+      branchS.rotation.y = sx*Math.PI/2.15;
+    }
+  }
+  if(hat === 'pointy'){
+    const h = cn(g, 0.2, 0.58, 9, mat(hatColor, { roughness:0.85 }), 0, 2.0, 0);
+    h.rotation.x = 0.06;
+    cy(g, 0.235, 0.235, 0.03, 9, mat(hatColor), 0, 1.83, 0);
+  } else if(hat === 'hood'){
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.195, 10, 8, 0, Math.PI*2, 0, Math.PI*0.6), mat(hatColor, { roughness:0.9 }));
+    h.position.y = 1.79; g.add(h);
+  } else if(hat === 'helmet'){
+    const steel = new THREE.MeshStandardMaterial({ color:0xc9cede, metalness:0.82, roughness:0.32 });
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8, 0, Math.PI*2, 0, Math.PI*0.55), steel);
+    h.position.y = 1.8; g.add(h);
+    bx(g, 0.026, 0.13, 0.02, steel, 0, 1.76, 0.165, false);   // nasal
+  } else if(hat === 'fancy'){
+    cy(g, 0.18, 0.19, 0.15, 10, mat(hatColor, { roughness:0.8 }), 0, 1.95, 0);
+    cy(g, 0.28, 0.28, 0.032, 10, mat(hatColor, { roughness:0.8 }), 0, 1.875, 0);
+    const feather = cn(g, 0.028, 0.22, 5, mat(0xeae2c4), 0.16, 2.0, 0);
+    feather.rotation.z = -0.5;
+  }
+  if(accessory === 'staff'){
+    cy(g, 0.028, 0.034, 1.62, 6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.8 }), 0.42, 0.86, 0.1);
+    sp(g, 0.085, mat(BLEU_CLAIR, { emissive:BLEU_CLAIR, emissiveIntensity:1.7 }), 0.42, 1.72, 0.1, 8);
+  } else if(accessory === 'spear'){
+    cy(g, 0.026, 0.026, 1.86, 6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.8 }), 0.42, 0.98, 0.1);
+    cn(g, 0.055, 0.24, 6, new THREE.MeshStandardMaterial({ color:0xc9cede, metalness:0.85, roughness:0.3 }), 0.42, 2.02, 0.1);
+  } else if(accessory === 'lute'){
+    const body2 = sp(g, 0.165, mat(0xb4854a, { roughness:0.6 }), 0.34, 1.02, 0.23, 8);
+    body2.scale.set(1, 1.25, 0.4);
+    const neck = bx(g, 0.042, 0.4, 0.036, mat(0x7a5736), 0.34, 1.34, 0.23);
+    neck.rotation.z = -0.25;
+    bx(g, 0.07, 0.05, 0.04, mat(0x5d4730), 0.34, 1.54, 0.23, false); // chevillier
+  } else if(accessory === 'scroll'){
+    const sc = cy(g, 0.048, 0.048, 0.4, 8, mat(0xf6efdc, { roughness:0.85 }), 0.4, 0.96, 0.15);
+    sc.rotation.z = Math.PI/2.4;
+    cy(g, 0.01, 0.01, 0.42, 4, mat(0xc44d4d), 0.4, 0.96, 0.15).rotation.z = Math.PI/2.4;
+  } else if(accessory === 'backpack'){
+    bx(g, 0.32, 0.44, 0.2, mat(0x7d6243, { roughness:0.92 }), 0, 1.24, -0.28);
+    bx(g, 0.28, 0.06, 0.22, mat(0x5d4730), 0, 1.48, -0.28, false);  // rabat
+    cy(g, 0.045, 0.045, 0.26, 6, mat(0x8a8f99, { metalness:0.4 }), 0.12, 1.5, -0.28); // étui à cartes
+  } else if(accessory === 'hammer'){
+    const st = cy(g, 0.026, 0.026, 0.46, 6, mat(0x8a6b48), 0.42, 0.96, 0.13);
+    st.rotation.z = 0.4;
+    bx(g, 0.16, 0.1, 0.1, new THREE.MeshStandardMaterial({ color:0x7e8494, metalness:0.85, roughness:0.38 }), 0.5, 1.16, 0.13);
+  }
+  return g;
+}
+
+const NPC_DEFS = [
+  { name:'Guillaume — PO & CEO de Perceval', short:'Guillaume', x:3, z:9, look:{ robe:0x3a4aa8, accessory:'scroll', hair:'cap', hairColor:0x9a5a30, skin:0xf2c79a },
+    lines:[
+      "Ah, Perceval ! Trois nouveaux tickets Modul'r ce matin. Leur API est encore tombée cette nuit. C'est urgent. Urgent-normal.",
+      "Je suis PO et CEO : je priorise le backlog ET je signe les chèques. Pratique — je ne suis jamais d'accord avec moi-même.",
+      "Le Contrat Sacré ne se signera pas tout seul. Surtout si Modul'r plante à l'étape signature. Comme la dernière fois.",
+      "La Team 10 Positif a passé la nuit sur le back-office : Modul'r a changé son API sans prévenir. Sans documenter. Sans s'excuser.",
+      "Mon rêve ? Un BO qui tienne une semaine. Mon quotidien ? Modul'r. Tu comprends pourquoi je t'envoie tuer leur dragon.",
+      "Tu avances bien ! Du coup je t'ai rajouté un petit ticket. P1. Enfin… P1-normal. P1, quoi.",
+    ]},
+  { name:"Merlin l'Enchanteur", short:'Merlin', x:-4, z:11, look:{ robe:0x4C53BD, hat:'pointy', hatColor:0x4C53BD, accessory:'staff', beard:'long' },
+    lines:[
+      "Bienvenue, jeune Perceval ! Clic droit pour regarder le monde, ZQSD pour le parcourir. La magie, c'est surtout de l'ergonomie.",
+      "Les Oubliettes, au sud-ouest… C'est là que Modul'r déverse ses logs d'erreur. Personne ne les lit jamais. Alors elles se sont organisées.",
+      "Un bon chevalier lit les petites lignes. Un bon dev lit la doc Modul'r. Le chevalier a plus de chance : les petites lignes, elles, existent.",
+      "La Team 10 Positif, c'est notre magie : dix bugs corrigés, dix sourires. Le moral est un sort de protection comme un autre.",
+      "J'ai connu les contrats signés au sang. Puis le PDF. Puis Modul'r. Parfois, le progrès recule.",
+      "Le Dragon Modul'r garde le Contrat Sacré. Son souffle ? Des timeouts. Sa fureur ? Une mise à jour non documentée un vendredi.",
+    ]},
+  { name:'Agathe la Chasseuse de Maléfices', short:'Agathe', x:9, z:19, look:{ robe:0x4a8a5c, hair:null, hairColor:0xcfa75e, skin:0xf6d2ac },
+    lines:[
+      "Je flaire un maléfice… ou un bug Modul'r. Même odeur : ça ne marche pas, et personne ne sait pourquoi.",
+      "Tiens, une potion de soin, offerte ! J'ai pas fini de tester la caisse de toute façon.",
+      "Je suis indépendante : je chasse les bugs là où ils se cachent. Devine qui m'appelle le plus ? Indice : ça commence par « Modul ».",
+      "Les Spectres du Sinistre ? Des dossiers que Modul'r a perdus pendant une synchro. Ils errent entre deux bases de données.",
+      "J'ai audité le pont. Le piège, c'est qu'il est relié au back-office : quand Modul'r tombe, le péage triple.",
+      "Si tu vois un truc bizarre, dis-le-moi. Si c'est dans Modul'r, prends plutôt un ticket… et la file d'attente.",
+    ], heal:true },
+  { name:'Jojo le Forgeron Compulsif', short:'Jojo', x:-5.5, z:12, look:{ robe:0x8a5a3a, accessory:'hammer', beard:'short', beardColor:0x3a2e24, hair:'cap', hairColor:0x2e2620, glasses:'round', skin:0xeec096 },
+    lines:[
+      "La forge est fermée. Mais je forge quand même. Comme la Team 10 Positif : le sprint est fini, on corrige encore.",
+      "Ton épée ? 2% plus brillante, c'est faisable. Le back-office 2% plus stable ? Faudrait déjà que Modul'r décroche.",
+      "Je me poste près de la fontaine maintenant. On me trouvait trop caché à la forge. Guillaume en avait fait un ticket.",
+      "Modul'r m'a livré une enclume en kit. Il manquait les vis. Et la notice. Et l'enclume.",
+      "Mille coups de marteau pour une bonne lame. Mille F5 pour une page Modul'r. Mes bras tiennent mieux que leurs serveurs.",
+      "J'ai forgé un bouton « Réessayer » en acier trempé. C'est notre arme la plus utilisée contre Modul'r.",
+    ]},
+  { name:'Roro le Capitaine de la Garde', short:'Roro', x:0, z:-2, look:{ robe:0x5a6378, hat:'helmet', accessory:'spear' },
+    lines:[
+      "La garde tient la position ! Comme la prod un soir de mise à jour Modul'r : on ne touche à RIEN et on respire doucement.",
+      "Procédure officielle : frappe d'abord, archive ensuite. Sauf dans Modul'r — l'archivage plante une fois sur deux.",
+      "Le village dort tranquille tant que je veille. Et je veille TOUT le temps. Sauf à la sieste. Elle est stratégique, la sieste.",
+      "Les sbires Modul'r passent par le pont du sud. Comme leurs bugs : toujours par l'endroit qu'on ne surveille pas.",
+      "Plan de défense en trois points. Le troisième, c'est toi. Le premier, c'est de débrancher Modul'r.",
+      "La Team 10 Positif garde le back-office comme moi le village : tout le temps, et personne ne dit merci.",
+    ]},
+  { name:'Mathias le Messager à Cheval', short:'Mathias', x:6, z:-38, look:{ robe:0xc9803a, hair:'cap', hairColor:0x16130f, beard:'full', beardColor:0x1d1a16, skin:0xd9a06e },
+    lines:[
+      "Désolé du retard ! Pourtant Galopin est trop rapide. C'est ça le problème, je crois.",
+      "Message urgent pour toi… resté au château. Comme les exports Modul'r : envoyés, jamais arrivés.",
+      "On dit que je suis lent. Non. C'est le monde qui est pressé.",
+      "Hier j'ai doublé un webhook Modul'r. Il était parti lundi. On est jeudi.",
+      "Galopin connaît trois vitesses : vite, très vite, et « synchro Modul'r ». La troisième, on l'évite.",
+      "Un jour j'arriverai avant la notification Modul'r. Bon… elle n'arrive jamais. Ça aide.",
+    ]},
+  { name:'Antoine le Barde Sage', short:'Antoine', x:3, z:19, look:{ robe:0x7a4ab0, accessory:'lute', hair:'cap', hairColor:0x241f1a, skin:0xe2b182 },
+    lines:[
+      "♪ Un gobelin s'avance… et il repart en pleurant ♪",
+      "Le secret de la sagesse ? Continuer à jouer. Même quand Modul'r est « en maintenance exceptionnelle ». Surtout à ce moment-là.",
+      "Ma ballade sur toi dure quatre heures. C'est court : celle sur les bugs Modul'r est une trilogie. Avec un spin-off.",
+      "♪ Le BO est tombé, tombé… mais la Team 10 Positif l'a relevé ♪ — ça marche à tous les stand-ups.",
+      "Modul'r voulait son hymne. J'ai lu leur changelog : il n'y avait rien dedans. Comme dans leurs correctifs.",
+      "♪ Et Perceval brandit sa lame… et la paperasse rendit l'âme ♪ — j'y travaille encore.",
+    ]},
+  { name:"Bobby l'Éclaireur des Montagnes", short:'Bobby', x:14, z:4, look:{ robe:0x6b7d4a, hat:'hood', hatColor:0x556339, accessory:'backpack', beard:'short', beardColor:0x6b5a3a },
+    lines:[
+      "Je reviens d'expédition. 80 kilomètres. À pied. Dans la montagne.",
+      "La prochaine fois je pars plus loin. C'est toujours plus court que le bout d'un log d'erreur Modul'r.",
+      "Un conseil d'éclaireur : le danger, c'est toujours au sud-ouest. Toujours. Vérifie ta carte.",
+      "J'ai exploré la doc Modul'r. 80 km de pages, aucune à jour. Même la montagne est mieux balisée.",
+      "Mes bottes ont fait trois fois le tour du royaume. Le ticket Modul'r n°1, lui, n'a toujours pas bougé de la colonne « To Do ».",
+      "Note tout, trace tout. Modul'r ne trace rien : c'est comme ça qu'on perd des dossiers en montagne. Enfin, en base.",
+    ]},
+  { name:'Ray le Barde Conteur', short:'Ray', x:-4, z:-66, look:{ robe:0x2a6a9a, accessory:'lute', hair:'bald', beard:'full', beardColor:0x9a948c, glasses:'sun', skin:0xe0aa7c },
+    lines:[
+      "Ma boule de cristal répond à toutes mes questions. Parfois même avant que je les pose.",
+      "Je suis indépendant : je conte pour Perceval, jamais pour Modul'r. Leur histoire n'a ni début, ni fin, ni sens. Surtout pas de fin.",
+      "Chaque soir je conte tes exploits. J'embellis à peine. Disons 20%. Bon… 40.",
+      "J'ai demandé à ma boule pourquoi Modul'r bug autant. Elle a affiché un sablier. Elle aussi.",
+      "Elle prédit tout, sauf le prochain plantage Modul'r. Trop aléatoire. Même pour la magie.",
+      "Hier je lui ai demandé la météo. Elle m'a répondu en alexandrins. On ne s'ennuie jamais, tous les deux.",
+    ]},
+];
+
+// corps KayKit par personnage (la ressemblance photo vient des greffes de visage)
+const NPC_BODY = {
+  Guillaume:'rogue', Merlin:'mage', Agathe:'female', Jojo:'barbarian', Roro:'knight',
+  Mathias:'rogueHooded', Antoine:'rogue', Bobby:'rogueHooded', Ray:'barbarian',
+};
+// signes distinctifs flottants au niveau de la tête : cheveux, barbe, lunettes (d'après photos)
+function buildFaceFeatures(look){
+  const f = new THREE.Group();
+  const { hairColor=0x6e4f33, beard=null, beardColor=0xe8e4dc, hair=null, glasses=null } = look;
+  // hair 'cap' : on garde la chevelure d'origine du modèle (têtes naturelles)
+  if(hair === 'long'){
+    const hairMat = mat(hairColor, { roughness:0.85 });
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.25, 14, 9, 0, Math.PI*2, 0, Math.PI*0.64), hairMat);
+    h.position.y = 0.02; h.scale.set(1, 0.92, 1.04); f.add(h);
+    for(const sx of [-0.18, 0.18]){
+      const strand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 7), hairMat);
+      strand.position.set(sx, -0.16, -0.02); strand.scale.set(0.8, 2.3, 1); f.add(strand);
+    }
+    const back = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 7), hairMat);
+    back.position.set(0, -0.14, -0.12); back.scale.set(1.1, 2.0, 0.55); f.add(back);
+  }
+  if(beard === 'long'){
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 8), mat(beardColor, { roughness:0.9 }));
+    b.position.set(0, -0.14, 0.09); b.rotation.x = 0.3; f.add(b);
+  } else if(beard === 'short'){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), mat(beardColor, { roughness:0.9 }));
+    b.position.set(0, -0.07, 0.11); f.add(b);
+  } else if(beard === 'full'){
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.125, 9, 8), mat(beardColor, { roughness:0.95 }));
+    b.position.set(0, -0.075, 0.04); b.scale.set(1.08, 0.8, 0.95); f.add(b);
+  }
+  if(glasses === 'round'){
+    const frameMat = new THREE.MeshStandardMaterial({ color:0x3a3530, metalness:0.6, roughness:0.4 });
+    for(const sx of [-0.055, 0.055]){
+      const lens = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.009, 6, 14), frameMat);
+      lens.position.set(sx, 0.02, 0.14); f.add(lens);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.008, 0.008), frameMat);
+    bridge.position.set(0, 0.02, 0.145); f.add(bridge);
+  } else if(glasses === 'sun'){
+    const dark = new THREE.MeshStandardMaterial({ color:0x14181f, metalness:0.5, roughness:0.15 });
+    for(const sx of [-0.055, 0.055]){
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.012, 12), dark);
+      lens.rotation.x = Math.PI/2;
+      lens.position.set(sx, 0.02, 0.135); f.add(lens);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.01, 0.01),
+      new THREE.MeshStandardMaterial({ color:0x4a4540, metalness:0.8, roughness:0.3 }));
+    bridge.position.set(0, 0.035, 0.14); f.add(bridge);
+  }
+  return f;
+}
+// équipement conservé par PNJ (tout le reste des armes du pack est masqué)
+const NPC_GEAR = {
+  Guillaume:[], Merlin:['2H_Staff'], Agathe:['Knife'], Jojo:['1H_Axe'],
+  Roro:['1H_Sword','Badge_Shield'], Mathias:[], Antoine:[], Bobby:[], Ray:[],
+};
+const GEAR_RX = /sword|axe|knife|crossbow|shield|throwable|mug|spellbook|wand|staff|arrow/i;
+function buildNpcGLB(def){
+  const key = NPC_BODY[def.short];
+  if(!key || !ASSETS[key]) return null;
+  const m = spawnModel(key, key === 'female' ? 1.76 : 1.82);
+  if(!m) return null;
+  const keepGear = new Set(NPC_GEAR[def.short] || []);
+  m.obj.traverse(o=>{
+    if(!(o.isMesh || o.isSkinnedMesh)) return;
+    if(GEAR_RX.test(o.name) && !keepGear.has(o.name)) o.visible = false;
+    if(def.short === 'Ray' && o.name === 'Barbarian_Hat') o.visible = false;   // crâne nu
+  });
+  if(key === 'female'){
+    // Agathe est blonde : on recolore le matériau « Hair » du modèle Quaternius
+    m.obj.traverse(o=>{
+      if(!(o.isMesh || o.isSkinnedMesh) || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((mt, i)=>{
+        if(!/hair/i.test(mt.name || '')) return;
+        const blond = mt.clone();
+        blond.color.setHex(0xd8a84c).convertSRGBToLinear();
+        if(Array.isArray(o.material)) o.material[i] = blond; else o.material = blond;
+      });
+    });
+  }
+  let headBone = null;
+  m.obj.traverse(o=>{ if(!headBone && (o.name||'').toLowerCase().includes('head')) headBone = o; });
+  if(headBone){
+    const f = buildFaceFeatures(def.look);
+    f.scale.setScalar(2.2);          // les têtes KayKit sont plus grosses que mes proportions
+    f.position.set(0, 0.25, 0.14);   // avancé pour épouser le visage
+    headBone.add(f);
+  }
+  makeEnemyAnim(m);   // joue l'Idle en boucle (mixer enregistré)
+  return m.wrap;
+}
+let npcsUpgraded = false;
+function upgradeNpcs(){
+  if(npcsUpgraded) return;
+  npcsUpgraded = true;
+  for(const n of npcs){
+    const wrap = buildNpcGLB(n.def);
+    if(!wrap) continue;
+    wrap.position.copy(n.group.position);
+    wrap.rotation.y = n.group.rotation.y;
+    const label = n.group.children.find(c=>c.isSprite);
+    if(label) wrap.add(label);
+    wrap.add(n.marker);
+    scene.remove(n.group);
+    scene.add(wrap);
+    n.group = wrap;
+  }
+}
+const npcs = [];
+for(const def of NPC_DEFS){
+  const g = buildNpcGLB(def) || buildVillager(def.look);
+  g.position.set(def.x, 0, def.z);
+  g.rotation.y = rand(0, Math.PI*2);
+  scene.add(g);
+  const label = makeTextSprite(def.short, '#ffffff', 2.6);
+  label.position.y = 2.35;
+  g.add(label);
+  // marqueur « ! » de quête
+  const marker = new THREE.Group();
+  const exMat = new THREE.MeshBasicMaterial({ color:0xffd44d });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.42, 0.13), exMat);
+  bar.position.y = 0.32; marker.add(bar);
+  const dot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), exMat);
+  marker.add(dot);
+  marker.position.y = 2.75;
+  marker.visible = false;
+  g.add(marker);
+  addCollider(def.x, def.z, 0.55);
+  npcs.push({ def, group:g, marker, lineIdx:0, bobPhase: rand(0,6) });
+}
+
+// le cheval de Mathias
+let horseProc = null;
+{
+  const h = new THREE.Group();
+  horseProc = h;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.85, 0.7), mat(0x8a6446));
+  body.position.y = 1.0; body.castShadow = true;
+  h.add(body);
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.4), mat(0x8a6446));
+  neck.position.set(0.85, 1.55, 0); neck.rotation.z = -0.5;
+  h.add(neck);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.3, 0.32), mat(0x77543a));
+  head.position.set(1.25, 1.85, 0);
+  h.add(head);
+  for(const [lx, lz] of [[-0.6,-0.22],[-0.6,0.22],[0.6,-0.22],[0.6,0.22]]){
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.0, 0.16), mat(0x77543a));
+    leg.position.set(lx, 0.5, lz);
+    h.add(leg);
+  }
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 6), mat(0x4a3526));
+  tail.position.set(-0.95, 1.1, 0); tail.rotation.z = 0.9;
+  h.add(tail);
+  h.position.set(9, 0, -39); h.rotation.y = -0.6;
+  scene.add(h);
+  addCollider(9, -39, 1.3);
+}
+
+// la boule de cristal de Ray
+let crystalBall;
+{
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 1.0, 8), mat(0x6e4f33));
+  stand.position.set(-5.4, 0.5, -66);
+  scene.add(stand);
+  crystalBall = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 12),
+    new THREE.MeshLambertMaterial({ color:0xbfe8ff, transparent:true, opacity:0.85, emissive:BLEU_CLAIR, emissiveIntensity:0.6 }));
+  crystalBall.position.set(-5.4, 1.25, -66);
+  scene.add(crystalBall);
+}
+
+/* ============================================================
+   ENNEMIS — gobelins, spectres, golem, dragon
+   ============================================================ */
+const enemies = [];
+
+function registerEnemy(e){
+  const bar = makeHPBar(e.type==='dragon' ? 3.4 : (e.type==='golem' ? 2.4 : 1.6));
+  bar.sprite.position.y = e.barHeight;
+  e.group.add(bar.sprite);
+  e.bar = bar;
+  // les lieutenants Modul'r affichent leur nom
+  if(e.type === 'golem' || e.type === 'dragon'){
+    const tag = makeTextSprite(e.label, '#ffb8b8', e.type==='dragon' ? 6.5 : 5);
+    tag.position.y = e.barHeight + (e.type==='dragon' ? 0.9 : 0.55);
+    e.group.add(tag);
+  }
+  e.alive = true;
+  e.attackCd = rand(0.5, 1.5);
+  e.wanderT = 0;
+  e.wanderTarget = null;
+  e.kb = V3();
+  e.flashT = 0;
+  e.deathT = 0;
+  scene.add(e.group);
+  enemies.push(e);
+  return e;
+}
+
+function buildGobelin(x, z){
+  // version sculptée : sbire squelette Modul'r (KayKit)
+  const m = spawnModel('skelMinion', 1.4);
+  if(m){
+    m.wrap.position.set(x, 0, z);
+    return registerEnemy({
+      type:'gobelin', label:'Gobelin Modul\'r de la Paperasse', group:m.wrap, bodyMeshes:collectMeshes(m.obj),
+      hp:10, maxhp:10, speed:4.4, dmg:5, range:1.9, aggro:13, barHeight:1.95,
+      home:V3(x,0,z), throwCd: rand(1,3), xpGain:12, glb:makeEnemyAnim(m),
+    });
+  }
+  const g = new THREE.Group();
+  const green = fmat(0x6fae5a);
+  const greenLight = fmat(0x83c46c);
+  const body = sp(g, 0.34, green, 0, 0.55, 0, 10);
+  body.scale.y = 1.15;
+  // pagne de cuir + sacoche pleine de parchemins
+  cy(g, 0.36, 0.42, 0.22, 8, mat(0x6e5236), 0, 0.34, 0);
+  const satchel = bx(g, 0.26, 0.3, 0.16, mat(0x8a6a44), 0.3, 0.55, -0.18);
+  satchel.rotation.z = -0.2;
+  for(let i=0;i<3;i++) cy(g, 0.04, 0.04, 0.22, 5, mat(0xf6efdc), 0.24+i*0.07, 0.76, -0.18);
+  // petite bedaine claire
+  sp(g, 0.22, greenLight, 0, 0.5, 0.16, 8).scale.y = 1.1;
+  // tête, grandes oreilles, yeux jaunes fâchés, nez crochu, dents
+  const head = sp(g, 0.26, greenLight, 0, 1.05, 0, 10);
+  for(const sx of [-0.24, 0.24]){
+    const ear = cn(g, 0.1, 0.45, 5, greenLight, sx*1.4, 1.22, -0.04);
+    ear.rotation.z = sx>0 ? -1.35 : 1.35;
+    ear.rotation.x = -0.2;
+  }
+  for(const sx of [-0.1, 0.1]){
+    sp(g, 0.055, mat(0xffd44d, { emissive:0xcc8a1d, emissiveIntensity:1.2 }), sx, 1.1, 0.21, 6);
+    sp(g, 0.025, mat(0x1d2433), sx, 1.1, 0.255, 5);
+    const brow = bx(g, 0.11, 0.03, 0.02, mat(0x3a5a2c), sx, 1.17, 0.23, false);
+    brow.rotation.z = sx>0 ? 0.45 : -0.45;   // sourcils fâchés
+  }
+  const nose = cn(g, 0.05, 0.16, 5, greenLight, 0, 1.03, 0.28);
+  nose.rotation.x = Math.PI/2.4;
+  for(const sx of [-0.06, 0.06]) cn(g, 0.025, 0.07, 4, mat(0xfffbe8), sx, 0.94, 0.22).rotation.x = Math.PI;
+  // plume de scribe derrière l'oreille
+  const quill = cn(g, 0.035, 0.3, 4, mat(0xf6efdc), 0.3, 1.3, -0.05);
+  quill.rotation.z = -0.7;
+  // jambes courtes
+  for(const sx of [-0.13, 0.13]) bx(g, 0.12, 0.22, 0.14, green, sx, 0.11, 0);
+  // parchemin brandi
+  const scroll = cy(g, 0.06, 0.06, 0.42, 6, mat(0xf6efdc), 0.38, 0.62, 0.12);
+  scroll.rotation.z = 1.2;
+  cy(g, 0.012, 0.012, 0.46, 4, mat(0xc44d4d), 0.38, 0.62, 0.12).rotation.z = 1.2; // ruban
+  g.position.set(x, 0, z);
+  return registerEnemy({
+    type:'gobelin', label:'Gobelin Modul\'r de la Paperasse', group:g, bodyMeshes:[body, head],
+    hp:10, maxhp:10, speed:4.4, dmg:5, range:1.9, aggro:13, barHeight:1.75,
+    home:V3(x,0,z), throwCd: rand(1,3), xpGain:12,
+  });
+}
+
+function buildSpectre(x, z){
+  // version sculptée : mage squelette spectral Modul'r (KayKit)
+  const m = spawnModel('skelMage', 2.0);
+  if(m){
+    const meshes = collectMeshes(m.obj);
+    for(const mesh of meshes){
+      mesh.material.transparent = true;
+      mesh.material.opacity = 0.72;
+      if(mesh.material.emissive) mesh.material.emissive.setHex(0x39406e);
+      mesh.castShadow = false;
+    }
+    m.wrap.position.set(x, 0, z);
+    return registerEnemy({
+      type:'spectre', label:'Spectre Modul\'r du Sinistre', group:m.wrap, bodyMeshes:meshes,
+      hp:30, maxhp:30, speed:3.1, dmg:9, range:2.1, aggro:15, barHeight:2.6,
+      home:V3(x,0,z), floating:true, floatPhase:rand(0,6), xpGain:25, glb:makeEnemyAnim(m),
+    });
+  }
+  const g = new THREE.Group();
+  const ghostMat = new THREE.MeshLambertMaterial({ color:0xb9c2e8, transparent:true, opacity:0.5, emissive:0x39406e, emissiveIntensity:0.5 });
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.6, 10), ghostMat);
+  body.position.y = 1.1; body.rotation.x = Math.PI;
+  body.castShadow = false;
+  g.add(body);
+  // frange déchiquetée en bas du suaire
+  for(let i=0;i<6;i++){
+    const a = i/6*Math.PI*2;
+    const frill = cn(g, 0.14, rand(0.3,0.55), 5, ghostMat, Math.sin(a)*0.38, 0.25, Math.cos(a)*0.38);
+    frill.rotation.x = Math.PI;
+    frill.castShadow = false;
+  }
+  const head = sp(g, 0.4, ghostMat, 0, 1.95, 0, 12);
+  head.castShadow = false;
+  // cœur spectral lumineux (visible par transparence)
+  sp(g, 0.16, mat(0x8a93ff, { emissive:0x4C53BD, emissiveIntensity:2.4 }), 0, 1.25, 0, 8).castShadow = false;
+  // capuche esquissée
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.44, 10, 8, 0, Math.PI*2, 0, Math.PI*0.6), ghostMat);
+  hood.position.y = 2.02; hood.castShadow = false;
+  g.add(hood);
+  // yeux luisants + bouche
+  for(const sx of [-0.15, 0.15]){
+    sp(g, 0.07, mat(0x9aa2ff, { emissive:0x6a72e8, emissiveIntensity:2.6 }), sx, 2.0, 0.33, 6).castShadow = false;
+  }
+  const mouth = sp(g, 0.06, mat(0x14182e), 0, 1.82, 0.36, 6);
+  mouth.scale.y = 1.6; mouth.castShadow = false;
+  // chaînes de dossiers égarés
+  for(const sx of [-0.3, 0.3]){
+    const chain = cy(g, 0.02, 0.02, 0.5, 4, mat(0x6a7088), sx, 1.5, 0.2);
+    chain.rotation.x = 0.5; chain.castShadow = false;
+    bx(g, 0.14, 0.1, 0.03, mat(0xd8d2c0), sx, 1.22, 0.36, false); // fiche cartonnée
+  }
+  g.position.set(x, 0, z);
+  return registerEnemy({
+    type:'spectre', label:'Spectre Modul\'r du Sinistre', group:g, bodyMeshes:[body, head],
+    hp:30, maxhp:30, speed:3.1, dmg:9, range:2.1, aggro:15, barHeight:2.8,
+    home:V3(x,0,z), floating:true, floatPhase:rand(0,6), xpGain:25,
+  });
+}
+
+function buildGolem(x, z){
+  // version sculptée : guerrier squelette colossal Modul'r (KayKit)
+  const m = spawnModel('skelWarrior', 3.0);
+  if(m){
+    m.wrap.position.set(x, 0, z);
+    return registerEnemy({
+      type:'golem', label:'Golem Modul\'r de la Franchise Cachée', group:m.wrap, bodyMeshes:collectMeshes(m.obj),
+      hp:80, maxhp:80, speed:1.7, dmg:22, range:2.8, aggro:11, barHeight:3.5,
+      home:V3(x,0,z), xpGain:90, glb:makeEnemyAnim(m),
+    });
+  }
+  const g = new THREE.Group();
+  const stone = fmat(0x8b8676);
+  const stoneDark = fmat(0x7b7666);
+  const lava = mat(0xffc23f, { emissive:0xff8a1d, emissiveIntensity:2.2 });
+  // torse massif en roc déformé
+  const body = addMesh(g, blobGeo(1.05, 1, 0.18, 2.1), stone, 0, 1.7, 0);
+  body.scale.set(1.0, 0.95, 0.65);
+  // fissures incandescentes sur le torse
+  for(const [fx, fy, rz] of [[-0.3,1.7,0.5],[0.25,1.95,-0.4],[0.05,1.45,0.15]]){
+    bx(g, 0.06, 0.55, 0.05, lava, fx, fy, 0.62, false).rotation.z = rz;
+  }
+  // épaules : blocs de roche bruts
+  for(const sx of [-1.0, 1.0]){
+    addMesh(g, blobGeo(0.55, 1, 0.25, sx*3), stoneDark, sx, 2.35, 0);
+  }
+  // mousse sur le dos et l'épaule
+  for(const [mx2, my, mz] of [[0.2, 2.2, -0.55], [-0.8, 2.6, 0.1], [0.4, 1.3, -0.6]]){
+    const moss = addMesh(g, blobGeo(0.3, 0, 0.3, mx2*7), fmat(0x6d9a58), mx2, my, mz);
+    moss.scale.y = 0.45;
+  }
+  // tête enchâssée
+  const head = bx(g, 0.8, 0.7, 0.8, fmat(0x9b9686), 0, 2.85, 0.1);
+  head.rotation.x = 0.08;
+  const eye = bx(g, 0.5, 0.13, 0.1, lava, 0, 2.92, 0.52, false);
+  bx(g, 0.6, 0.16, 0.5, stoneDark, 0, 3.12, 0.3);   // arcade massive
+  // bras énormes + poings
+  for(const sx of [-1.15, 1.15]){
+    addMesh(g, blobGeo(0.42, 1, 0.2, sx*5), stone, sx, 1.6, 0).scale.set(0.75, 1.9, 0.8);
+    addMesh(g, blobGeo(0.42, 1, 0.22, sx*9), stoneDark, sx, 0.6, 0.1);
+    bx(g, 0.1, 0.3, 0.06, lava, sx, 1.7, 0.32, false).rotation.z = sx*0.4;
+  }
+  // jambes trapues
+  for(const sx of [-0.5, 0.5]){
+    addMesh(g, blobGeo(0.4, 1, 0.18, sx*11), stoneDark, sx, 0.45, 0).scale.set(0.8, 1.2, 0.9);
+  }
+  // l'étiquette « € » cachée dans le dos (la franchise cachée…)
+  const tagC = canvasTex(64, (ctx,s)=>{
+    ctx.fillStyle = '#f6efdc'; ctx.fillRect(0,0,s,s);
+    ctx.fillStyle = '#283581'; ctx.font = '800 42px Georgia';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('€', s/2, s/2+2);
+  });
+  const tag = addMesh(g, new THREE.PlaneGeometry(0.45, 0.55), new THREE.MeshLambertMaterial({ map:tagC }), 0, 1.85, -0.75, false);
+  tag.rotation.y = Math.PI;
+  tag.rotation.z = 0.15;
+  cy(g, 0.015, 0.015, 0.3, 4, mat(0xd8d2c0), 0, 2.2, -0.7).rotation.x = 0.4; // ficelle
+  g.position.set(x, 0, z);
+  return registerEnemy({
+    type:'golem', label:'Golem Modul\'r de la Franchise Cachée', group:g, bodyMeshes:[body, head],
+    hp:80, maxhp:80, speed:1.7, dmg:22, range:2.8, aggro:11, barHeight:3.9,
+    home:V3(x,0,z), xpGain:90,
+  });
+}
+
+function buildDragon(x, z){
+  // version sculptée : dragon Quaternius (s'il a bien ses animations)
+  if(ASSETS.dragon && ASSETS.dragon.animations.length){
+    const m = spawnModel('dragon', 6.2);
+    if(m){
+      m.wrap.position.set(x, 0, z);
+      return registerEnemy({
+        type:'dragon', label:'Dragon Modul\'r des Oubliettes', group:m.wrap, bodyMeshes:collectMeshes(m.obj),
+        hp:250, maxhp:250, speed:2.6, dmg:18, range:5.2, aggro:22, barHeight:7.0,
+        home:V3(x,0,z), breathCd:4, breathing:0, enraged:false, xpGain:220, glb:makeEnemyAnim(m),
+      });
+    }
+  }
+  const g = new THREE.Group();
+  // écailles procédurales
+  const scaleTex = canvasTex(256, (ctx,s)=>{
+    ctx.fillStyle = '#7e828f'; ctx.fillRect(0,0,s,s);
+    for(let r=0;r<10;r++){
+      const off = (r%2)*s/12;
+      for(let i=-1;i<7;i++){
+        const px = i*s/6 + off, py = r*s/10;
+        ctx.fillStyle = `rgba(${rand(105,135)|0},${rand(110,140)|0},${rand(125,155)|0},1)`;
+        ctx.beginPath(); ctx.arc(px+s/12, py+s/10, s/11, Math.PI*0.05, Math.PI*0.95); ctx.fill();
+        ctx.strokeStyle = 'rgba(40,45,60,0.45)'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+  }, 3, 3);
+  const scaled = new THREE.MeshStandardMaterial({ map:scaleTex, normalMap:NTEX.scales, roughness:0.55, metalness:0.25 });
+  const gray = fmat(0x7e828f);
+  const darkGray = fmat(0x666a78);
+  const belly = mat(0xb8b4a8);
+  const boneMat = mat(0xe8e4d8);
+
+  // corps écaillé + ventre clair strié
+  const body = addMesh(g, new THREE.SphereGeometry(1.5, 16, 12), scaled, 0, 2.0, 0);
+  body.scale.set(1.25, 1, 1.9);
+  for(let i=0;i<5;i++){
+    const plate = cy(g, 0.95-i*0.06, 1.0-i*0.06, 0.3, 12, belly, 0, 1.05, 1.4-i*0.7);
+    plate.rotation.x = Math.PI/2;
+    plate.scale.y = 0.5;
+  }
+  // crête dorsale : rangée d'ailerons
+  for(let i=0;i<7;i++){
+    const fin = cn(g, 0.18, 0.55-Math.abs(i-2)*0.06, 4, darkGray, 0, 3.35-i*0.12, 1.4-i*0.8);
+    fin.rotation.x = -0.25;
+  }
+  // cou en trois segments écaillés
+  const neck1 = addMesh(g, new THREE.SphereGeometry(0.85, 12, 9), scaled, 0, 2.8, 2.3);
+  addMesh(g, new THREE.SphereGeometry(0.7, 12, 9), scaled, 0, 3.5, 3.0);
+  addMesh(g, new THREE.SphereGeometry(0.6, 12, 9), scaled, 0, 4.1, 3.6);
+  // poitrail incandescent (s'embrase avant le souffle)
+  const chest = sp(g, 0.5, mat(0xff9a3f, { emissive:0xff6a1d, emissiveIntensity:0.4 }), 0, 2.2, 2.7, 10);
+  chest.scale.set(1, 1.3, 0.5);
+
+  // tête : crâne, mâchoire, dents, cornes, narines
+  const headG = new THREE.Group();
+  const skull = bx(headG, 1.1, 0.8, 1.4, darkGray, 0, 0.05, 0);
+  const snout = bx(headG, 0.72, 0.45, 1.0, gray, 0, -0.05, 1.05);
+  const jaw = bx(headG, 0.66, 0.22, 0.95, darkGray, 0, -0.42, 0.95);
+  jaw.rotation.x = 0.12;
+  for(let i=0;i<4;i++){
+    for(const sx of [-0.26, 0.26]){
+      cn(headG, 0.045, 0.16, 4, boneMat, sx, -0.3, 0.45+i*0.3).rotation.x = Math.PI;
+    }
+  }
+  for(const sx of [-0.34, 0.34]){
+    const horn = cn(headG, 0.14, 0.85, 6, boneMat, sx, 0.5, -0.45);
+    horn.rotation.x = -0.6;
+    const horn2 = cn(headG, 0.08, 0.45, 5, boneMat, sx*1.6, 0.25, -0.3);
+    horn2.rotation.x = -0.4; horn2.rotation.z = sx;
+    // œil flamboyant + paupière
+    sp(headG, 0.11, mat(0xffb83f, { emissive:0xff8a1d, emissiveIntensity:2.6 }), sx, 0.22, 0.62, 8);
+    bx(headG, 0.2, 0.06, 0.1, darkGray, sx, 0.34, 0.62, false).rotation.z = sx>0?-0.3:0.3;
+    // narine
+    sp(headG, 0.05, mat(0x14182e), sx*0.55, 0.08, 1.52, 5);
+  }
+  headG.position.set(0, 4.55, 4.1);
+  g.add(headG);
+
+  // ailes : doigts d'os + membrane
+  const wings = [];
+  for(const sx of [-1, 1]){
+    const wing = new THREE.Group();
+    const membGeo = new THREE.PlaneGeometry(3.6, 2.0, 4, 2);
+    const mp = membGeo.attributes.position;
+    for(let i=0;i<mp.count;i++){               // bord inférieur festonné
+      if(mp.getY(i) < -0.9) mp.setY(i, mp.getY(i) + Math.sin(mp.getX(i)*2.6)*0.25);
+    }
+    const membrane = new THREE.Mesh(membGeo, new THREE.MeshLambertMaterial({
+      color:0x3e4252, side:THREE.DoubleSide, transparent:true, opacity:0.88 }));
+    membrane.position.x = sx*1.9;
+    wing.add(membrane);
+    const armBone = cy(wing, 0.09, 0.07, 3.6, 6, darkGray, sx*1.9, 0.95, 0.01);
+    armBone.rotation.z = Math.PI/2;
+    for(let f=0; f<3; f++){
+      const finger = cy(wing, 0.05, 0.03, 1.9, 5, darkGray, sx*(1.1+f*0.85), 0, 0.01);
+      finger.rotation.z = sx*(0.5 + f*0.45);
+    }
+    cn(wing, 0.07, 0.25, 5, boneMat, sx*3.75, 0.95, 0);  // griffe d'aile
+    wing.position.set(sx*0.95, 3.3, 1.1);
+    g.add(wing);
+    wings.push(wing);
+  }
+
+  // pattes griffues
+  for(const [px, pz] of [[-1.0, 1.3], [1.0, 1.3], [-1.1, -1.2], [1.1, -1.2]]){
+    addMesh(g, blobGeo(0.5, 1, 0.18, px*pz), scaled, px, 0.75, pz).scale.set(0.8, 1.5, 0.8);
+    const paw = addMesh(g, blobGeo(0.4, 0, 0.2, px+pz), darkGray, px, 0.25, pz+0.15);
+    paw.scale.y = 0.6;
+    for(let cidx=0; cidx<3; cidx++){
+      cn(g, 0.06, 0.22, 4, boneMat, px-0.18+cidx*0.18, 0.18, pz+0.5).rotation.x = Math.PI/2.6;
+    }
+  }
+
+  // queue articulée (segments mémorisés pour l'ondulation)
+  const tailSegs = [];
+  for(let i=0;i<5;i++){
+    const seg = addMesh(g, new THREE.SphereGeometry(0.78 - i*0.14, 10, 8), scaled, 0, 1.8 - i*0.14, -2.6 - i*0.85);
+    tailSegs.push({ seg, baseX:0, z:-2.6 - i*0.85, i });
+    if(i>0) cn(g, 0.12, 0.3, 4, darkGray, 0, 2.35 - i*0.16, -2.6 - i*0.85).rotation.x = -0.3;
+  }
+  const tailSpike = cn(g, 0.22, 1.0, 6, boneMat, 0, 1.35, -6.6);
+  tailSpike.rotation.x = Math.PI/2 + 0.35;
+  tailSegs.push({ seg:tailSpike, baseX:0, z:-6.6, i:5 });
+
+  g.position.set(x, 0, z);
+  g.scale.setScalar(1.15);
+  return registerEnemy({
+    type:'dragon', label:'Dragon Modul\'r des Oubliettes', group:g, bodyMeshes:[body, skull],
+    hp:250, maxhp:250, speed:2.6, dmg:18, range:5.2, aggro:22, barHeight:6.4,
+    home:V3(x,0,z), wings, headG, jaw, chest, tailSegs, breathCd:4, breathing:0, enraged:false, xpGain:220,
+  });
+}
+
+// --- projectiles (parchemins des gobelins) ---
+const projectiles = [];
+function throwParchment(from, target){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 6), mat(0xf6efdc));
+  m.position.copy(from); m.position.y = 1.0;
+  const dir = target.clone().setY(1.0).sub(m.position).normalize();
+  m.rotation.z = Math.PI/2;
+  scene.add(m);
+  projectiles.push({ mesh:m, vel: dir.multiplyScalar(11), life:2.2, dmg:4 });
+}
+function updateProjectiles(dt){
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p = projectiles[i];
+    p.life -= dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    p.mesh.rotation.x += dt*9;
+    const d = p.mesh.position.distanceTo(player.group.position.clone().setY(1));
+    if(d < 0.9 && !player.dead){
+      hurtPlayer(p.dmg, p.mesh.position);
+      p.life = 0;
+    }
+    if(p.life <= 0){
+      scene.remove(p.mesh); p.mesh.geometry.dispose();
+      projectiles.splice(i,1);
+    }
+  }
+}
+
+// --- apparitions (les Oubliettes crachent des ennemis) ---
+let spawnTimer = 4, spectreTimer = 9;
+const SPAWN_GATE = { x:-40, z:47 };  // sortie nord du pont des Oubliettes
+function updateSpawner(dt){
+  if(!started || qi < 1 || gameOver) return;
+  spawnTimer -= dt; spectreTimer -= dt;
+  const gobs = enemies.filter(e=>e.alive && e.type==='gobelin').length;
+  const specs = enemies.filter(e=>e.alive && e.type==='spectre').length;
+  if(spawnTimer <= 0){
+    spawnTimer = 7;
+    if(gobs < 5) buildGobelin(SPAWN_GATE.x + rand(-4,4), SPAWN_GATE.z + rand(-3,0));
+  }
+  if(spectreTimer <= 0){
+    spectreTimer = 13;
+    if(qi >= 2 && specs < 2) buildSpectre(-71 + rand(-3,3), 74 + rand(-2,2));
+  }
+}
+
+// --- IA des ennemis ---
+function updateEnemy(e, dt, t){
+  if(!e.alive){
+    // petite animation de disparition
+    e.deathT += dt;
+    e.group.scale.setScalar(Math.max(0.01, 1 - e.deathT*2.2));
+    if(e.deathT > 0.5){
+      scene.remove(e.group);
+      e.removed = true;
+    }
+    return;
+  }
+  const pos = e.group.position;
+  const ppos = player.group.position;
+  const d = Math.hypot(pos.x-ppos.x, pos.z-ppos.z);
+
+  // flash de dégâts
+  if(e.flashT > 0){
+    e.flashT -= dt;
+    for(const m of e.bodyMeshes) m.material.emissive && m.material.emissive.setHex(0x883333);
+  } else {
+    for(const m of e.bodyMeshes) m.material.emissive && m.material.emissive.setHex(e.type==='spectre' ? 0x39406e : 0x000000);
+  }
+
+  // recul (knockback)
+  if(e.kb.lengthSq() > 0.01){
+    pos.addScaledVector(e.kb, dt);
+    e.kb.multiplyScalar(Math.max(0, 1 - dt*7));
+  }
+
+  e.attackCd -= dt;
+  let moveDir = null;
+
+  if(e.type === 'dragon'){
+    updateDragon(e, dt, t, d);
+  } else if(d < e.aggro && !player.dead){
+    // poursuite / attaque
+    if(d > e.range){
+      moveDir = V3(ppos.x-pos.x, 0, ppos.z-pos.z).normalize();
+    } else if(e.attackCd <= 0){
+      e.attackCd = e.type==='golem' ? 2.6 : 1.5;
+      hurtPlayer(e.dmg, pos);
+      if(e.glb) enemyAnim(e.glb, 'attack', true);
+      else e.group.scale.y = 0.85; // petit écrasement d'attaque
+      if(e.type==='golem') shake(0.35, 0.25);
+    }
+    // gobelin : jet de parchemin à distance moyenne
+    if(e.type==='gobelin'){
+      e.throwCd -= dt;
+      if(d > 5 && d < 12 && e.throwCd <= 0){
+        e.throwCd = 3.2;
+        throwParchment(pos, ppos);
+      }
+    }
+  } else {
+    // patrouille : errance autour du point d'attache, dérive vers le village
+    e.wanderT -= dt;
+    if(e.wanderT <= 0 || !e.wanderTarget){
+      e.wanderT = rand(2.5, 5);
+      const drift = (e.type==='gobelin' || e.type==='spectre') ? 0.35 : 0;
+      const tx = e.home.x + rand(-8,8) + (0 - e.home.x)*drift*Math.random();
+      const tz = e.home.z + rand(-8,8) + (15 - e.home.z)*drift*Math.random();
+      e.wanderTarget = V3(tx, 0, tz);
+    }
+    const wd = Math.hypot(e.wanderTarget.x-pos.x, e.wanderTarget.z-pos.z);
+    if(wd > 1){
+      moveDir = V3(e.wanderTarget.x-pos.x, 0, e.wanderTarget.z-pos.z).normalize().multiplyScalar(0.45);
+    }
+  }
+
+  if(moveDir){
+    pos.addScaledVector(moveDir, e.speed*dt);
+    const targetRot = Math.atan2(moveDir.x, moveDir.z);
+    e.group.rotation.y = lerpAngle(e.group.rotation.y, targetRot, dt*8);
+  }
+  resolveCollision(pos, 0.5, e.floating);
+
+  // animations d'allure
+  if(e.glb && e.type !== 'dragon' && e.glb.current !== e.glb.map.attack){
+    enemyAnim(e.glb, moveDir ? 'walk' : 'idle');
+  }
+  e.group.scale.y += (1 - e.group.scale.y)*dt*8;
+  if(e.floating){
+    pos.y = 0.35 + Math.sin(t*2.2 + e.floatPhase)*0.25;
+  } else if(e.type==='gobelin' && !e.glb){
+    pos.y = getGroundY(pos.x, pos.z) + Math.abs(Math.sin(t*9 + e.home.x))*0.12;
+  } else {
+    pos.y = getGroundY(pos.x, pos.z);   // les ennemis marchent aussi sur le pont
+  }
+}
+
+function updateDragon(e, dt, t, d){
+  const pos = e.group.position, ppos = player.group.position;
+  // battement d'ailes (dragon procédural uniquement)
+  if(e.wings) for(let i=0;i<e.wings.length;i++){
+    e.wings[i].rotation.z = (i===0?1:-1) * (0.5 + Math.sin(t*3.2)*0.45);
+  }
+  // queue ondulante
+  if(e.tailSegs) for(const ts of e.tailSegs){
+    ts.seg.position.x = Math.sin(t*1.8 - ts.i*0.55) * 0.16 * ts.i;
+  }
+  // tête qui respire + mâchoire
+  if(e.headG) e.headG.position.y = 4.55 + Math.sin(t*1.6)*0.12;
+  if(e.jaw) e.jaw.rotation.x = 0.12 + (e.breathing > 0 ? 0.5 : Math.max(0, Math.sin(t*0.9))*0.1);
+  // poitrail : s'embrase à l'approche du souffle
+  if(e.chest){
+    const charge = e.breathing > 0 ? 2.6 : (e.breathCd < 1.2 ? (1.2-e.breathCd)*1.6+0.4 : 0.4);
+    e.chest.material.emissiveIntensity += (charge - e.chest.material.emissiveIntensity)*dt*6;
+  }
+  // panaches des narines au repos
+  if(e.breathing <= 0 && Math.random() < dt*2.2){
+    const nostril = V3(rand(-0.35,0.35), 4.6, 5.6).applyAxisAngle(V3(0,1,0), e.group.rotation.y).add(pos);
+    spawnPuff(nostril, { color:0x8a8d96, scale:0.2, growth:0.35, rise:0.5, life:1.2, opacity:0.3, drift:0.1 });
+  }
+  // enragement à mi-vie
+  if(!e.enraged && e.hp < e.maxhp/2){
+    e.enraged = true;
+    e.speed *= 1.5;
+    SFX.growl();
+    showToast('🔥 Le Dragon Modul\'r entre en fureur ! Ses clauses s\'embrasent !');
+  }
+  if(player.dead) return;
+  e.breathCd -= dt;
+  if(e.breathing > 0){
+    // souffle de fumée
+    e.breathing -= dt;
+    const mouth = V3(0, 4.6, 5.6).applyMatrix4(e.group.matrixWorld);
+    const dir = V3(ppos.x-pos.x, 0, ppos.z-pos.z).normalize();
+    if(Math.random() < 0.9){
+      burst(mouth, 0x55585f, 5, 7, 0.5, 0.8, 0.5, 0.4);
+      burst(mouth, 0x8a8d96, 4, 5, 0.55, 0.9, 0.8, 0.5);
+      burst(mouth, 0xff8a3f, 3, 8, 0.3, 0.5, 1.5, 0.3);   // braises
+      spawnPuff(mouth, { color:0x4a4d58, scale:0.6, growth:1.6, rise:0.3, life:1.1, opacity:0.4, drift:0.4 });
+    }
+    // dégâts au cœur du souffle
+    if(e.breathing < 0.7 && !e.breathHit){
+      const toPlayer = V3(ppos.x-pos.x, 0, ppos.z-pos.z);
+      const facing = V3(Math.sin(e.group.rotation.y), 0, Math.cos(e.group.rotation.y));
+      const angle = toPlayer.angleTo(facing);
+      if(d < 14 && angle < 0.7){
+        hurtPlayer(e.enraged ? 16 : 12, pos);
+        e.breathHit = true;
+      }
+    }
+    return;
+  }
+  if(d < e.aggro){
+    const moveDir = V3(ppos.x-pos.x, 0, ppos.z-pos.z).normalize();
+    const targetRot = Math.atan2(moveDir.x, moveDir.z);
+    e.group.rotation.y = lerpAngle(e.group.rotation.y, targetRot, dt*4);
+    if(d > e.range){
+      pos.addScaledVector(moveDir, e.speed*dt);
+    } else if(e.attackCd <= 0){
+      e.attackCd = e.enraged ? 1.6 : 2.2;
+      hurtPlayer(e.dmg, pos);
+      if(e.glb) enemyAnim(e.glb, 'attack', true);
+      shake(0.4, 0.3);
+      SFX.growl();
+    }
+    if(e.glb && e.glb.current !== e.glb.map.attack) enemyAnim(e.glb, d > e.range ? 'walk' : 'idle');
+    if(d < 16 && d > 4 && e.breathCd <= 0){
+      e.breathCd = e.enraged ? 4 : 6;
+      e.breathing = 1.3;
+      e.breathHit = false;
+      SFX.growl();
+    }
+  }
+}
+
+// --- dégâts infligés aux ennemis ---
+function damageEnemy(e, amount){
+  if(!e.alive) return;
+  e.hp -= amount;
+  e.flashT = 0.15;
+  e.bar.update(Math.max(0, e.hp/e.maxhp));
+  addFloatText(e.group.position.clone().setY(e.barHeight*0.7), '-'+amount, '#ffd44d');
+  // recul
+  const away = V3().subVectors(e.group.position, player.group.position).setY(0).normalize();
+  e.kb.copy(away.multiplyScalar(e.type==='golem'||e.type==='dragon' ? 1.5 : 6));
+  SFX.hit();
+  burst(e.group.position.clone().setY(1.2), 0x4C53BD, 10, 4, 0.14, 0.4, -4);
+  if(e.hp <= 0) killEnemy(e);
+}
+function killEnemy(e){
+  e.alive = false;
+  e.bar.sprite.visible = false;
+  burst(e.group.position.clone().setY(1), 0xffffff, 18, 5, 0.2, 0.7, -3);
+  burst(e.group.position.clone().setY(1), 0x4C53BD, 12, 4, 0.16, 0.6, -3);
+  addXP(e.xpGain);
+  onEnemyKilled(e.type);
+  if(e.type === 'dragon') onDragonSlain();
+}
+
+/* ============================================================
+   QUÊTES — la chaîne du Contrat Sacré
+   ============================================================ */
+const quests = [
+  { titre:'Parle à Merlin',
+    desc:"Trouvez Merlin l'Enchanteur sur la place du village et parlez-lui (touche E).",
+    type:'talk', target:'Merlin', goal:1, xp:60 },
+  { titre:'Protège le village',
+    desc:'Les Gobelins de la Paperasse — les sbires de Modul\'r — sortent des Oubliettes ! Éliminez-en 5.',
+    type:'kill', target:'gobelin', goal:5, xp:130 },
+  { titre:'La lumière dans la forêt',
+    desc:'Récupérez 3 cristaux lumineux dans la forêt enchantée, à l\'est du village.',
+    type:'collect', goal:3, xp:160 },
+  { titre:'Le Golem du péage',
+    desc:'Le Golem Modul\'r de la Franchise Cachée bloque le pont du sud. Pour une fois, faites-LUI payer.',
+    type:'kill', target:'golem', goal:1, xp:220 },
+  { titre:'Le Contrat Sacré',
+    desc:'Entrez dans les Oubliettes, vainquez le Dragon Modul\'r, puis rapportez le Contrat Sacré au château.',
+    type:'dragon', goal:1, xp:420 },
+];
+let qi = 0;            // index de la quête courante
+let qProgress = 0;     // progression
+let contractInHand = false;
+let gameOver = false;
+
+const crystals = [];
+function spawnCrystals(){
+  const spots = [[56, -18], [72, 8], [62, 30]];
+  for(const [x,z] of spots){
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.55),
+      new THREE.MeshLambertMaterial({ color:0xbfe8ff, emissive:BLEU_CLAIR, emissiveIntensity:1.8 }));
+    m.position.set(x, 1.2, z);
+    scene.add(m);
+    const halo = new THREE.PointLight(BLEU_CLAIR, 0.9, 8);
+    halo.position.set(x, 1.6, z);
+    scene.add(halo);
+    crystals.push({ mesh:m, halo, collected:false, phase:rand(0,6) });
+  }
+}
+function updateCrystals(dt, t){
+  for(const c of crystals){
+    if(c.collected) continue;
+    c.mesh.rotation.y += dt*1.8;
+    c.mesh.position.y = 1.2 + Math.sin(t*2 + c.phase)*0.25;
+    if(Math.random() < 0.06) burst(c.mesh.position, 0xbfe8ff, 2, 1, 0.1, 0.5, 1, 0.6);
+    if(qi===2 && !player.dead && c.mesh.position.distanceTo(player.group.position.clone().setY(c.mesh.position.y)) < 2.2){
+      c.collected = true;
+      c.mesh.visible = false; c.halo.visible = false;
+      SFX.pickup();
+      burst(c.mesh.position, 0xbfe8ff, 24, 5, 0.18, 0.8, 2);
+      qProgress++;
+      addFloatText(c.mesh.position, 'Cristal récupéré !', '#bfe8ff', true);
+      if(qProgress >= quests[2].goal) completeQuest();
+      else updateQuestUI();
+    }
+  }
+}
+
+function startQuest(idx){
+  qi = idx; qProgress = 0;
+  const q = quests[qi];
+  showToast('📜 Nouvelle quête : ' + q.titre);
+  SFX.quest();
+  if(q.type === 'collect') spawnCrystals();
+  if(qi === 3) buildGolem(-40, 58.5);   // le golem prend position sur le pont
+  if(qi === 4) buildDragon(-66, 70);    // le dragon garde les Oubliettes
+  updateQuestUI();
+  updateMarkers();
+}
+function completeQuest(){
+  const q = quests[qi];
+  showToast('✅ Quête terminée : ' + q.titre + '  (+' + q.xp + ' XP)');
+  SFX.quest();
+  addXP(q.xp);
+  if(qi < quests.length-1){
+    setTimeout(()=>{ if(!gameOver) startQuest(qi+1); }, 1800);
+    qi = qi; // l'UI affichera la suivante au démarrage différé
+  }
+  updateQuestUI(true);
+}
+function onEnemyKilled(type){
+  const q = quests[qi];
+  if(q.type==='kill' && q.target===type && qProgress < q.goal){
+    qProgress++;
+    if(qProgress >= q.goal) completeQuest();
+    else updateQuestUI();
+  }
+}
+function onDragonSlain(){
+  contractInHand = true;
+  SFX.victory();
+  setTimeout(()=>{
+    document.getElementById('dragonScreen').style.display = 'flex';
+  }, 700);
+  updateQuestUI();
+}
+function checkCastleReturn(){
+  if(qi===4 && contractInHand && !gameOver){
+    const d = Math.hypot(player.group.position.x - 0, player.group.position.z - (-66));
+    if(d < 14){
+      gameOver = true;
+      addXP(quests[4].xp);
+      SFX.victory();
+      document.getElementById('victoryScreen').style.display = 'flex';
+    }
+  }
+}
+function updateQuestUI(done=false){
+  const q = quests[qi];
+  document.getElementById('questTitle').textContent = q.titre;
+  let obj = q.desc, prog = '';
+  if(qi===4){
+    obj = contractInHand
+      ? 'Le Contrat Sacré est en votre possession ! Rapportez-le au château, au nord.'
+      : q.desc;
+    prog = contractInHand ? 'Contrat récupéré ✓' : 'Dragon : ' + (done?'vaincu':'à vaincre');
+  } else if(q.type==='talk'){
+    prog = done ? 'Terminé ✓' : 'Parlez à Merlin';
+  } else {
+    prog = Math.min(qProgress, q.goal) + ' / ' + q.goal;
+  }
+  document.getElementById('questObj').textContent = obj;
+  document.getElementById('questProg').textContent = prog;
+}
+function updateMarkers(){
+  for(const n of npcs){
+    n.marker.visible =
+      (qi===0 && n.def.short==='Merlin') ||
+      (n.def.short==='Guillaume' && qi>=1 && !gameOver);
+  }
+}
+
+/* ==================== XP & NIVEAUX ==================== */
+function addXP(n){
+  if(player.level >= 10){ updateHUD(); return; }
+  player.xp += n;
+  while(player.xp >= xpNeeded() && player.level < 10){
+    player.xp -= xpNeeded();
+    player.level++;
+    player.maxhp += 20;
+    player.hp = player.maxhp;
+    player.mana = player.maxmana;
+    SFX.level();
+    showToast('✨ Niveau ' + player.level + ' ! PV et dégâts augmentés.');
+    const flash = document.getElementById('lvlFlash');
+    flash.style.opacity = '1';
+    setTimeout(()=>flash.style.opacity='0', 600);
+    burst(player.group.position.clone().setY(0.5), 0xffd700, 40, 6, 0.22, 1.1, 2);
+    burst(player.group.position.clone().setY(1.5), 0xfff2b0, 24, 4, 0.18, 1.0, 3);
+  }
+  updateHUD();
+}
+
+/* ============================================================
+   ENTRÉES — clavier & souris (style WoW)
+   ============================================================ */
+const keys = {};
+let camYaw = Math.PI, camPitch = 0.42, camDist = 11;
+let orbiting = false;
+let started = false;
+
+addEventListener('keydown', (e)=>{
+  if(e.code === 'Space') e.preventDefault();
+  keys[e.code] = true;
+  if(!started || player.dead || gameOver) return;
+  if(e.code === 'Digit1') tryAttack();
+  if(e.code === 'Digit2') tryShield();
+  if(e.code === 'KeyE') interact();
+});
+addEventListener('keyup', (e)=>{ keys[e.code] = false; });
+addEventListener('contextmenu', (e)=>e.preventDefault());
+
+renderer.domElement.addEventListener('mousedown', (e)=>{
+  if(!started) return;
+  if(e.button === 2) orbiting = true;
+  if(e.button === 0 && !player.dead && !gameOver) tryAttack();
+});
+addEventListener('mouseup', (e)=>{ if(e.button === 2) orbiting = false; });
+addEventListener('mousemove', (e)=>{
+  if(orbiting){
+    camYaw   -= e.movementX * 0.0042;
+    camPitch  = clamp(camPitch + e.movementY * 0.0032, 0.08, 1.25);
+  }
+});
+addEventListener('wheel', (e)=>{
+  camDist = clamp(camDist + Math.sign(e.deltaY)*1.2, 5, 24);
+}, { passive:true });
+
+/* ==================== CONTRÔLES TACTILES (mobile) ==================== */
+const touchMove = { x:0, y:0, active:false };
+if(('ontouchstart' in window) || navigator.maxTouchPoints > 0){
+  document.getElementById('touchUI').style.display = 'block';
+  document.getElementById('helpHint').style.display = 'none';
+  const joy = document.getElementById('joy');
+  const knob = document.getElementById('joyKnob');
+  let joyId = null;
+  const setKnob = (dx, dy)=>{ knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; };
+  joy.addEventListener('touchstart', (e)=>{ joyId = e.changedTouches[0].identifier; e.preventDefault(); }, { passive:false });
+  joy.addEventListener('touchmove', (e)=>{
+    for(const t of e.changedTouches){
+      if(t.identifier !== joyId) continue;
+      const r = joy.getBoundingClientRect();
+      let dx = t.clientX - (r.left + r.width/2);
+      let dy = t.clientY - (r.top + r.height/2);
+      const len = Math.hypot(dx, dy), max = 47;
+      if(len > max){ dx = dx/len*max; dy = dy/len*max; }
+      setKnob(dx, dy);
+      touchMove.x = dx/max; touchMove.y = dy/max; touchMove.active = true;
+    }
+    e.preventDefault();
+  }, { passive:false });
+  const joyEnd = (e)=>{
+    for(const t of e.changedTouches){
+      if(t.identifier === joyId){ joyId = null; touchMove.active = false; touchMove.x = touchMove.y = 0; setKnob(0, 0); }
+    }
+  };
+  joy.addEventListener('touchend', joyEnd);
+  joy.addEventListener('touchcancel', joyEnd);
+  // boutons d'action
+  const bindBtn = (id, fn)=>{
+    document.getElementById(id).addEventListener('touchstart', (e)=>{ e.preventDefault(); initAudio(); fn(); }, { passive:false });
+  };
+  bindBtn('tbA', ()=>{ if(started && !player.dead && !gameOver) tryAttack(); });
+  bindBtn('tbB', ()=>{ if(started && !player.dead && !gameOver) tryShield(); });
+  bindBtn('tbE', ()=>{ if(started && !player.dead && !gameOver) interact(); });
+  bindBtn('tbJ', ()=>{ keys['Space'] = true; setTimeout(()=>{ keys['Space'] = false; }, 140); });
+  // caméra au glisser sur la zone de jeu
+  let camTouch = null, lastTX = 0, lastTY = 0;
+  renderer.domElement.addEventListener('touchstart', (e)=>{
+    const t = e.changedTouches[0];
+    camTouch = t.identifier; lastTX = t.clientX; lastTY = t.clientY;
+  }, { passive:true });
+  renderer.domElement.addEventListener('touchmove', (e)=>{
+    for(const t of e.changedTouches){
+      if(t.identifier !== camTouch) continue;
+      camYaw   -= (t.clientX - lastTX) * 0.006;
+      camPitch  = clamp(camPitch + (t.clientY - lastTY) * 0.004, 0.08, 1.25);
+      lastTX = t.clientX; lastTY = t.clientY;
+    }
+    e.preventDefault();
+  }, { passive:false });
+  renderer.domElement.addEventListener('touchend', (e)=>{
+    for(const t of e.changedTouches) if(t.identifier === camTouch) camTouch = null;
+  });
+}
+
+function moveInput(){
+  // ZQSD (AZERTY) et WASD (QWERTY) : e.code est physique, donc les deux marchent
+  const f = (keys['KeyW']||keys['ArrowUp'])?1:0;
+  const b = (keys['KeyS']||keys['ArrowDown'])?1:0;
+  const l = (keys['KeyA']||keys['ArrowLeft'])?1:0;
+  const r = (keys['KeyD']||keys['ArrowRight'])?1:0;
+  let mx = 0, mz = 0;
+  const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);   // avant caméra
+  const lx = -Math.cos(camYaw), lz = Math.sin(camYaw);    // gauche caméra
+  mx += fx*(f-b) + lx*(l-r);
+  mz += fz*(f-b) + lz*(l-r);
+  if(touchMove.active){
+    mx += fx*(-touchMove.y) + lx*(-touchMove.x);
+    mz += fz*(-touchMove.y) + lz*(-touchMove.x);
+  }
+  const len = Math.hypot(mx, mz);
+  if(len > 0.001){ mx/=len; mz/=len; }
+  return { mx, mz, has: len > 0.001 };
+}
+
+/* ==================== ACTIONS DU JOUEUR ==================== */
+function tryAttack(){
+  if(player.attackCd > 0 || player.dead) return;
+  player.attackCd = 0.5;
+  player.attackAnim = player.glb ? 0.5 : 0.32;
+  if(player.glb) setPlayerAnim('attack', true);
+  SFX.swing();
+  spawnSlash();
+  // détection en arc devant le héros
+  const facing = V3(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
+  let hitSomething = false;
+  for(const e of enemies){
+    if(!e.alive) continue;
+    const to = V3().subVectors(e.group.position, player.group.position).setY(0);
+    const d = to.length();
+    const reach = e.type==='dragon' ? 5 : (e.type==='golem' ? 3.6 : 2.9);
+    if(d < reach && to.normalize().angleTo(facing) < 1.1){
+      damageEnemy(e, playerDamage());
+      hitSomething = true;
+    }
+  }
+  if(hitSomething) shake(0.12, 0.06);
+}
+function tryShield(){
+  if(player.shieldCd > 0 || player.dead) return;
+  if(player.mana < 30){ addFloatText(player.group.position.clone().setY(2), 'Mana insuffisant', '#8fa0ff'); return; }
+  player.mana -= 30;
+  player.shieldCd = 8;
+  player.shieldTime = 3;
+  player.shieldBubble.visible = true;
+  SFX.shield();
+  burst(player.group.position.clone().setY(1.2), BLEU_CLAIR, 20, 4, 0.16, 0.7, 1);
+}
+function hurtPlayer(amount, fromPos){
+  if(player.dead || gameOver) return;
+  if(player.shieldTime > 0){
+    addFloatText(player.group.position.clone().setY(2.2), 'Absorbé !', '#8fa0ff');
+    return;
+  }
+  player.hp -= amount;
+  SFX.hurt();
+  addFloatText(player.group.position.clone().setY(2.2), '-'+amount, '#ff7a7a');
+  const vg = document.getElementById('vignette');
+  vg.style.opacity = '1';
+  setTimeout(()=>vg.style.opacity='0', 250);
+  if(amount >= 15) shake(0.3, 0.22);
+  if(player.hp <= 0){
+    player.hp = 0;
+    player.dead = true;
+    SFX.death();
+    document.getElementById('deathScreen').style.display = 'flex';
+  }
+  updateHUD();
+}
+
+/* ==================== INTERACTION PNJ ==================== */
+let dlgNpc = null;
+function nearestNpc(){
+  let best = null, bd = 3.6;
+  for(const n of npcs){
+    const d = n.group.position.distanceTo(player.group.position);
+    if(d < bd){ bd = d; best = n; }
+  }
+  return best;
+}
+function interact(){
+  const n = nearestNpc();
+  if(!n) return;
+  dlgNpc = n;
+  const line = n.def.lines[n.lineIdx % n.def.lines.length];
+  n.lineIdx++;
+  document.getElementById('dlgName').textContent = n.def.name;
+  document.getElementById('dlgText').textContent = line;
+  document.getElementById('dialogue').style.display = 'block';
+  tone(440, 0.08, 'sine', 0.08);
+  // effets de quête / soins
+  if(n.def.short === 'Merlin' && qi === 0){
+    qProgress = 1;
+    completeQuest();
+  }
+  if(n.def.heal && player.hp < player.maxhp){
+    player.hp = player.maxhp;
+    SFX.pickup();
+    burst(player.group.position.clone().setY(1.2), 0x8fe89a, 18, 3.5, 0.16, 0.8, 2);
+    addFloatText(player.group.position.clone().setY(2.2), '+PV max !', '#8fe89a', true);
+    updateHUD();
+  }
+}
+function updateDialogue(){
+  if(dlgNpc && dlgNpc.group.position.distanceTo(player.group.position) > 5){
+    dlgNpc = null;
+    document.getElementById('dialogue').style.display = 'none';
+  }
+  const n = nearestNpc();
+  const hint = document.getElementById('interactHint');
+  if(n && !dlgNpc){
+    document.getElementById('interactTxt').textContent = 'Parler à ' + n.def.short;
+    hint.style.display = 'block';
+  } else hint.style.display = 'none';
+}
+
+/* ============================================================
+   HUD — barres, cooldowns, journal, mini-carte, toasts
+   ============================================================ */
+function updateHUD(){
+  document.getElementById('hpFill').style.width = (player.hp/player.maxhp*100)+'%';
+  document.getElementById('mpFill').style.width = (player.mana/player.maxmana*100)+'%';
+  document.getElementById('hpTxt').textContent = Math.ceil(player.hp)+' / '+player.maxhp;
+  document.getElementById('mpTxt').textContent = Math.ceil(player.mana)+' / '+player.maxmana;
+  document.getElementById('lvlTxt').textContent = player.level;
+  const pct = player.level >= 10 ? 100 : player.xp/xpNeeded()*100;
+  document.getElementById('xpFill').style.width = pct+'%';
+  document.getElementById('xpTxt').textContent = player.level >= 10
+    ? 'Niveau 10 — niveau maximum !'
+    : 'Niveau '+player.level+' — '+player.xp+' / '+xpNeeded()+' XP';
+}
+function updateCooldownUI(){
+  const s1 = document.getElementById('slot1');
+  const s2 = document.getElementById('slot2');
+  const f1 = clamp(player.attackCd/0.5, 0, 1);
+  const f2 = clamp(player.shieldCd/8, 0, 1);
+  s1.querySelector('.cd').style.height = (f1*100)+'%';
+  s2.querySelector('.cd').style.height = (f2*100)+'%';
+  const t2 = s2.querySelector('.cdTxt');
+  t2.style.visibility = f2 > 0.02 ? 'visible' : 'hidden';
+  t2.textContent = Math.ceil(player.shieldCd);
+}
+let toastTimer = null;
+function showToast(msg, dur=3200){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.style.opacity='0', dur);
+}
+
+// journal repliable
+let questOpen = true;
+document.getElementById('questHeader').addEventListener('click', ()=>{
+  questOpen = !questOpen;
+  document.getElementById('questBody').style.display = questOpen ? 'block' : 'none';
+  document.getElementById('questToggle').textContent = questOpen ? '▾' : '▸';
+});
+
+// --- mini-carte ---
+const mmCtx = document.getElementById('minimap').getContext('2d');
+function drawMinimap(){
+  // carte locale : toujours orientée nord, centrée sur Perceval, elle défile avec lui
+  const S = 144, range = 52;                 // rayon visible en unités monde
+  const s = S/(range*2);
+  const px = player.group.position.x, pz = player.group.position.z;
+  const wx = (x)=> (x-px)*s + S/2;
+  const wz = (z)=> (z-pz)*s + S/2;
+  mmCtx.clearRect(0,0,S,S);
+  mmCtx.save();
+  mmCtx.beginPath(); mmCtx.arc(S/2, S/2, S/2, 0, 7); mmCtx.clip();
+  mmCtx.fillStyle = '#79ad6c'; mmCtx.fillRect(0,0,S,S);
+  // forêt enchantée
+  mmCtx.fillStyle = 'rgba(48,104,58,0.55)';
+  mmCtx.fillRect(wx(42), wz(-50), 56*s, 98*s);
+  // chemins principaux
+  mmCtx.strokeStyle = 'rgba(231,220,195,0.9)'; mmCtx.lineWidth = 3.4*s;
+  mmCtx.beginPath(); mmCtx.moveTo(wx(0), wz(14)); mmCtx.lineTo(wx(0), wz(-64)); mmCtx.stroke();
+  mmCtx.beginPath(); mmCtx.moveTo(wx(0), wz(16)); mmCtx.lineTo(wx(-38), wz(50)); mmCtx.stroke();
+  mmCtx.beginPath(); mmCtx.moveTo(wx(2), wz(16)); mmCtx.lineTo(wx(48), wz(4)); mmCtx.stroke();
+  mmCtx.beginPath(); mmCtx.moveTo(wx(-40), wz(60)); mmCtx.lineTo(wx(-70), wz(72)); mmCtx.stroke();
+  // rivière + pont
+  mmCtx.fillStyle = '#5fb8e8';
+  mmCtx.fillRect(wx(-112), wz(51.6), 224*s, 6.8*s);
+  mmCtx.fillStyle = '#cfc7b6';
+  mmCtx.fillRect(wx(-42.7), wz(50.6), 5.4*s, 9*s);
+  // place du village
+  mmCtx.fillStyle = '#cfc7b6';
+  mmCtx.beginPath(); mmCtx.arc(wx(0), wz(15), 11*s, 0, 7); mmCtx.fill();
+  // château
+  mmCtx.fillStyle = '#f4efe2';
+  mmCtx.fillRect(wx(-17), wz(-96), 34*s, 32*s);
+  mmCtx.strokeStyle = '#283581'; mmCtx.lineWidth = 1.5;
+  mmCtx.strokeRect(wx(-17), wz(-96), 34*s, 32*s);
+  // Oubliettes
+  mmCtx.fillStyle = '#3a3c4a';
+  mmCtx.beginPath(); mmCtx.arc(wx(-75), wz(82), 13*s, 0, 7); mmCtx.fill();
+  // PNJ
+  mmCtx.fillStyle = '#ffd44d';
+  for(const n of npcs) mmCtx.fillRect(wx(n.group.position.x)-2, wz(n.group.position.z)-2, 4, 4);
+  // ennemis
+  mmCtx.fillStyle = '#e85a5a';
+  for(const e of enemies){
+    if(!e.alive) continue;
+    mmCtx.beginPath();
+    mmCtx.arc(wx(e.group.position.x), wz(e.group.position.z), e.type==='dragon'?4:2.5, 0, 7);
+    mmCtx.fill();
+  }
+  // cristaux de quête
+  if(qi===2){
+    mmCtx.fillStyle = '#bfe8ff';
+    for(const c of crystals){
+      if(!c.collected){
+        mmCtx.beginPath(); mmCtx.arc(wx(c.mesh.position.x), wz(c.mesh.position.z), 3, 0, 7); mmCtx.fill();
+      }
+    }
+  }
+  // flèche du joueur au centre (seule la flèche tourne, la carte reste au nord)
+  mmCtx.save();
+  mmCtx.translate(S/2, S/2);
+  mmCtx.rotate(-player.group.rotation.y + Math.PI);
+  mmCtx.fillStyle = '#283581'; mmCtx.strokeStyle = '#fff'; mmCtx.lineWidth = 1.6;
+  mmCtx.beginPath();
+  mmCtx.moveTo(0, -6.5); mmCtx.lineTo(4.6, 5.2); mmCtx.lineTo(0, 2.8); mmCtx.lineTo(-4.6, 5.2); mmCtx.closePath();
+  mmCtx.fill(); mmCtx.stroke();
+  mmCtx.restore();
+  mmCtx.restore();
+  // indicateur Nord
+  mmCtx.font = '700 11px system-ui, sans-serif';
+  mmCtx.textAlign = 'center';
+  mmCtx.strokeStyle = 'rgba(20,25,60,0.9)'; mmCtx.lineWidth = 3;
+  mmCtx.strokeText('N', S/2, 13);
+  mmCtx.fillStyle = '#fff';
+  mmCtx.fillText('N', S/2, 13);
+}
+
+/* ==================== CAMÉRA & SECOUSSE ==================== */
+let shakeT = 0, shakeMag = 0;
+function shake(dur, mag){ shakeT = Math.max(shakeT, dur); shakeMag = mag; }
+function updateCamera(dt, t){
+  if(!started){
+    // travelling lent autour du château pour l'écran titre
+    const a = t*0.06;
+    camera.position.set(Math.sin(a)*58, 24 + Math.sin(t*0.3)*1.5, -82 + Math.cos(a)*58);
+    camera.lookAt(0, 8, -82);
+    return;
+  }
+  const target = V3().copy(player.group.position); target.y += 2.1;
+  const off = V3(
+    Math.sin(camYaw)*Math.cos(camPitch),
+    Math.sin(camPitch),
+    Math.cos(camYaw)*Math.cos(camPitch)
+  ).multiplyScalar(camDist);
+  camera.position.copy(target).add(off);
+  if(camera.position.y < 0.6) camera.position.y = 0.6;
+  if(shakeT > 0){
+    shakeT -= dt;
+    camera.position.x += (Math.random()-0.5)*shakeMag;
+    camera.position.y += (Math.random()-0.5)*shakeMag;
+    camera.position.z += (Math.random()-0.5)*shakeMag;
+  }
+  camera.lookAt(target);
+}
+
+/* ==================== AMBIANCE DES OUBLIETTES ==================== */
+const SKY_TOP = new THREE.Color(0x8ec8f5), SKY_HOR = new THREE.Color(0xeef6ff), SKY_WARM = new THREE.Color(0xfdeecb);
+const CAVE_TOP = new THREE.Color(0x2e2a44), CAVE_HOR = new THREE.Color(0x4a4060), CAVE_WARM = new THREE.Color(0x5a4a6a);
+const fogDay = new THREE.Color(0xdceefc), fogCave = new THREE.Color(0x3a3450);
+function updateAtmosphere(){
+  const d = Math.hypot(player.group.position.x+75, player.group.position.z-80);
+  const k = started ? clamp(1 - d/34, 0, 1) : 0;
+  skyUniforms.topColor.value.copy(SKY_TOP).lerp(CAVE_TOP, k);
+  skyUniforms.horizonColor.value.copy(SKY_HOR).lerp(CAVE_HOR, k);
+  skyUniforms.warmColor.value.copy(SKY_WARM).lerp(CAVE_WARM, k);
+  scene.fog.color.copy(fogDay).lerp(fogCave, k);
+  scene.fog.near = 95 - k*73;
+  hemi.intensity = AMB_BASE*(1 - k*0.55);
+  sun.intensity = SUN_BASE*(1 - k*0.75);
+  renderer.toneMappingExposure = 1.05*(1 - k*0.42);   // assombrit aussi la lumière d'environnement
+  bloomPass.strength = 0.38 + k*0.4;    // la magie ressort dans la pénombre
+}
+
+/* ============================================================
+   MISE À JOUR DU JOUEUR (déplacement, saut, animations)
+   ============================================================ */
+function updatePlayer(dt, t){
+  if(player.dead || gameOver){
+    player.moving = false;
+    return;
+  }
+  const { mx, mz, has } = moveInput();
+  player.moving = has;
+  const pos = player.group.position;
+  if(has){
+    pos.x += mx*player.speed*dt;
+    pos.z += mz*player.speed*dt;
+    const targetRot = Math.atan2(mx, mz);
+    player.group.rotation.y = lerpAngle(player.group.rotation.y, targetRot, dt*12);
+    player.walkT += dt*10;
+  } else {
+    player.walkT += (Math.round(player.walkT/Math.PI)*Math.PI - player.walkT)*dt*10;
+  }
+  // saut
+  if(keys['Space'] && player.onGround){
+    player.vy = 9.5;
+    player.onGround = false;
+  }
+  const gy = getGroundY(pos.x, pos.z);
+  if(!player.onGround || pos.y > gy){
+    player.vy -= 26*dt;
+    pos.y += player.vy*dt;
+    if(pos.y <= gy){ pos.y = gy; player.vy = 0; player.onGround = true; }
+  } else {
+    pos.y = gy;   // suit les rampes du pont
+  }
+  resolveCollision(pos, 0.55);
+
+  // cooldowns & ressources
+  player.attackCd = Math.max(0, player.attackCd - dt);
+  player.shieldCd = Math.max(0, player.shieldCd - dt);
+  if(player.shieldTime > 0){
+    player.shieldTime -= dt;
+    player.shieldBubble.visible = true;
+    player.shieldBubble.material.opacity = 0.3 + Math.sin(t*8)*0.08;
+    player.shieldBubble.scale.setScalar(1 + Math.sin(t*6)*0.03);
+    if(player.shieldTime <= 0) player.shieldBubble.visible = false;
+  }
+  player.mana = Math.min(player.maxmana, player.mana + 6*dt);
+  // régénération douce hors combat
+  const inDanger = enemies.some(e=>e.alive && e.group.position.distanceTo(pos) < 14);
+  if(!inDanger && player.hp < player.maxhp) player.hp = Math.min(player.maxhp, player.hp + 3*dt);
+
+  // --- animations : squelette KayKit si chargé, sinon procédural ---
+  if(player.glb){
+    if(player.attackAnim > 0){
+      player.attackAnim -= dt;
+    } else {
+      setPlayerAnim(!player.onGround ? 'jump' : (has ? 'run' : 'idle'));
+    }
+  } else {
+  // --- animations procédurales : marche articulée (hanches, genoux, épaules, coudes) ---
+  const swing  = Math.sin(player.walkT) * (has ? 0.6 : 0.04);
+  const swingB = Math.sin(player.walkT + Math.PI) * (has ? 0.6 : 0.04);
+  player.legL.rotation.x = swing;
+  player.legR.rotation.x = swingB;
+  player.kneeL.rotation.x = has ? Math.max(0, -Math.sin(player.walkT - 0.55))*0.95 + 0.06 : 0.06;
+  player.kneeR.rotation.x = has ? Math.max(0, -Math.sin(player.walkT + Math.PI - 0.55))*0.95 + 0.06 : 0.06;
+  player.armL.rotation.x = -swing*0.75;
+  player.elbowL.rotation.x = -0.32 - (has ? Math.max(0, Math.sin(player.walkT))*0.3 : 0);
+  if(player.attackAnim > 0){
+    player.attackAnim -= dt;
+    const k = 1 - player.attackAnim/0.32;        // 0 → 1
+    player.armR.rotation.x = -2.5 + k*3.3;       // grand swing depuis l'épaule
+    player.armR.rotation.z = -0.4 + k*0.35;
+    player.elbowR.rotation.x = -0.75 + k*0.6;    // le coude se déplie pendant la frappe
+  } else {
+    player.armR.rotation.x = -swingB*0.75;
+    player.armR.rotation.z = 0;
+    player.elbowR.rotation.x = -0.35;
+  }
+  }
+  // --- cape : pivot porteur + simulation d'étoffe (ondes, gonflement, rappel) ---
+  if(player.cape){
+  player.cape.rotation.x = 0.08 + (has ? 0.42 : 0.05) + Math.sin(t*4.6)*0.035;
+  {
+    const posA = player.capeMesh.geometry.attributes.position;
+    const base = player.capeBase;
+    const run = has ? 1 : 0;
+    for(let i=0;i<posA.count;i++){
+      const bxv = base[i*3], byv = base[i*3+1];
+      const hang = (0.56 - byv)/1.12;                      // 0 épaules → 1 ourlet
+      const free = Math.min(1, hang*1.8);                  // le haut reste plaqué (zone du bouclier)
+      const z = - hang*hang*(0.1 + run*0.42)*free
+                + Math.sin(t*(5 + run*4.5) + hang*6 + bxv*2.2)*0.05*hang*(0.4 + run*0.8)
+                + Math.sin(t*2.6 + hang*3 - bxv*4)*0.024*hang;
+      posA.setZ(i, z);
+      posA.setX(i, bxv + Math.sin(t*3.4 + hang*5 + bxv*2)*0.035*hang);
+      posA.setY(i, byv + Math.cos(t*(5 + run*3.5) + hang*5)*0.02*hang*run);
+    }
+    posA.needsUpdate = true;
+    player.capeMesh.geometry.computeVertexNormals();        // la lumière suit les plis
+  }
+  }
+}
+
+/* ============================================================
+   MISE À JOUR DES PNJ (regard vers le joueur, marqueurs)
+   ============================================================ */
+function updateNpcs(dt, t){
+  for(const n of npcs){
+    const d = n.group.position.distanceTo(player.group.position);
+    if(d < 5){
+      const dir = V3().subVectors(player.group.position, n.group.position);
+      const ty = Math.atan2(dir.x, dir.z);
+      n.group.rotation.y = lerpAngle(n.group.rotation.y, ty, dt*5);
+    }
+    if(n.marker.visible){
+      n.marker.position.y = 2.75 + Math.sin(t*3 + n.bobPhase)*0.15;
+      n.marker.rotation.y = t*2;
+    }
+  }
+  crystalBall.material.emissiveIntensity = 0.5 + Math.sin(t*2.5)*0.25;
+}
+
+/* ============================================================
+   DÉMARRAGE / MORT / FIN
+   ============================================================ */
+function startGame(){
+  if(started) return;
+  upgradePlayerModel();
+  upgradeNpcs();
+  swapNature();
+  started = true;
+  document.getElementById('title').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  camYaw = 0;  // caméra derrière le héros, regard vers le nord (le château)
+  player.group.rotation.y = Math.PI;
+  startQuest(0);
+  updateHUD();
+  showToast('Bienvenue à Valblanche, Perceval !');
+}
+document.getElementById('playBtn').addEventListener('click', ()=>{
+  initAudio();
+  if(started) return;
+  if(!assetsReady){
+    document.getElementById('playBtn').textContent = 'Chargement des modèles…';
+    assetsPromise.then(startGame);
+  } else {
+    startGame();
+  }
+});
+document.getElementById('respawnBtn').addEventListener('click', ()=>{
+  player.dead = false;
+  player.hp = player.maxhp;
+  player.mana = player.maxmana;
+  player.group.position.set(0, 0, 22);
+  document.getElementById('deathScreen').style.display = 'none';
+  updateHUD();
+  showToast('Vous voilà de retour. Le village compte sur vous !');
+});
+document.getElementById('dragonBtn').addEventListener('click', ()=>{
+  document.getElementById('dragonScreen').style.display = 'none';
+  updateQuestUI();
+  showToast('📜 Rapportez le Contrat Sacré au château !');
+});
+document.getElementById('replayBtn').addEventListener('click', ()=>location.reload());
+
+/* ============================================================
+   BOUCLE PRINCIPALE
+   ============================================================ */
+let lastT = performance.now();
+function animate(){
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min(0.05, (now-lastT)/1000);
+  lastT = now;
+  const t = now/1000;
+
+  // monde vivant
+  if(grassUniforms) grassUniforms.uTime.value = t;
+  for(const f of flags){
+    f.flag.rotation.y = Math.sin(t*2.6 + f.phase)*0.45;
+    f.flag.scale.y = 1 + Math.sin(t*5 + f.phase)*0.06;
+  }
+  for(const c of clouds){
+    c.g.position.x += c.speed*dt;
+    if(c.g.position.x > 130) c.g.position.x = -130;
+  }
+  // étincelles de la forêt
+  {
+    const arr = forestSparkles.geometry.attributes.position.array;
+    for(let i=0;i<arr.length/3;i++){
+      arr[i*3+1] = sparkleBase[i*3+1] + Math.sin(t*1.4 + i*1.7)*0.6;
+    }
+    forestSparkles.geometry.attributes.position.needsUpdate = true;
+    forestSparkles.material.opacity = 0.6 + Math.sin(t*2)*0.3;
+  }
+  riverWater.material.uniforms['time'].value = t*0.55;
+  gradePass.uniforms.uTime.value = t;
+  TEX.water.offset.x = t*0.045;
+  TEX.water.offset.y = Math.sin(t*0.4)*0.05;
+  updateFountain(dt);
+  updateChimneys(dt);
+  updateOubliettes(dt, t);
+  updateButterflies(dt, t);
+  updateBirds(dt, t);
+  updatePuffs(dt);
+
+  if(started){
+    for(const m2 of mixers) m2.update(dt);
+    updatePlayer(dt, t);
+    updateNpcs(dt, t);
+    updateSpawner(dt);
+    for(let i=enemies.length-1;i>=0;i--){
+      updateEnemy(enemies[i], dt, t);
+      if(enemies[i].removed) enemies.splice(i,1);
+    }
+    updateProjectiles(dt);
+    updateCrystals(dt, t);
+    updateSlashes(dt);
+    updateDialogue();
+    updateCooldownUI();
+    checkCastleReturn();
+    drawMinimap();
+    // barres HP/mana rafraîchies en continu (régén)
+    updateHUD();
+  }
+  updateBursts(dt);
+  updateFloatTexts(dt);
+  updateAtmosphere();
+  updateCamera(dt, t);
+  composer.render();
+}
+updateQuestUI();
+animate();
+</script>
+</body>
+</html>
