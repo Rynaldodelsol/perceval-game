@@ -297,6 +297,34 @@ function initAudio(){
     s.connect(audioCtx.destination); s.start(0);
   }catch(e){}
 }
+/* iOS coupe le Web Audio quand l'iPhone est en mode SILENCE. Astuce : un <audio> qui
+   tourne en boucle bascule iOS en "session playback" → le Web Audio redevient audible
+   même bouton silence activé. (technique unmute-ios-audio) */
+let silentEl = null;
+function makeSilentWavUrl(){
+  const sr = 8000, n = Math.floor(sr * 0.3);            // 0,3 s de silence, mono 8 kHz
+  const buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+  const w = (o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36+n*2, true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true);
+  v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);   // échantillons déjà à 0
+  return URL.createObjectURL(new Blob([buf], { type:'audio/wav' }));
+}
+function unlockSilentAudio(){
+  try{
+    if(!silentEl){
+      silentEl = document.createElement('audio');
+      silentEl.src = makeSilentWavUrl();
+      silentEl.loop = true;
+      silentEl.setAttribute('playsinline', '');
+      silentEl.preload = 'auto';
+      silentEl.volume = 0.03;
+    }
+    const p = silentEl.play();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+}
 function tone(f, dur, type='sine', vol=0.18, delay=0, f2=null){
   if(!audioCtx) return;
   const t0 = audioCtx.currentTime + delay;
@@ -369,7 +397,7 @@ function startMusic(){
   if(!audioCtx || musicGain) return;
   musicGain = audioCtx.createGain();
   musicGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-  musicGain.gain.exponentialRampToValueAtTime(0.10, audioCtx.currentTime + 5);
+  musicGain.gain.exponentialRampToValueAtTime(0.10, audioCtx.currentTime + 2.2);
   musicGain.connect(audioCtx.destination);
   musicNextTime = audioCtx.currentTime + 0.15;
   musicStep = 0;
@@ -378,9 +406,13 @@ function startMusic(){
 }
 // déblocage audio : à chaque geste on (ré)active le contexte — iOS le suspend volontiers,
 // donc on ne se contente PAS d'un { once:true } : on rattrape à chaque contact
-function unlockAudio(){ initAudio(); startMusic(); startRainSound(); }
-['pointerdown','touchstart','mousedown','keydown'].forEach(ev =>
+function unlockAudio(){ unlockSilentAudio(); initAudio(); startMusic(); startRainSound(); }
+['pointerdown','touchstart','touchend','mousedown','keydown'].forEach(ev =>
   addEventListener(ev, unlockAudio, { passive:true }));
+// si l'onglet revient au premier plan, on relance contexte + session iOS
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && audioCtx){ audioCtx.resume(); unlockSilentAudio(); }
+});
 
 /* ==================== ASSETS 3D (KayKit & Quaternius, licence CC0) ==================== */
 const ASSETS = {};
@@ -4518,7 +4550,7 @@ function startGame(){
   showToast('Bienvenue à Valblanche, Perceval !');
 }
 document.getElementById('playBtn').addEventListener('click', ()=>{
-  initAudio(); startMusic();
+  unlockSilentAudio(); initAudio(); startMusic(); startRainSound();
   if(started) return;
   if(!assetsReady){
     document.getElementById('playBtn').textContent = 'Chargement des modèles…';
