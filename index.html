@@ -388,7 +388,7 @@ function startMusic(){
   musicScheduler();
 }
 // déblocage audio au tout premier geste (iOS bloque l'AudioContext sans interaction)
-function unlockAudio(){ initAudio(); startMusic(); }
+function unlockAudio(){ initAudio(); startMusic(); startRainSound(); }
 ['pointerdown','touchstart','keydown'].forEach(ev =>
   addEventListener(ev, unlockAudio, { once:true, passive:true }));
 
@@ -4135,18 +4135,85 @@ function updateFireflies(dt, t){
   fireflies.points.geometry.attributes.position.needsUpdate = true;
 }
 
+/* ==================== MÉTÉO : PLUIE OCCASIONNELLE ==================== */
+let rain = null, weatherWet = 0;
+{
+  const N = 3000;
+  const pos = new Float32Array(N*2*3), vel = new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const x = rand(-17,17), y = rand(0,28), z = rand(-17,17), len = rand(1.6,2.8);
+    pos[i*6]=x;       pos[i*6+1]=y;     pos[i*6+2]=z;     // sommet de la goutte
+    pos[i*6+3]=x-0.4; pos[i*6+4]=y-len; pos[i*6+5]=z;     // bas (léger biais de vent)
+    vel[i] = rand(40, 60);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const seg = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+    color:0xe6f0fb, transparent:true, opacity:0, depthWrite:false, fog:true }));
+  seg.frustumCulled = false;
+  scene.add(seg);
+  rain = { seg, pos, vel, N };
+}
+// son de pluie : bruit filtré en boucle, volume piloté par l'intensité
+let rainSound = null;
+function startRainSound(){
+  if(!audioCtx || rainSound) return;
+  const n = Math.floor(audioCtx.sampleRate*2);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i] = (Math.random()*2-1)*0.5;
+  const src = audioCtx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const lp = audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 2400;
+  const g = audioCtx.createGain(); g.gain.value = 0;
+  src.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
+  src.start();
+  rainSound = { gain:g };
+}
+const weather = { state:'clear', timer: rand(35, 75), intensity:0, target:0 };
+function updateWeather(dt){
+  weather.timer -= dt;
+  if(weather.timer <= 0){
+    if(weather.state === 'clear'){ weather.state='rain'; weather.target = rand(0.55, 1.0); weather.timer = rand(25, 55); }
+    else { weather.state='clear'; weather.target = 0; weather.timer = rand(45, 95); }
+  }
+  weather.intensity += (weather.target - weather.intensity) * Math.min(1, dt*0.4);
+  const I = weather.intensity;
+  weatherWet = I;
+  if(rainSound) rainSound.gain.gain.value = I*0.05;
+  if(!rain) return;
+  rain.seg.material.opacity = I*0.8;
+  rain.seg.visible = I > 0.02;
+  if(!rain.seg.visible) return;
+  // la pluie suit la caméra (boîte centrée sur le regard)
+  rain.seg.position.set(camera.position.x, 0, camera.position.z);
+  const p = rain.pos, speedScale = 0.8 + I*0.6;
+  for(let i=0;i<rain.N;i++){
+    const dy = rain.vel[i]*speedScale*dt;
+    let y0 = p[i*6+1]-dy, y1 = p[i*6+4]-dy;
+    if(y0 < 0){
+      const L = rand(1.6, 2.8);
+      const ny = rand(22, 30), nx = rand(-17,17), nz = rand(-17,17);
+      p[i*6]   = nx;     p[i*6+1] = ny;     p[i*6+2] = nz;
+      p[i*6+3] = nx-0.4; p[i*6+4] = ny - L;  p[i*6+5] = nz;
+    } else { p[i*6+1] = y0; p[i*6+4] = y1; }
+  }
+  rain.seg.geometry.attributes.position.needsUpdate = true;
+}
+
 /* ==================== ÉPHÉMÉRIDE : CYCLE JOUR / NUIT + OUBLIETTES ==================== */
 const CAVE_TOP = new THREE.Color(0x2e2a44), CAVE_HOR = new THREE.Color(0x4a4060), CAVE_WARM = new THREE.Color(0x5a4a6a);
 const fogCave = new THREE.Color(0x3a3450);
 // palettes du ciel selon l'heure
 const DAY_TOP = new THREE.Color(0x4f8fd6), DAY_HOR = new THREE.Color(0xdfeefb), DAY_WARM = new THREE.Color(0xfdeecb);
-const NIGHT_TOP = new THREE.Color(0x0b1230), NIGHT_HOR = new THREE.Color(0x1b2a52), NIGHT_WARM = new THREE.Color(0x2a2350);
+const NIGHT_TOP = new THREE.Color(0x1c2c58), NIGHT_HOR = new THREE.Color(0x3a4d80), NIGHT_WARM = new THREE.Color(0x44406e);
 const DUSK_HOR = new THREE.Color(0xffb56a), DUSK_WARM = new THREE.Color(0xff9d57);
 const DAY_FOG = new THREE.Color(0xdceefc), NIGHT_FOG = new THREE.Color(0x0e1636);
 // couleurs de travail (réutilisées chaque frame, zéro alloc)
 const _cTop = new THREE.Color(), _cHor = new THREE.Color(), _cWarm = new THREE.Color(), _cFog = new THREE.Color();
-const _hemiDay = new THREE.Color(0xdcecff), _hemiNight = new THREE.Color(0x24365e), _cHemi = new THREE.Color();
+const _GREY = new THREE.Color(0x8a93a0);   // voile gris de pluie
+const _hemiDay = new THREE.Color(0xdcecff), _hemiNight = new THREE.Color(0x49628f), _cHemi = new THREE.Color();
 const _sunWarm = new THREE.Color(0xffb066), _sunHigh = new THREE.Color(0xffe9c4), _cSun = new THREE.Color();
+const _moonCol = new THREE.Color(0x9fb4e0), _cDaySun = new THREE.Color();   // lumière lunaire froide
 const smooth = (a,b,x)=>{ const t = clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
 
 let dayTime = 0.37;   // 0..1 — 0=minuit, 0.25=aube, 0.5=midi, 0.75=crépuscule
@@ -4193,12 +4260,22 @@ function updateAtmosphere(dt){
   // lumières
   _cHemi.copy(_hemiNight).lerp(_hemiDay, daylight);
   hemi.color.copy(_cHemi);
-  hemi.intensity = (0.07 + daylight*0.19) * (1 - k*0.55);
-  _cSun.copy(_sunWarm).lerp(_sunHigh, clamp(ef.el,0,1));
+  hemi.intensity = (0.20 + daylight*0.20) * (1 - k*0.55);
+  // couleur du soleil le jour (chaud→clair), lumière lunaire froide la nuit
+  _cDaySun.copy(_sunWarm).lerp(_sunHigh, clamp(ef.el,0,1));
+  _cSun.copy(_moonCol).lerp(_cDaySun, daylight);
   sun.color.copy(_cSun);
-  sun.intensity = (0.12 + daylight*1.45) * (1 - k*0.72);
-  renderer.toneMappingExposure = (0.46 + daylight*0.60) * (1 - k*0.40);
+  sun.intensity = (0.42 + daylight*1.15) * (1 - k*0.72);
+  renderer.toneMappingExposure = (0.66 + daylight*0.42) * (1 - k*0.40);
   bloomPass.strength = 0.36 + k*0.4 + nightF*0.16;
+  // temps couvert quand il pleut : ciel plus gris, soleil voilé, brume rapprochée
+  if(weatherWet > 0.01){
+    const w = weatherWet;
+    sun.intensity *= (1 - w*0.45);
+    renderer.toneMappingExposure *= (1 - w*0.18);
+    scene.fog.color.lerp(_GREY, w*0.5);
+    scene.fog.near = Math.min(scene.fog.near, scene.fog.near - w*18);
+  }
   // lampadaires : allumés la nuit
   const lampE = 0.3 + nightF*2.5;
   for(const m of lampGlows) m.emissiveIntensity = lampE;
@@ -4491,6 +4568,7 @@ function animate(){
   updateFloatTexts(dt);
   updateAtmosphere(dt);
   updateFireflies(dt, t);
+  updateWeather(dt);
   updateDelorean(dt, t);
   updateCamera(dt, t);
   composer.render();
