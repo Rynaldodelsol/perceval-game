@@ -142,15 +142,6 @@
   #dragonScreen .slogan { font-size:clamp(20px,3.4vw,32px); font-weight:800; color:#fff; margin-top:10px;
     text-shadow:0 0 30px #4C53BD, 0 2px 6px #000; }
 
-  /* Éphéméride (horloge jour/nuit) */
-  #clock { position:absolute; top:14px; left:300px; transform:none;
-    display:flex; align-items:center; gap:8px; padding:6px 14px; font-size:13px; font-weight:700;
-    color:#fff; }
-  #clockIcon { font-size:17px; }
-  #clockArc { width:60px; height:6px; border-radius:3px; background:rgba(10,14,40,0.6); overflow:hidden; position:relative; }
-  #clockArc i { position:absolute; top:-3px; width:12px; height:12px; border-radius:50%;
-    background:#ffe07a; box-shadow:0 0 8px #ffd34d; transform:translateX(-50%); }
-
   /* ==================== RESPONSIVE (téléphones / petits écrans) ==================== */
   @media (max-width: 880px) {
     #minimapWrap { width:96px; height:96px; top:10px; right:10px; border-width:2px; }
@@ -163,24 +154,18 @@
     #questPanel { top:116px; right:8px; left:auto; width:min(216px, 58vw); }
     #questHeader { padding:7px 11px; font-size:12px; }
     #questBody { padding:0 11px 9px; font-size:11px; line-height:1.35; }
-    #clock { top:8px; left:50%; transform:translateX(-50%); padding:4px 10px; font-size:11px; }
     #actionbar { display:none; }              /* sur mobile, les boutons tactiles remplacent la barre */
     #xpWrap { width:min(420px, 64vw); height:12px; bottom:4px; }
-    #xpTxt { line-height:12px; }
     #helpHint { display:none; }
-  }
-  @media (max-height: 520px) {
-    /* paysage de téléphone : on empile les boutons en grille 2×2 pour libérer la mini-carte */
-    #touchBtns { right:14px; bottom:14px; display:grid; grid-template-columns:repeat(2, 1fr); gap:9px; }
-    #touchBtns button { width:54px; height:54px; font-size:22px; }
-    #joy { left:16px; bottom:16px; width:112px; height:112px; }
-    #joyKnob { width:48px; height:48px; }
-    #dialogue { bottom:78px; }
-    #interactHint { bottom:140px; }
-  }
-  @media (max-width: 480px) {
-    /* portrait étroit : l'horloge descend sous les barres pour ne pas les chevaucher */
-    #clock { top:72px; }
+    /* commandes tactiles compactes, confinées aux coins bas (joystick à gauche, grille 2×2 à droite) */
+    #touchBtns { right:14px; bottom:16px; display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+    #touchBtns button { width:56px; height:56px; font-size:23px; }
+    #joy { left:16px; bottom:16px; width:116px; height:116px; }
+    #joyKnob { width:50px; height:50px; }
+    /* l'encart de dialogue et l'indice E passent AU-DESSUS des commandes (jamais de chevauchement) */
+    #dialogue { bottom:152px; width:min(440px, 94vw); padding:11px 15px; }
+    #dlgText { font-size:14px; }
+    #interactHint { bottom:160px; font-size:13px; padding:6px 14px; }
   }
 </style>
 </head>
@@ -224,8 +209,6 @@
   </div>
 
   <div id="minimapWrap"><canvas id="minimap" width="144" height="144"></canvas></div>
-
-  <div id="clock" class="panel"><span id="clockIcon">☀️</span><span id="clockTime">08:00</span><span id="clockArc"><i></i></span></div>
 
   <div id="xpWrap"><div id="xpFill"></div><div id="xpTxt">Niveau 1 — 0 / 110 XP</div></div>
 
@@ -305,8 +288,14 @@ const CIEL      = 0xcfeaff;
 /* ==================== AUDIO (Web Audio API) ==================== */
 let audioCtx = null;
 function initAudio(){
-  if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
-  if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+  if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  // déblocage iOS/Safari : jouer un buffer muet À L'INTÉRIEUR du geste utilisateur
+  try{
+    const b = audioCtx.createBuffer(1, 1, 22050);
+    const s = audioCtx.createBufferSource(); s.buffer = b;
+    s.connect(audioCtx.destination); s.start(0);
+  }catch(e){}
 }
 function tone(f, dur, type='sine', vol=0.18, delay=0, f2=null){
   if(!audioCtx) return;
@@ -387,10 +376,11 @@ function startMusic(){
   musicTimer = setInterval(musicScheduler, 110);
   musicScheduler();
 }
-// déblocage audio au tout premier geste (iOS bloque l'AudioContext sans interaction)
+// déblocage audio : à chaque geste on (ré)active le contexte — iOS le suspend volontiers,
+// donc on ne se contente PAS d'un { once:true } : on rattrape à chaque contact
 function unlockAudio(){ initAudio(); startMusic(); startRainSound(); }
-['pointerdown','touchstart','keydown'].forEach(ev =>
-  addEventListener(ev, unlockAudio, { once:true, passive:true }));
+['pointerdown','touchstart','mousedown','keydown'].forEach(ev =>
+  addEventListener(ev, unlockAudio, { passive:true }));
 
 /* ==================== ASSETS 3D (KayKit & Quaternius, licence CC0) ==================== */
 const ASSETS = {};
@@ -796,11 +786,13 @@ TEX.banner = (()=>{
 })();
 // le picto remplace la lettre du portrait et l'emoji du titre
 {
+  // logo officiel (assets/logo.png) sur fond clair pour que le picto violet/marine ressorte ;
+  // repli sur le picto dessiné si le fichier est absent
   const p = document.getElementById('portrait');
   p.textContent = '';
-  p.style.background = `url(${PICTO_LIGHT}) center/64% no-repeat, radial-gradient(circle at 35% 30%, #6a73d8, #283581)`;
+  p.style.background = `url(assets/logo.png) center/56% no-repeat, radial-gradient(circle at 40% 32%, #ffffff, #e6e9fb)`;
   const h1 = document.querySelector('#title h1');
-  h1.innerHTML = `<img src="${PICTO_LIGHT}" alt="" style="height:0.92em;vertical-align:-0.08em;filter:drop-shadow(0 3px 10px rgba(20,25,60,0.7))"> Perceval`;
+  h1.innerHTML = `<img src="assets/logo.png" onerror="this.onerror=null;this.src='${PICTO_LIGHT}';this.style.background='none';this.style.boxShadow='none'" alt="" style="height:1.05em;vertical-align:-0.16em;background:#fff;border-radius:13px;padding:5px 9px;box-shadow:0 4px 16px rgba(20,25,60,0.4)"> Perceval`;
 }
 // si le VRAI logo est fourni (fichier assets/logo.png), il remplace le picto dessiné partout
 {
@@ -813,17 +805,7 @@ TEX.banner = (()=>{
     let w = 94, h = w/ratio;
     if(h > 148){ h = 148; w = h*ratio; }
     ctx.drawImage(img, 64 - w/2, 128 - h/2, w, h);
-    TEX.banner.needsUpdate = true;
-    document.getElementById('portrait').style.background =
-      `url(assets/logo.png) center/60% no-repeat, radial-gradient(circle at 35% 30%, #ffffff, #c9d2f0)`;
-    const im2 = document.querySelector('#title h1 img');
-    if(im2){
-      im2.src = 'assets/logo.png';
-      im2.style.background = '#fff';
-      im2.style.borderRadius = '10px';
-      im2.style.padding = '3px 6px';
-      im2.style.filter = 'none';
-    }
+    TEX.banner.needsUpdate = true;   // bannières 3D (château) avec le vrai logo
   };
   img.src = 'assets/logo.png';
 }
@@ -1430,40 +1412,32 @@ function windMaterial(opts, strength=0.25){
   scene.add(grass);
 }
 
-// --- fleurs des prés ---
+// --- fleurs des prés (tige verte + corolle colorée : de vraies fleurs, pas des épingles) ---
 {
-  const N = 420;
-  const stem = new THREE.PlaneGeometry(0.16, 0.3);
-  stem.translate(0, 0.15, 0);
-  const head = new THREE.SphereGeometry(0.07, 6, 5);
-  head.translate(0, 0.34, 0);
-  const geo = new THREE.BufferGeometry();
-  const posArr = [...stem.attributes.position.array, ...head.attributes.position.array];
-  const nArr = [...stem.attributes.normal.array, ...head.attributes.normal.array];
-  const off = stem.attributes.position.count;
-  const idxArr = [...stem.index.array, ...Array.from(head.index.array, i=>i+off)];
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nArr, 3));
-  geo.setIndex(idxArr);
-  const fm = windMaterial({ color:0xffffff, side:THREE.DoubleSide }, 0.18);
-  const flowers = new THREE.InstancedMesh(geo, fm, N);
-  const palette = [0xffffff, 0xffd9e8, 0xfff3b0, 0xc9c4ff, 0xffb3c8, 0x9fd8ff];
+  const N = 360;
+  const stemGeo = new THREE.PlaneGeometry(0.045, 0.34); stemGeo.translate(0, 0.17, 0);
+  const stems = new THREE.InstancedMesh(stemGeo, windMaterial({ color:0x539a45, side:THREE.DoubleSide }, 0.18), N);
+  // corolle colorée
+  const headGeo = new THREE.SphereGeometry(0.085, 8, 6); headGeo.translate(0, 0.39, 0);
+  const heads = new THREE.InstancedMesh(headGeo, windMaterial({ color:0xffffff, side:THREE.DoubleSide }, 0.18), N);
+  const palette = [0xffd44d, 0xff7eb0, 0xbf8bff, 0xff5d5d, 0x7ad0ff, 0xffa53f, 0xff9ec4];
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
   let placed = 0, guard = 0;
   while(placed < N && guard++ < N*30){
     const x = rand(-100,100), z = rand(-100,100);
     if(inKeepOutZone(x,z)) continue;
     q.setFromAxisAngle(V3(0,1,0), rand(0,Math.PI*2));
-    const sc = rand(0.8, 1.6);
+    const sc = rand(0.85, 1.5);
     m4.compose(V3(x,0,z), q, V3(sc,sc,sc));
-    flowers.setMatrixAt(placed, m4);
+    stems.setMatrixAt(placed, m4);
+    heads.setMatrixAt(placed, m4);
     col.setHex(palette[(Math.random()*palette.length)|0]);
-    flowers.setColorAt(placed, col);
+    heads.setColorAt(placed, col);
     placed++;
   }
-  flowers.count = placed;
-  if(flowers.instanceColor) flowers.instanceColor.needsUpdate = true;
-  scene.add(flowers);
+  stems.count = placed; heads.count = placed;
+  if(heads.instanceColor) heads.instanceColor.needsUpdate = true;
+  scene.add(stems); scene.add(heads);
 }
 
 // --- papillons ---
@@ -1906,7 +1880,7 @@ buildHouse( 11, 37, Math.PI+0.4, 4.4, 4);
 buildHouse(-14, 15, Math.PI/2, 4.5, 4, 0x555a66);
 
 // place du village pavée + fontaine à jets + mobilier
-let fountainWater, fountainJet;
+let fountainWater, fountainJet, coffeeStand = null;
 {
   const plaza = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 0.12, 36), new THREE.MeshStandardMaterial({ map:TEX.cobble, normalMap:NTEX.cobble, color:0xcfc7b6, roughness:0.85 }));
   plaza.position.set(0, 0.06, 15); plaza.receiveShadow = true;
@@ -1966,23 +1940,49 @@ let fountainWater, fountainJet;
     scene.add(lp);
     addCollider(lx, lz, 0.35);
   }
-  // étal de marché à auvent rayé
+  // ☕ stand à café (le carburant officiel de la Team 10 Positif)
   {
     const st = new THREE.Group();
+    const wood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 });
+    bx(st, 2.6, 0.9, 1.3, wood, 0, 0.45, 0);
+    bx(st, 2.8, 0.1, 1.5, mat(0x6f4a32), 0, 0.95, 0);                 // plateau bois foncé
+    for(const [px,pz] of [[-1.25,-0.6],[1.25,-0.6],[-1.25,0.6],[1.25,0.6]]) cy(st, 0.05, 0.05, 2.3, 6, wood, px, 1.15, pz);
     const stripes = canvasTex(128, (ctx,s)=>{
-      for(let i=0;i<8;i++){ ctx.fillStyle = i%2 ? '#ffffff' : '#4C53BD'; ctx.fillRect(i*s/8, 0, s/8, s); }
+      for(let i=0;i<8;i++){ ctx.fillStyle = i%2 ? '#f3ead6' : '#6f4a32'; ctx.fillRect(i*s/8, 0, s/8, s); }
     }, 2, 1);
-    bx(st, 2.6, 0.9, 1.3, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), 0, 0.45, 0);
-    bx(st, 2.8, 0.1, 1.5, mat(0xc9a87a), 0, 0.95, 0);
-    for(const [px,pz] of [[-1.25,-0.6],[1.25,-0.6],[-1.25,0.6],[1.25,0.6]]) cy(st, 0.05, 0.05, 2.3, 6, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.78 }), px, 1.15, pz);
     const awn = addMesh(st, new THREE.PlaneGeometry(3.0, 1.8), new THREE.MeshLambertMaterial({ map:stripes, side:THREE.DoubleSide }), 0, 2.45, 0);
     awn.rotation.x = -Math.PI/2 + 0.25;
-    for(let i=0;i<5;i++) sp(st, 0.1, mat([0xe85a5a, 0xffd44d, 0x8fd98a][(i)%3]), -0.8+i*0.4, 1.1, 0.2, 7);
+    // machine à espresso
+    const metal = new THREE.MeshStandardMaterial({ color:0xccd2da, metalness:0.85, roughness:0.3 });
+    bx(st, 0.95, 0.55, 0.6, metal, -0.45, 1.28, 0);
+    bx(st, 0.98, 0.12, 0.64, mat(0x3a2a1c), -0.45, 1.6, 0);           // dosseret
+    cy(st, 0.06, 0.06, 0.18, 8, metal, -0.45, 1.04, 0.34);            // groupe d'extraction
+    sp(st, 0.05, mat(0x2a2a2e), -0.45, 1.45, 0.32, 6);               // manomètre
+    // tasses empilées
+    for(let i=0;i<3;i++) cy(st, 0.07, 0.06, 0.1, 10, mat(0xfaf6ee), 0.25 + i*0.24, 1.06, 0.22);
+    // panneau « CAFÉ »
+    const signTex = canvasTex(128, (ctx,s)=>{
+      ctx.fillStyle = '#3a2a1c'; ctx.fillRect(0,0,s,s);
+      ctx.fillStyle = '#f3ead6'; ctx.textAlign = 'center';
+      ctx.font = 'bold 40px Georgia'; ctx.fillText('CAFÉ', s/2, s*0.42);
+      ctx.font = '46px serif'; ctx.fillText('☕', s/2, s*0.86);
+    });
+    const board = addMesh(st, new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ map:signTex }), 0.95, 1.7, 0.5, false);
+    board.rotation.y = -0.5;
+    // vapeur
+    const M = 16, spv = new Float32Array(M*3), life = [];
+    for(let i=0;i<M;i++){ spv[i*3]=-0.45; spv[i*3+1]=1.62+Math.random()*0.6; spv[i*3+2]=0.1; life.push(Math.random()); }
+    const steamGeo = new THREE.BufferGeometry();
+    steamGeo.setAttribute('position', new THREE.BufferAttribute(spv, 3));
+    const steam = new THREE.Points(steamGeo, new THREE.PointsMaterial({
+      color:0xffffff, size:0.16, map:softTex, transparent:true, opacity:0.4, depthWrite:false }));
+    st.add(steam);
     st.position.set(7.5, 0, 11);
     st.rotation.y = -0.7;
     scene.add(st);
     addCollider(7.5, 11, 1.7);
     addAO(7.5, 11, 2.3, 0.35, 0.135);
+    coffeeStand = { group:st, x:7.5, z:11, steam, life };
   }
   // tonneaux et caisses
   for(const [bxx, bzz] of [[-8.5, 12], [-8.0, 13.2], [12.5, 17.5]]){
@@ -2014,6 +2014,39 @@ function updateFountain(dt){
     arr[i*3] = d.p.x; arr[i*3+1] = d.p.y; arr[i*3+2] = d.p.z;
   });
   fountainJet.jet.geometry.attributes.position.needsUpdate = true;
+}
+// ☕ stand à café : vapeur + hint de proximité
+function updateCoffee(dt, t){
+  if(!coffeeStand) return;
+  const a = coffeeStand.steam.geometry.attributes.position.array, life = coffeeStand.life;
+  for(let i=0;i<life.length;i++){
+    life[i] += dt*0.55;
+    if(life[i] > 1){ life[i] = 0; a[i*3] = -0.45 + rand(-0.05,0.05); a[i*3+1] = 1.62; a[i*3+2] = 0.1 + rand(-0.04,0.04); }
+    else { a[i*3+1] += dt*0.45; a[i*3] += Math.sin(t*2 + i)*0.003; }
+  }
+  coffeeStand.steam.geometry.attributes.position.needsUpdate = true;
+  coffeeStand.steam.material.opacity = 0.42 * (1 - nightFactor*0.3);
+  // indice « Prendre un café » si on est proche et qu'aucun autre indice n'est affiché
+  if(started && !(delorean && delorean.driving)){
+    const hint = document.getElementById('interactHint');
+    if(hint && hint.style.display !== 'block'){
+      const d = Math.hypot(player.group.position.x - coffeeStand.x, player.group.position.z - coffeeStand.z);
+      if(d < 3.3 && !nearestNpc()){
+        hint.style.display = 'block';
+        document.getElementById('interactTxt').textContent = 'Prendre un café ☕';
+      }
+    }
+  }
+}
+function takeCoffee(){
+  player.hp = player.maxhp;
+  player.mana = player.maxmana;
+  player.coffeeBoost = 7;     // 7 s de regain de motivation (vitesse +50%)
+  SFX.pickup();
+  showToast("☕ Café de la Team 10 Positif\n+100% de motivation — et zéro downtime, lui au moins !");
+  burst(V3(coffeeStand.x, 1.7, coffeeStand.z), 0xfff0d8, 16, 2, 0.12, 0.7, 1);
+  addFloatText(player.group.position.clone().setY(2.3), '☕ +Café', '#e0b483');
+  updateHUD();
 }
 
 // --- les Oubliettes (grotte sombre au sud-ouest) ---
@@ -2880,8 +2913,8 @@ const delorean = (()=>{
   }
   const fluxLight = new THREE.PointLight(0x66ccff, 0.6, 6, 2);
   fluxLight.position.set(0, 1.5, -1.4); g.add(fluxLight);
-  g.position.set(-23, 0, -90);
-  g.rotation.y = 0.5;
+  g.position.set(-14, 0, -61);   // dans l'herbe à côté du château, près de Ray
+  g.rotation.y = 0.35;
   scene.add(g);
   const carCol = { x:g.position.x, z:g.position.z, r:1.7 };
   colliders.push(carCol);
@@ -2929,7 +2962,7 @@ function updateDelorean(dt, t){
     car.position.y = getGroundY(car.position.x, car.position.z);
     for(let i=0;i<delorean.wheels.length;i++){
       delorean.wheels[i].tire.rotation.x += delorean.speed*dt*2.2;
-      if(i<2) delorean.wheels[i].grp.rotation.y = steer*0.4;
+      if(i<2) delorean.wheels[i].grp.rotation.y = -steer*0.45;   // roues avant alignées sur le virage réel
     }
     player.group.position.set(car.position.x, car.position.y, car.position.z);
     player.group.rotation.y = delorean.heading;
@@ -3913,6 +3946,10 @@ function interact(){
   if(!nearestNpc()){
     const d = Math.hypot(player.group.position.x - delorean.group.position.x, player.group.position.z - delorean.group.position.z);
     if(d < 4.4){ enterCar(); return; }
+    if(coffeeStand){
+      const dc = Math.hypot(player.group.position.x - coffeeStand.x, player.group.position.z - coffeeStand.z);
+      if(dc < 3.3){ takeCoffee(); return; }
+    }
   }
   const n = nearestNpc();
   if(!n) return;
@@ -4304,9 +4341,11 @@ function updatePlayer(dt, t){
   const { mx, mz, has } = moveInput();
   player.moving = has;
   const pos = player.group.position;
+  if(player.coffeeBoost > 0) player.coffeeBoost -= dt;     // ☕ regain de motivation
+  const spd = player.speed * (player.coffeeBoost > 0 ? 1.5 : 1);
   if(has){
-    pos.x += mx*player.speed*dt;
-    pos.z += mz*player.speed*dt;
+    pos.x += mx*spd*dt;
+    pos.z += mz*spd*dt;
     const targetRot = Math.atan2(mx, mz);
     player.group.rotation.y = lerpAngle(player.group.rotation.y, targetRot, dt*12);
     player.walkT += dt*10;
@@ -4570,6 +4609,7 @@ function animate(){
   updateFireflies(dt, t);
   updateWeather(dt);
   updateDelorean(dt, t);
+  updateCoffee(dt, t);
   updateCamera(dt, t);
   composer.render();
 }
