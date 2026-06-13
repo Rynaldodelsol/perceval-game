@@ -34,6 +34,24 @@
   }
   #playBtn:hover { transform:scale(1.06); }
 
+  /* Flash d'éclair (plein écran) */
+  #flash { position:fixed; inset:0; background:#eaf2ff; opacity:0; pointer-events:none; z-index:55; }
+
+  /* ==================== CHOIX DU PERSONNAGE ==================== */
+  #charSelect { margin-top:22px; padding:14px 16px 16px; max-width:min(680px, 92vw); }
+  #charSelect .csTitle { color:#eef1ff; font-size:14px; font-weight:700; letter-spacing:0.4px; margin-bottom:10px; }
+  #charRow { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .charBtn { border:2px solid rgba(255,255,255,0.35); background:rgba(255,255,255,0.10); color:#fff;
+    border-radius:12px; padding:8px 12px; cursor:pointer; font-family:inherit; min-width:84px;
+    transition:transform .12s, border-color .12s, background .12s; text-align:center; }
+  .charBtn:hover { transform:translateY(-2px); background:rgba(255,255,255,0.18); }
+  .charBtn.sel { border-color:#ffd44d; background:rgba(255,212,77,0.22); box-shadow:0 4px 16px rgba(255,212,77,0.3); }
+  .charBtn .cbName { font-size:15px; font-weight:800; }
+  .charBtn .cbRole { font-size:10px; color:#cdd3ff; margin-top:2px; }
+  #pseudo { margin-top:12px; width:min(280px, 80%); padding:9px 14px; border-radius:999px; border:2px solid rgba(255,255,255,0.35);
+    background:rgba(15,20,55,0.5); color:#fff; font-family:inherit; font-size:14px; text-align:center; outline:none; }
+  #pseudo::placeholder { color:#aab2e8; }
+
   /* ==================== HUD ==================== */
   .panel { background:rgba(40,53,129,0.78); border-radius:14px; color:#fff;
     box-shadow:0 4px 18px rgba(0,0,0,0.25); backdrop-filter:blur(3px); }
@@ -170,11 +188,17 @@
 </style>
 </head>
 <body>
+<div id="flash"></div>
 
 <!-- ==================== ÉCRAN TITRE ==================== -->
 <div id="title">
   <h1>⚔️ Perceval</h1>
   <h2>la quête du Contrat Sacré</h2>
+  <div id="charSelect" class="panel">
+    <div class="csTitle">Choisis ton personnage</div>
+    <div id="charRow"></div>
+    <input id="pseudo" maxlength="16" placeholder="Ton pseudo (optionnel)" autocomplete="off">
+  </div>
   <div class="controls">
     <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut<br>
     <b>Clic droit maintenu</b> : caméra &nbsp;·&nbsp; <b>Molette</b> : zoom<br>
@@ -268,6 +292,7 @@
 <script src="https://unpkg.com/three@0.128.0/examples/js/objects/Water.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://unpkg.com/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
 /* ============================================================
@@ -1082,11 +1107,16 @@ function resolveCollision(pos, r, isFloating=false){
   pos.z = clamp(pos.z, -106, 106);
 }
 // hauteur du sol : 0 partout, sauf le tablier du pont (avec rampes aux extrémités)
+// immeuble Perceval (toit-terrasse accessible)
+const TOWER = { x:40, z:8, w:7.5, d:9.5, y:10.8 };   // centre, demi-largeur/profondeur, hauteur du toit
+let playerOnRoof = false;
+function onRoofZone(x, z){ return Math.abs(x - TOWER.x) < TOWER.w && Math.abs(z - TOWER.z) < TOWER.d; }
 function getGroundY(x, z){
   if(Math.abs(x + 40) < 2.7 && z > 49 && z < 61){
     const dz = Math.abs(z - 55);
     return 0.78 * clamp((5.8 - dz)/1.4, 0, 1);
   }
+  if(playerOnRoof && onRoofZone(x, z)) return TOWER.y;   // sur le toit de l'immeuble
   return 0;
 }
 
@@ -1911,6 +1941,144 @@ buildHouse( 11, 37, Math.PI+0.4, 4.4, 4);
 // la forge de Jojo
 buildHouse(-14, 15, Math.PI/2, 4.5, 4, 0x555a66);
 
+/* ==================== IMMEUBLE PERCEVAL (bureaux + loft/piscine sur le toit) ==================== */
+let towerDoor = { x:32.2, z:8 }, roofExit = { x:40, z:15.5 };
+{
+  const BX = TOWER.x, BZ = TOWER.z, W = TOWER.w, D = TOWER.d, H = TOWER.y;   // demi-dimensions, hauteur du toit
+  const sky    = new THREE.MeshStandardMaterial({ color:0x5aa8e0, roughness:0.7, metalness:0.05 });
+  const navy   = new THREE.MeshStandardMaterial({ color:0x21347e, roughness:0.6 });
+  const white  = new THREE.MeshStandardMaterial({ map:TEX.plaster, normalMap:NTEX.plaster, color:0xf2f3ef, roughness:0.9 });
+  const glassD = new THREE.MeshStandardMaterial({ color:0x16314e, metalness:0.6, roughness:0.12 });
+  const beige  = new THREE.MeshStandardMaterial({ color:0xe6dcc6, roughness:0.85 });
+  const railG  = new THREE.MeshStandardMaterial({ color:0xbfe3f5, metalness:0.3, roughness:0.1, transparent:true, opacity:0.28 });
+  const tower = new THREE.Group();
+
+  // corps : socle blanc + 3 niveaux bleu ciel avec bandeaux blancs et bandes vitrées
+  bx(tower, W*2+0.2, 0.7, D*2+0.2, white, 0, 0.35, 0);
+  for(let f=0; f<3; f++){
+    const y0 = 0.7 + f*((H-0.7)/3);
+    const fh = (H-0.7)/3;
+    bx(tower, W*2, fh*0.55, D*2, sky, 0, y0 + fh*0.30, 0);                 // allège bleu ciel
+    bx(tower, W*2+0.05, fh*0.12, D*2+0.05, white, 0, y0 + fh*0.62, 0);     // bandeau blanc
+    // bandes vitrées (avant, arrière, côtés)
+    bx(tower, W*2-0.6, fh*0.42, 0.12, glassD, 0, y0 + fh*0.62, D);
+    bx(tower, W*2-0.6, fh*0.42, 0.12, glassD, 0, y0 + fh*0.62, -D);
+    bx(tower, 0.12, fh*0.42, D*2-0.6, glassD, W, y0 + fh*0.62, 0);
+    bx(tower, 0.12, fh*0.42, D*2-0.6, glassD, -W, y0 + fh*0.62, 0);
+  }
+  // entrée (face ouest, vers le village)
+  bx(tower, 0.3, 2.6, 1.8, navy, -W, 1.3, 0);
+  const door = bx(tower, 0.2, 2.3, 1.5, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.7 }), -W-0.06, 1.15, 0);
+  // enseigne Perceval (panneau crème + logo) au-dessus de l'entrée
+  const sign = addMesh(tower, new THREE.PlaneGeometry(2.4, 1.3), new THREE.MeshBasicMaterial({ map:TEX.banner }), -W-0.07, 3.4, 0, false);
+  sign.rotation.y = -Math.PI/2;
+  // grande enseigne sur la façade sud
+  const sign2 = addMesh(tower, new THREE.PlaneGeometry(3.2, 1.7), new THREE.MeshBasicMaterial({ map:TEX.banner }), 0, H*0.62, D+0.07, false);
+
+  // --- TOIT-TERRASSE ---
+  bx(tower, W*2, 0.3, D*2, beige, 0, H-0.15, 0);                          // dalle de la terrasse
+  // garde-corps en verre (4 côtés)
+  const railMeta = new THREE.MeshStandardMaterial({ color:0x9aa0aa, metalness:0.8, roughness:0.3 });
+  for(const [sx,sz,len,horiz] of [[0,D,W,true],[0,-D,W,true],[W,0,D,false],[-W,0,D,false]]){
+    const panel = bx(tower, horiz? W*2:0.06, 1.0, horiz?0.06:D*2, railG, sx, H+0.5, sz, false);
+    bx(tower, horiz? W*2:0.1, 0.06, horiz?0.1:D*2, railMeta, sx, H+1.02, sz, false);   // main courante
+  }
+  // === piscine (côté avant/sud, forme allongée à liseré lumineux) ===
+  const poolMat = new THREE.MeshStandardMaterial({ color:0x37b6e8, emissive:0x1f8fc8, emissiveIntensity:0.7, metalness:0.2, roughness:0.15, transparent:true, opacity:0.92 });
+  const edge = new THREE.MeshStandardMaterial({ color:0xeaf6ff, emissive:0x9fe0ff, emissiveIntensity:1.6 });
+  const px = BX-2.6, pz = BZ+4.2, pw = 3.4, pd = 1.7;   // local (sera dans tower)
+  const PL = -2.6, PZ = 4.2;
+  // bassin (eau) : rectangle + 2 demi-cercles aux bouts
+  bx(tower, pw, 0.34, pd*2, poolMat, PL, H+0.05, PZ, false);
+  cy(tower, pd, pd, 0.34, 16, poolMat, PL-pw/2, H+0.05, PZ, false);
+  cy(tower, pd, pd, 0.34, 16, poolMat, PL+pw/2, H+0.05, PZ, false);
+  // liseré lumineux du bord
+  for(const ez of [PZ-pd, PZ+pd]) bx(tower, pw, 0.06, 0.1, edge, PL, H+0.02, ez, false);
+  const pl = new THREE.PointLight(0x6fd0ff, 0.9, 7, 2); pl.position.set(PL, H+0.4, PZ); tower.add(pl);
+  // margelle beige autour
+  bx(tower, pw+1.4, 0.06, pd*2+1.4, new THREE.MeshStandardMaterial({ color:0xded2b8, roughness:0.9 }), PL, H+0.16, PZ, false);
+  bx(tower, pw, 0.34, pd*2, poolMat, PL, H+0.05, PZ, false);    // re-dessus eau (par-dessus margelle)
+  // yucca en pot (déco de la photo)
+  cy(tower, 0.28, 0.34, 0.5, 8, new THREE.MeshStandardMaterial({ color:0x2a2d33, roughness:0.6 }), PL-pw/2-0.9, H+0.4, PZ-1.2, false);
+  for(let i=0;i<7;i++){ const bl=cn(tower, 0.06, 0.9, 4, fmat(0x4f9a44), PL-pw/2-0.9, H+1.1, PZ-1.2); bl.rotation.set(rand(-0.4,0.4), i, rand(-0.4,0.4)); }
+
+  // === coin salon + pergola arrondie (le "toit arrondi") ===
+  const LX = BX+3.2, LZ = BZ-4.5, lx = 3.2, lz = -4.5;
+  // canapé d'angle (assises sombres, structure bois)
+  const sofaWood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a6a48, roughness:0.7 });
+  const cushion = new THREE.MeshStandardMaterial({ color:0x3a3d44, roughness:0.85 });
+  bx(tower, 2.6, 0.4, 0.9, sofaWood, lx, H+0.45, lz, false);
+  bx(tower, 2.4, 0.3, 0.7, cushion, lx, H+0.68, lz, false);
+  bx(tower, 2.4, 0.5, 0.18, cushion, lx, H+0.85, lz-0.36, false);        // dossier
+  // table basse + bougie/plante
+  bx(tower, 1.0, 0.3, 0.6, sofaWood, lx, H+0.5, lz+1.1, false);
+  // pergola arrondie au-dessus du salon
+  for(const [cx,cz] of [[lx-1.4,lz-0.6],[lx+1.4,lz-0.6],[lx-1.4,lz+1.4],[lx+1.4,lz+1.4]]) cy(tower, 0.08, 0.08, 2.2, 6, railMeta, cx, H+1.1, cz, false);
+  const arch = addMesh(tower, new THREE.CylinderGeometry(1.6, 1.6, 3.0, 16, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color:0xf0ece2, roughness:0.85, side:THREE.DoubleSide }), lx, H+2.2, lz+0.4, false);
+  arch.rotation.z = Math.PI/2; arch.scale.set(1, 1, 1);
+  const pergLight = new THREE.PointLight(0xffd9a0, 0.5, 6, 2); pergLight.position.set(lx, H+1.9, lz); tower.add(pergLight);
+
+  // === loft de code (grande table, écrans, chaises rouges, TV) ===
+  const wood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x9a6f44, roughness:0.7 });
+  const TLX = BX-2.5, tlx = -2.5, tlz = -4.5;
+  // grande table de code
+  bx(tower, 3.4, 0.16, 1.7, wood, tlx, H+0.78, tlz, false);
+  for(const [ox,oz] of [[-1.5,-0.7],[1.5,-0.7],[-1.5,0.7],[1.5,0.7]]) cy(tower, 0.07, 0.07, 0.78, 6, wood, tlx+ox, H+0.39, tlz+oz, false);
+  // laptops + écrans (planches sombres + écrans qui brillent)
+  const screenMat = new THREE.MeshStandardMaterial({ color:0x0a1830, emissive:0x2aa0e0, emissiveIntensity:0.9 });
+  const silver = new THREE.MeshStandardMaterial({ color:0xc8ccd2, metalness:0.7, roughness:0.4 });
+  for(let i=0;i<4;i++){
+    const ox = -1.1 + (i%2)*2.2, oz = -0.45 + Math.floor(i/2)*0.9;
+    bx(tower, 0.5, 0.03, 0.34, silver, tlx+ox, H+0.87, tlz+oz, false);            // base laptop
+    const scr = bx(tower, 0.5, 0.32, 0.025, screenMat, tlx+ox, H+1.04, tlz+oz-0.16, false); scr.rotation.x = -0.35;
+  }
+  // chaises rouges (mesh assises rouges)
+  const red = new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.7 });
+  const black = new THREE.MeshStandardMaterial({ color:0x18181c, roughness:0.6 });
+  for(const [ox,oz] of [[-1.5,1.5],[0,1.6],[1.5,1.5],[-1.5,-1.6],[1.5,-1.6]]){
+    bx(tower, 0.5, 0.1, 0.5, red, tlx+ox, H+0.5, tlz+oz, false);
+    bx(tower, 0.5, 0.5, 0.1, red, tlx+ox, H+0.78, tlz+oz+(oz>0?0.22:-0.22), false);
+    cy(tower, 0.04, 0.04, 0.5, 6, black, tlx+ox, H+0.25, tlz+oz, false);
+  }
+  // TV murale avec du "code" (sur la façade nord, à l'intérieur du loft)
+  const codeTex = canvasTex(256, (ctx,s)=>{
+    ctx.fillStyle='#0c1424'; ctx.fillRect(0,0,s,s);
+    const cols=['#7fd1ff','#9ae6a0','#ffd479','#ff9ec4'];
+    ctx.font='13px monospace';
+    for(let l=0;l<16;l++){ ctx.fillStyle=cols[l%4]; ctx.fillText('  '.repeat((l*7)%6)+['const','function go(){','return Perceval','// BO Modul\'r','app.listen(80)','if(bug) fix()'][l%6], 8, 20+l*15); }
+  });
+  const tv = addMesh(tower, new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshBasicMaterial({ map:codeTex }), tlx, H+1.6, -D+0.12, false);
+
+  // === machine à café + pizzas ===
+  const metal = new THREE.MeshStandardMaterial({ color:0xccd2da, metalness:0.85, roughness:0.3 });
+  // comptoir café (coin nord-est de la terrasse)
+  const cfx = 4.2, cfz = 4.5;
+  bx(tower, 1.8, 0.9, 0.7, wood, cfx, H+0.45, cfz, false);
+  bx(tower, 0.8, 0.5, 0.5, metal, cfx-0.4, H+1.15, cfz, false);                    // machine espresso
+  bx(tower, 0.85, 0.1, 0.55, new THREE.MeshStandardMaterial({ color:0x3a2a1c }), cfx-0.4, H+1.42, cfz, false);
+  for(let i=0;i<3;i++) cy(tower, 0.06, 0.05, 0.09, 8, mat(0xfaf6ee), cfx+0.3+i*0.18, H+0.96, cfz, false);  // tasses
+  // pizzas (sur une petite table)
+  bx(tower, 1.2, 0.7, 0.7, wood, cfx, H+0.35, cfz+1.4, false);
+  for(const oz of [-0.18, 0.2]){
+    cy(tower, 0.32, 0.32, 0.04, 16, new THREE.MeshStandardMaterial({ color:0xe6b65c, roughness:0.8 }), cfx, H+0.73, cfz+1.4+oz, false);   // pâte
+    cy(tower, 0.28, 0.28, 0.05, 16, new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.8 }), cfx, H+0.75, cfz+1.4+oz, false);   // sauce
+    for(let i=0;i<6;i++) cy(tower, 0.04, 0.04, 0.04, 6, mat(0xd23b2b), cfx+Math.cos(i)*0.18, H+0.78, cfz+1.4+oz+Math.sin(i)*0.18, false); // pepperoni
+  }
+
+  // === cage d'escalier / accès (où l'on monte/descend) sur le toit ===
+  const stair = bx(tower, 2.2, 2.4, 2.0, white, roofExit.x-BX, H+1.2, roofExit.z-BZ, false);
+  bx(tower, 0.12, 2.0, 1.2, navy, roofExit.x-BX-1.1, H+1.0, roofExit.z-BZ, false);   // porte
+  // flèche/marqueur "descendre"
+  const dn = makeTextSprite('▼ Descendre', '#ffe9a0', 2.4); dn.position.set(roofExit.x-BX, H+2.9, roofExit.z-BZ); tower.add(dn);
+
+  tower.position.set(BX, 0, BZ);     // tout est construit en LOCAL, le groupe est posé à (BX, BZ)
+  scene.add(tower);
+  // colliders : on bloque le contour du bâtiment au sol (le joueur fait le tour, l'entrée est gérée par E)
+  for(let a=0; a<16; a++){ const an=a/16*Math.PI*2; addCollider(BX+Math.cos(an)*W*1.02, BZ+Math.sin(an)*D*1.02, 1.4); }
+  // marqueur d'entrée
+  const up = makeTextSprite('▲ Loft Perceval', '#ffe9a0', 3.0); up.position.set(towerDoor.x, 3.4, towerDoor.z); scene.add(up);
+}
+
 // place du village pavée + fontaine à jets + mobilier
 let fountainWater, fountainJet, coffeeStand = null;
 {
@@ -2352,6 +2520,8 @@ const player = {
   walkT: 0,
 };
 player.group.position.set(0, 0, 22);
+let chosenChar = 'Perceval';      // personnage choisi à l'écran-titre (multijoueur : chacun le sien)
+let chosenPseudo = '';
 scene.add(player.group);
 function playerDamage(){ return 14 + (player.level-1)*3; }
 function xpNeeded(){ return 50 + player.level*60; }
@@ -2384,39 +2554,48 @@ function buildBrandSword(){
   return sword;
 }
 function upgradePlayerModel(){
-  if(player.glb || !ASSETS.knight) return;
-  const m = spawnModel('knight', 1.95);
+  if(player.glb) return;
+  const hero = getHeroDef(chosenChar) || getHeroDef('Perceval');
+  if(!hero || !ASSETS[hero.body]) return;
+  const m = spawnModel(hero.body, 1.92);
   if(!m) return;
-  // on retire le corps procédural ; le chevalier KayKit a déjà épée et bouclier
+  // on retire le corps procédural (on garde la bulle de bouclier)
   const keep = new Set([player.shieldBubble]);
   [...player.group.children].forEach(c=>{ if(!keep.has(c)) player.group.remove(c); });
   player.group.add(m.obj);
   player.cape = null;            // la cape procédurale est remplacée par le modèle sculpté
-  // une seule épée + le bouclier à blason (les variantes du pack sont masquées)
-  const keepGearK = new Set(['1H_Sword', 'Badge_Shield']);
-  m.obj.traverse(o=>{
-    if((o.isMesh || o.isSkinnedMesh) && /sword|shield/i.test(o.name) && !keepGearK.has(o.name)) o.visible = false;
-  });
-  // blason Perceval (picto) porté dans le dos
-  const brand = new THREE.Group();
-  addMesh(brand, new THREE.CircleGeometry(0.26, 18),
-    new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, -0.035, false);
-  addMesh(brand, new THREE.TorusGeometry(0.26, 0.03, 8, 22),
-    new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:1.0, roughness:0.28 }), 0, 0, -0.025, false);
-  brand.rotation.y = Math.PI;
-  brand.rotation.z = 0.12;
-  brand.position.set(0, 1.32, -0.3);
-  player.group.add(brand);
-  // lueur de marque : l'épée du chevalier rayonne en bleu Perceval
-  const glow = new THREE.PointLight(BLEU_CLAIR, 0.65, 5.5);
-  glow.position.set(0.4, 1.0, 0.2);
-  player.group.add(glow);
+  m.obj.traverse(o=>{ if((o.isMesh||o.isSkinnedMesh) && hero.id === 'Ray' && o.name === 'Barbarian_Hat') o.visible = false; }); // Ray chauve
+  graftSwordShield(m.obj);       // tout héros apparaît avec épée + écu Perceval
+  if(hero.id === 'Agathe') recolorHeadBlonde(m.obj);
+  // greffe de visage pour la ressemblance (membres de l'équipe)
+  if(hero.look){
+    let headBone = null;
+    m.obj.traverse(o=>{ if(!headBone && (o.name||'').toLowerCase().includes('head')) headBone = o; });
+    if(headBone){
+      const f = buildFaceFeatures(hero.look);
+      f.scale.setScalar(2.2); f.position.set(0, 0.25, 0.14);
+      headBone.add(f);
+    }
+  }
+  // blason Perceval (picto) dans le dos + épée rayonnante : réservé à Perceval
+  if(hero.brand){
+    const brand = new THREE.Group();
+    addMesh(brand, new THREE.CircleGeometry(0.26, 18),
+      new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, -0.035, false);
+    addMesh(brand, new THREE.TorusGeometry(0.26, 0.03, 8, 22),
+      new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:1.0, roughness:0.28 }), 0, 0, -0.025, false);
+    brand.rotation.y = Math.PI; brand.rotation.z = 0.12; brand.position.set(0, 1.32, -0.3);
+    player.group.add(brand);
+    const glow = new THREE.PointLight(BLEU_CLAIR, 0.65, 5.5);
+    glow.position.set(0.4, 1.0, 0.2);
+    player.group.add(glow);
+  }
   player.glb = {
     mixer: m.mixer, actions: m.actions, current: null,
     map: {
       idle:   pickClip(m.actions, 'idle'),
       run:    pickClip(m.actions, 'running_a', 'running', 'run', 'walking_a', 'walk'),
-      attack: pickClip(m.actions, 'slice_diagonal', 'slice', 'chop', '1h_melee', 'attack'),
+      attack: pickClip(m.actions, 'slice_diagonal', 'slice', 'chop', '1h_melee', '2h_melee', 'spellcast', 'attack', 'cast'),
       jump:   pickClip(m.actions, 'jump_full_short', 'jump_full', 'jump_idle', 'jump'),
     },
   };
@@ -2801,6 +2980,30 @@ const NPC_GEAR = {
   Roro:['1H_Sword','Badge_Shield'], Mathias:[], Antoine:[], Bobby:[], Ray:[],
 };
 const GEAR_RX = /sword|axe|knife|crossbow|shield|throwable|mug|spellbook|wand|staff|arrow/i;
+
+/* ==================== ROSTER JOUABLE (chacun prend son personnage) ==================== */
+// rôle court affiché sous chaque personnage à l'écran de choix
+const HERO_ROLE = {
+  Perceval:'Chevalier', Guillaume:'PO & CEO', Merlin:'Enchanteur', Agathe:'Chasseuse',
+  Jojo:'Forgeron', Roro:'Capitaine', Mathias:'Cavalier', Antoine:'Aubergiste', Bobby:'Éclaireur', Ray:'Barde',
+};
+// Merlin est exclu : c'est le donneur de quêtes, il reste PNJ
+const HERO_ORDER = ['Perceval','Guillaume','Agathe','Roro','Jojo','Ray','Mathias','Antoine','Bobby'];
+let _heroRoster = null;
+function heroRoster(){
+  if(_heroRoster) return _heroRoster;
+  const list = [{ id:'Perceval', name:'Perceval', role:HERO_ROLE.Perceval,
+    body:'knight', look:null, gear:['1H_Sword','Badge_Shield'], brand:true }];
+  for(const sh of HERO_ORDER){
+    if(sh === 'Perceval') continue;
+    const def = NPC_DEFS.find(d=>d.short === sh);
+    if(!def || !NPC_BODY[sh]) continue;
+    list.push({ id:sh, name:sh, role:HERO_ROLE[sh] || '', body:NPC_BODY[sh], look:def.look, gear:NPC_GEAR[sh] || [], brand:false });
+  }
+  _heroRoster = list;
+  return list;
+}
+function getHeroDef(id){ return heroRoster().find(h=>h.id === id) || null; }
 // Agathe : on garde le corps KayKit (même univers que la team) mais on rend ses cheveux blonds
 // en repeignant la zone chevelure de l'atlas de la TÊTE uniquement (gants/bottes inchangés).
 function recolorHeadBlonde(obj){
@@ -2824,6 +3027,36 @@ function recolorHeadBlonde(obj){
   nt.flipY = src.flipY; nt.encoding = src.encoding; nt.wrapS = src.wrapS; nt.wrapT = src.wrapT;
   nt.magFilter = src.magFilter; nt.minFilter = src.minFilter;
   const headMat = head.material.clone(); headMat.map = nt; head.material = headMat;
+}
+// épée + écu Perceval greffés dans les mains (tout perso joué apparaît armé)
+function buildHeroSword(){
+  const g = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color:0xd6dae2, metalness:0.85, roughness:0.3 });
+  const gold  = new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:0.9, roughness:0.3 });
+  const grip  = new THREE.MeshStandardMaterial({ color:0x5a3a24, roughness:0.85 });
+  addMesh(g, new THREE.BoxGeometry(0.05, 0.62, 0.014), steel, 0, 0.42, 0, false);     // lame
+  addMesh(g, new THREE.ConeGeometry(0.028, 0.1, 4), steel, 0, 0.78, 0, false);         // pointe
+  addMesh(g, new THREE.BoxGeometry(0.2, 0.04, 0.045), gold, 0, 0.1, 0, false);         // garde
+  addMesh(g, new THREE.CylinderGeometry(0.02, 0.02, 0.14, 8), grip, 0, 0.03, 0, false);// poignée
+  addMesh(g, new THREE.SphereGeometry(0.03, 8, 6), gold, 0, -0.045, 0, false);         // pommeau
+  return g;
+}
+function buildHeroShield(){
+  const g = new THREE.Group();
+  addMesh(g, new THREE.CircleGeometry(0.24, 22), new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, 0.01, false);
+  const rim = addMesh(g, new THREE.TorusGeometry(0.24, 0.028, 8, 24), new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:0.9, roughness:0.3 }), 0, 0, 0.01, false);
+  addMesh(g, new THREE.CylinderGeometry(0.21, 0.21, 0.05, 18), new THREE.MeshStandardMaterial({ color:0x8a6a44, roughness:0.8 }), 0, 0, -0.02, false).rotation.x = Math.PI/2;
+  return g;
+}
+// greffe épée (main droite) + écu (main gauche) sur les slots KayKit, et masque les armes d'origine
+function graftSwordShield(rootObj){
+  let hr = null, hl = null;
+  rootObj.traverse(o=>{
+    if(o.isBone){ if(o.name === 'handslotr') hr = o; else if(o.name === 'handslotl') hl = o; }
+    else if((o.isMesh || o.isSkinnedMesh) && GEAR_RX.test(o.name)) o.visible = false;   // pas de double arme
+  });
+  if(hr){ const s = buildHeroSword(); s.scale.setScalar(2.4); s.rotation.set(Math.PI, 0, 0); s.position.set(0, 0, 0); hr.add(s); }
+  if(hl){ const sh = buildHeroShield(); sh.scale.setScalar(2.4); sh.rotation.set(0, Math.PI/2, 0); sh.position.set(0, 0, 0); hl.add(sh); }
 }
 function buildNpcGLB(def){
   const key = NPC_BODY[def.short];
@@ -2991,6 +3224,9 @@ function updateDelorean(dt, t){
     car.rotation.y = delorean.heading;
     car.position.x = clamp(car.position.x + Math.sin(delorean.heading)*delorean.speed*dt, -104, 104);
     car.position.z = clamp(car.position.z + Math.cos(delorean.heading)*delorean.speed*dt, -104, 104);
+    const bx0 = car.position.x, bz0 = car.position.z;
+    resolveCollision(car.position, 1.9);                 // la DeLorean bute sur les bâtiments
+    if(Math.hypot(car.position.x-bx0, car.position.z-bz0) > 0.05) delorean.speed *= 0.4;  // choc = on ralentit
     car.position.y = getGroundY(car.position.x, car.position.z);
     for(let i=0;i<delorean.wheels.length;i++){
       delorean.wheels[i].tire.rotation.x += delorean.speed*dt*2.2;
@@ -3973,8 +4209,25 @@ function nearestNpc(){
   }
   return best;
 }
+function goUpTower(){
+  playerOnRoof = true;
+  player.group.position.set(roofExit.x, TOWER.y, roofExit.z - 2.8);   // sur le toit, devant la cage d'escalier
+  player.vy = 0; player.onGround = true;
+  showToast('🏢 Loft Perceval — le QG des devs (et la piscine) !');
+}
+function goDownTower(){
+  playerOnRoof = false;
+  player.group.position.set(towerDoor.x - 1.6, 0, towerDoor.z);       // au sol, devant l'entrée
+  player.vy = 0; player.onGround = true;
+}
 function interact(){
   if(delorean.driving){ exitCar(); return; }
+  // immeuble Perceval : monter au loft / en redescendre
+  if(playerOnRoof){
+    if(Math.hypot(player.group.position.x - roofExit.x, player.group.position.z - roofExit.z) < 3){ goDownTower(); return; }
+  } else if(Math.hypot(player.group.position.x - towerDoor.x, player.group.position.z - towerDoor.z) < 3.4){
+    goUpTower(); return;
+  }
   if(!nearestNpc()){
     const d = Math.hypot(player.group.position.x - delorean.group.position.x, player.group.position.z - delorean.group.position.z);
     if(d < 4.4){ enterCar(); return; }
@@ -4238,17 +4491,56 @@ function startRainSound(){
   src.start();
   rainSound = { gain:g };
 }
-const weather = { state:'clear', timer: rand(35, 75), intensity:0, target:0 };
+// coup de tonnerre : grondement de bruit filtré qui descend, décalé (distance de l'éclair)
+function thunder(delay){
+  if(!audioCtx) return;
+  const t0 = audioCtx.currentTime + Math.max(0, delay);
+  const dur = rand(1.4, 2.6);
+  const n = Math.floor(audioCtx.sampleRate*dur);
+  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<n;i++){ const env = Math.pow(1 - i/n, 1.4); d[i] = (Math.random()*2-1)*env; }
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const lp = audioCtx.createBiquadFilter(); lp.type='lowpass';
+  lp.frequency.setValueAtTime(700, t0); lp.frequency.exponentialRampToValueAtTime(80, t0+dur);
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.38, t0+0.04);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  src.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
+  src.start(t0); src.stop(t0+dur+0.1);
+}
+// éclair : flash plein écran (double) + tonnerre décalé
+let lightningT = 0;
+function lightningStrike(intensity){
+  const f = document.getElementById('flash');
+  if(f){
+    f.style.transition = 'none'; f.style.opacity = (0.5 + 0.4*intensity).toFixed(2);
+    requestAnimationFrame(()=>{ f.style.transition = 'opacity .45s'; f.style.opacity = '0'; });
+    setTimeout(()=>{ if(!f) return; f.style.transition='none'; f.style.opacity='0.45';
+      requestAnimationFrame(()=>{ f.style.transition='opacity .4s'; f.style.opacity='0'; }); }, 95);
+  }
+  lightningT = 0.22;                 // bref éclat de lumière dans la scène
+  thunder(rand(0.4, 1.8));           // le son arrive après (l'éclair voyage plus vite)
+}
+const weather = { state:'clear', timer: rand(38, 80), intensity:0, target:0, lightTimer:0 };
 function updateWeather(dt){
   weather.timer -= dt;
   if(weather.timer <= 0){
-    if(weather.state === 'clear'){ weather.state='rain'; weather.target = rand(0.55, 1.0); weather.timer = rand(25, 55); }
-    else { weather.state='clear'; weather.target = 0; weather.timer = rand(45, 95); }
+    // cycle ralenti de ~10 % (averses moins fréquentes)
+    if(weather.state === 'clear'){ weather.state='rain'; weather.target = rand(0.55, 1.0); weather.timer = rand(27, 60); }
+    else { weather.state='clear'; weather.target = 0; weather.timer = rand(50, 105); }
   }
   weather.intensity += (weather.target - weather.intensity) * Math.min(1, dt*0.4);
   const I = weather.intensity;
   weatherWet = I;
   if(rainSound) rainSound.gain.gain.value = I*0.05;
+  // orage : éclairs + tonnerre quand l'averse est forte
+  if(I > 0.45){
+    weather.lightTimer -= dt;
+    if(weather.lightTimer <= 0){ lightningStrike(I); weather.lightTimer = rand(7, 22); }
+  }
+  if(lightningT > 0) lightningT -= dt;
   if(!rain) return;
   rain.seg.material.opacity = I*0.8;
   rain.seg.visible = I > 0.02;
@@ -4345,6 +4637,7 @@ function updateAtmosphere(dt){
     scene.fog.color.lerp(_GREY, w*0.5);
     scene.fog.near = Math.min(scene.fog.near, scene.fog.near - w*18);
   }
+  if(lightningT > 0){ renderer.toneMappingExposure += lightningT*3.0; hemi.intensity += lightningT*1.5; }   // éclat de l'éclair
   // lampadaires : allumés la nuit
   const lampE = 0.3 + nightF*2.5;
   for(const m of lampGlows) m.emissiveIntensity = lampE;
@@ -4397,7 +4690,12 @@ function updatePlayer(dt, t){
   } else {
     pos.y = gy;   // suit les rampes du pont
   }
-  resolveCollision(pos, 0.55);
+  if(playerOnRoof){            // sur le toit : on reste dans l'enceinte (garde-corps), pas de collision sol
+    pos.x = clamp(pos.x, TOWER.x - TOWER.w + 0.6, TOWER.x + TOWER.w - 0.6);
+    pos.z = clamp(pos.z, TOWER.z - TOWER.d + 0.6, TOWER.z + TOWER.d - 0.6);
+  } else {
+    resolveCollision(pos, 0.55);
+  }
 
   // cooldowns & ressources
   player.attackCd = Math.max(0, player.attackCd - dt);
@@ -4535,19 +4833,132 @@ function updateNpcs(dt, t){
 /* ============================================================
    DÉMARRAGE / MORT / FIN
    ============================================================ */
+/* ==================== MULTIJOUEUR TEMPS RÉEL (Supabase Realtime) ====================
+   ⚙️  POUR ACTIVER : crée un projet gratuit sur supabase.com puis colle ci-dessous
+       l'URL du projet et la clé « anon public » (Settings → API).
+       Tant que c'est vide, le jeu reste solo (aucune erreur).                        */
+const MULTI = {
+  url:  'https://kxkhyzbwuehuctrfihvo.supabase.co',
+  key:  'sb_publishable_xz3bT6J5IamTBQmOqowkXA_nSnD9czO',   // clé "publishable" (publique, sans danger)
+  room: 'valblanche',  // nom de la partie partagée (tout le monde sur le même = ensemble)
+};
+// activation possible SANS redéployer : ?mpurl=...&mpkey=...&room=... (mémorisé localement)
+try {
+  const q = new URLSearchParams(location.search);
+  if(q.get('mpurl')) localStorage.pv_mpurl = q.get('mpurl');
+  if(q.get('mpkey')) localStorage.pv_mpkey = q.get('mpkey');
+  if(q.get('room'))  localStorage.pv_room  = q.get('room');
+  if(!MULTI.url && localStorage.pv_mpurl) MULTI.url = localStorage.pv_mpurl;
+  if(!MULTI.key && localStorage.pv_mpkey) MULTI.key = localStorage.pv_mpkey;
+  if(localStorage.pv_room) MULTI.room = localStorage.pv_room;
+} catch(e){}
+const MY_ID = 'p' + Math.floor(Math.random()*1e9).toString(36) + '-' + Date.now().toString(36).slice(-4);
+const remotePlayers = {};
+let mpChannel = null, mpLastSend = 0;
+
+// construit un avatar (corps + visage de l'équipe) SANS contrôles — pour les autres joueurs
+function buildHeroModel(charId){
+  const hero = getHeroDef(charId) || getHeroDef('Perceval');
+  if(!hero || !ASSETS[hero.body]) return null;
+  const m = spawnModel(hero.body, 1.92);
+  if(!m) return null;
+  m.obj.traverse(o=>{ if((o.isMesh||o.isSkinnedMesh) && hero.id === 'Ray' && o.name === 'Barbarian_Hat') o.visible = false; });
+  graftSwordShield(m.obj);       // les autres joueurs aussi : épée + écu
+  if(hero.id === 'Agathe') recolorHeadBlonde(m.obj);
+  if(hero.look){
+    let hb = null; m.obj.traverse(o=>{ if(!hb && (o.name||'').toLowerCase().includes('head')) hb = o; });
+    if(hb){ const f = buildFaceFeatures(hero.look); f.scale.setScalar(2.2); f.position.set(0, 0.25, 0.14); hb.add(f); }
+  }
+  return { wrap:m.wrap, anim:makeEnemyAnim(m) };
+}
+function spawnRemote(data){
+  const built = buildHeroModel(data.char);
+  if(!built) return null;
+  const g = built.wrap;
+  g.position.set(data.x, (data.y != null) ? data.y : getGroundY(data.x, data.z), data.z);
+  g.rotation.y = data.ry || 0;
+  const label = makeTextSprite((data.name || data.char || 'Joueur').slice(0,16), '#ffe9a0', 2.6);
+  label.position.y = 2.45; g.add(label);
+  scene.add(g);
+  return { group:g, anim:built.anim, char:data.char, target:V3(data.x, 0, data.z), ry:data.ry||0, moving:!!data.mv, last:performance.now() };
+}
+function onRemoteData(data){
+  if(!data || data.id === MY_ID || !started) return;
+  let r = remotePlayers[data.id];
+  if(!r){ r = spawnRemote(data); if(r) remotePlayers[data.id] = r; return; }
+  if(data.char && data.char !== r.char){    // le joueur a changé de personnage → on reconstruit
+    scene.remove(r.group); r = spawnRemote(data); if(r) remotePlayers[data.id] = r; return;
+  }
+  r.target.set(data.x, 0, data.z); r.ty = (data.y != null) ? data.y : null; r.ry = data.ry || 0; r.moving = !!data.mv; r.last = performance.now();
+}
+function removeRemote(id){ const r = remotePlayers[id]; if(r){ scene.remove(r.group); delete remotePlayers[id]; } }
+function updateRemotePlayers(dt){
+  const now = performance.now();
+  for(const id in remotePlayers){
+    const r = remotePlayers[id];
+    if(now - r.last > 8000){ removeRemote(id); continue; }   // plus de nouvelles → parti
+    const p = r.group.position, k = Math.min(1, dt*10);
+    p.x += (r.target.x - p.x) * k;
+    p.z += (r.target.z - p.z) * k;
+    const ty = (r.ty != null) ? r.ty : getGroundY(p.x, p.z);   // hauteur diffusée (toit) sinon le sol
+    p.y += (ty - p.y) * k;
+    r.group.rotation.y = lerpAngle(r.group.rotation.y, r.ry, k);
+    if(r.anim) enemyAnim(r.anim, r.moving ? 'walk' : 'idle');
+  }
+}
+function connectMultiplayer(){
+  if(!MULTI.url || !MULTI.key || !window.supabase) return;
+  try{
+    const client = window.supabase.createClient(MULTI.url, MULTI.key);
+    mpChannel = client.channel('perceval-' + MULTI.room, { config:{ broadcast:{ self:false }, presence:{ key:MY_ID } } });
+    mpChannel.on('broadcast', { event:'p' }, ({ payload })=> onRemoteData(payload));
+    mpChannel.on('presence', { event:'leave' }, ({ leftPresences })=>{
+      (leftPresences || []).forEach(pr=>{ const id = pr.id || pr.presence_ref; if(id) removeRemote(id); });
+    });
+    mpChannel.subscribe(status=>{
+      if(status === 'SUBSCRIBED'){
+        mpChannel.track({ id:MY_ID });
+        showToast('🌐 En ligne — partie « ' + MULTI.room + ' »');
+      }
+    });
+  }catch(e){ console.warn('Multijoueur indisponible :', e); }
+}
+function broadcastSelf(){
+  if(!mpChannel) return;
+  const now = performance.now();
+  if(now - mpLastSend < 80) return;          // ~12 envois / seconde
+  mpLastSend = now;
+  const p = player.group.position;
+  mpChannel.send({ type:'broadcast', event:'p', payload:{
+    id:MY_ID, name:(chosenPseudo && chosenPseudo.trim()) || chosenChar, char:chosenChar,
+    x:+p.x.toFixed(2), y:+p.y.toFixed(2), z:+p.z.toFixed(2), ry:+player.group.rotation.y.toFixed(2), mv:!!player.moving
+  }});
+}
+
 function startGame(){
   if(started) return;
   upgradePlayerModel();
   upgradeNpcs();
   swapNature();
+  // si on incarne un membre de l'équipe, on retire son PNJ (on ne se parle pas à soi-même)
+  if(chosenChar !== 'Perceval'){
+    const meIdx = npcs.findIndex(n=>n.def.short === chosenChar);
+    if(meIdx >= 0){ scene.remove(npcs[meIdx].group); npcs.splice(meIdx, 1); }
+  }
   started = true;
+  // nom affiché dans le HUD : pseudo si fourni, sinon le nom du personnage
+  const heroName = getHeroDef(chosenChar) ? getHeroDef(chosenChar).name : 'Perceval';
+  const shown = (chosenPseudo && chosenPseudo.trim()) ? chosenPseudo.trim() : heroName;
+  const pn = document.getElementById('playerName');
+  if(pn) pn.innerHTML = shown + ' — Niveau <span id="lvlTxt">' + player.level + '</span>';
   document.getElementById('title').style.display = 'none';
   document.getElementById('hud').style.display = 'block';
   camYaw = 0;  // caméra derrière le héros, regard vers le nord (le château)
   player.group.rotation.y = Math.PI;
   startQuest(0);
   updateHUD();
-  showToast('Bienvenue à Valblanche, Perceval !');
+  showToast('Bienvenue à Valblanche, ' + shown + ' !');
+  connectMultiplayer();   // rejoint la partie en ligne si Supabase est configuré
 }
 document.getElementById('playBtn').addEventListener('click', ()=>{
   unlockSilentAudio(); initAudio(); startMusic(); startRainSound();
@@ -4559,6 +4970,26 @@ document.getElementById('playBtn').addEventListener('click', ()=>{
     startGame();
   }
 });
+// --- écran de choix du personnage (chacun prend le sien) ---
+(function buildCharSelect(){
+  const row = document.getElementById('charRow');
+  if(!row) return;
+  heroRoster().forEach((h, i)=>{
+    const b = document.createElement('button');
+    b.className = 'charBtn' + (i === 0 ? ' sel' : '');
+    b.innerHTML = '<div class="cbName">' + h.name + '</div><div class="cbRole">' + h.role + '</div>';
+    b.addEventListener('click', ()=>{
+      chosenChar = h.id;
+      row.querySelectorAll('.charBtn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      unlockSilentAudio(); initAudio();
+      if(SFX && SFX.pickup) SFX.pickup();
+    });
+    row.appendChild(b);
+  });
+  const ps = document.getElementById('pseudo');
+  if(ps) ps.addEventListener('input', e=>{ chosenPseudo = e.target.value; });
+})();
 document.getElementById('respawnBtn').addEventListener('click', ()=>{
   player.dead = false;
   player.hp = player.maxhp;
@@ -4628,6 +5059,8 @@ function animate(){
     updateProjectiles(dt);
     updateCrystals(dt, t);
     updateSlashes(dt);
+    broadcastSelf();            // envoie ma position aux autres joueurs
+    updateRemotePlayers(dt);    // déplace/anime les autres joueurs
     updateDialogue();
     updateCooldownUI();
     checkCastleReturn();
