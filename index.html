@@ -3127,14 +3127,14 @@ function buildVillager({ robe=0x9a86c9, skin=0xf2c79a, hat=null, hatColor=BLEU, 
 }
 
 const NPC_DEFS = [
-  { name:'Guillaume — PO & CEO de Perceval', short:'Guillaume', x:3, z:9, look:{ robe:0x3a4aa8, accessory:'scroll', hair:'cap', hairColor:0x9a5a30, skin:0xf2c79a },
+  { name:'Guillaume — PO & CEO de Perceval', short:'Guillaume', x:3, z:9, look:{ robe:0x3a4aa8, accessory:'scroll', hair:'tied', hairColor:0x9a5a30, skin:0xf2c79a },
     lines:[
-      "On me dit de lever le pied. J'ai répondu que mon drone vole déjà très haut, merci, et que le backlog ne se priorise pas tout seul.",
-      "Trois nuits que l'API Modul'r me hante. La seule chose qui me sort des oubliettes, c'est un message de Lia. Et un café. Surtout un café.",
-      "Mon équilibre vie pro vie perso ? Le matin je code, le midi je signe les chèques, le soir je pilote mon drone. Lia appelle ça « une journée », moi j'appelle ça « le sprint ».",
-      "Modul'r est tombé un vendredi soir, pile à l'heure de l'apéro. La Team 10 Positif a dégainé. Moi aussi, hélas, j'avais promis cette soirée à Lia.",
-      "Vacances ? J'ai essayé. Au bout d'une heure de plage je faisais voler le drone au-dessus du BO pour vérifier que tout tenait. Spoiler : ça tenait pas.",
-      "Un jour mon back-office tiendra une semaine entière. Ce jour-là, je range le clavier, j'attrape le drone, et j'emmène Lia voir le coucher de soleil. En attendant : nouveau ticket Modul'r.",
+      "On me dit de lever le pied. J'ai répondu que le backlog ne se priorise pas tout seul — et non, je ne touche pas au code, ce n'est pas mon métier, c'est mon angoisse.",
+      "Trois nuits que l'API Modul'r me hante. La seule chose qui me sort des oubliettes, c'est l'IA. Et un café. Surtout un café.",
+      "Mon équilibre vie pro / vie perso ? Le matin je priorise, le midi je signe les chèques, le soir je relance la Team 10 Positif. L'IA appelle ça « une journée », moi « le sprint ».",
+      "Modul'r est tombé un vendredi soir, pile à l'heure de l'apéro. La Team 10 Positif a dégainé. Moi je ne code pas une ligne — mais je tiens la lampe et le moral, c'est déjà un job.",
+      "Vacances ? J'ai essayé. Au bout d'une heure de plage je demandais à l'IA si le back-office tenait toujours. Spoiler : il tenait pas.",
+      "Un jour mon back-office tiendra une semaine entière. Ce jour-là, je ferme le laptop, je laisse l'IA veiller, et je regarde enfin le coucher de soleil. En attendant : nouveau ticket Modul'r.",
     ]},
   { name:"Merlin l'Enchanteur", short:'Merlin', x:-4, z:11, look:{ robe:0x4C53BD, hat:'pointy', hatColor:0x4C53BD, accessory:'staff', beard:'long' },
     lines:[
@@ -3145,14 +3145,14 @@ const NPC_DEFS = [
       "J'ai connu les contrats signés au sang. Puis le PDF. Puis Modul'r. Parfois, le progrès recule.",
       "Le Dragon Modul'r garde le Contrat Sacré. Son souffle ? Des timeouts. Sa fureur ? Une mise à jour non documentée un vendredi.",
     ]},
-  { name:'Agathe la Chasseuse de Maléfices', short:'Agathe', x:9, z:19, look:{ robe:0x4a8a5c, hair:'long', hairColor:0xd8a84c, skin:0xf6d2ac },
+  { name:'Agathe la Chasseuse de Maléfices', short:'Agathe', x:9, z:19, look:{ robe:0x4a8a5c, hair:'long', hairColor:0xd8a84c, skin:0xf6d2ac, eyes:0x3a86d6 },
     lines:[
-      "Une seconde, je finis mon donjon sur ma DS… voilà. Maintenant on s'occupe du vrai boss : Modul'r en maintenance exceptionnelle.",
-      "Je chasse mieux le ventre plein. File-moi des pâtes et je t'exorcise trois webhooks perdus avant qu'elles refroidissent.",
-      "La doc de Modul'r fait 80 km ? J'ai fini des RPG plus courts sur ma Nintendo DS, et au moins eux avaient une fin.",
-      "Un sortilège qui frappe le vendredi soir sans prévenir ? C'est pas un maléfice, c'est une mise à jour non documentée. Classique.",
-      "La Team 10 Positif m'a recrutée parce que je save avant chaque combat. Eux, ils déployaient sans backup… le vendredi, en plus.",
-      "Tiens, une potion de soin offerte ! Merlin me lance une quête, l'API tombe en pleine nuit. Du coup je mange des pâtes en attendant que le sort se relève.",
+      "Une seconde, je finis mon niveau sur ma Switch… voilà. Maintenant on traque le vrai boss : un bug de Modul'r planqué dans un recoin.",
+      "Je ne code pas une seule ligne — mais montre-moi une appli et je te trouve LE truc qui cloche en trente secondes. Paraît que c'est un don.",
+      "Mon dada, c'est l'expérience utilisateur : si la personne galère, c'est pas elle le problème, c'est l'écran. Modul'r devrait s'en souvenir.",
+      "File-moi des pâtes et je te déniche trois bugs avant qu'elles refroidissent. Je chasse toujours mieux le ventre plein.",
+      "La doc de Modul'r fait 80 km ? J'ai fini des jeux plus courts sur ma Switch — et au moins, eux, le parcours était pensé pour le joueur.",
+      "Tiens, une potion de soin offerte ! Pendant que l'API se relève, je te signale au passage ce bouton illisible… et je remange des pâtes.",
     ], heal:true },
   { name:'Jojo le Forgeron Compulsif', short:'Jojo', x:-5.5, z:12, look:{ robe:0x8a5a3a, accessory:'hammer', beard:'short', beardColor:0x3a2e24, hair:'cap', hairColor:0x2e2620, glasses:'round', skin:0xeec096 },
     lines:[
@@ -3199,14 +3199,14 @@ const NPC_DEFS = [
       "Mes bottes ont fait trois fois le tour du royaume. Le ticket Modul'r n°1, lui, n'a toujours pas bougé de la colonne « To Do ».",
       "Note tout, trace tout. Modul'r ne trace rien : c'est comme ça qu'on perd des dossiers en montagne. Enfin, en base.",
     ]},
-  { name:'Ray le Barde Conteur', short:'Ray', x:-4, z:-66, look:{ robe:0x2a6a9a, accessory:'lute', hair:'bald', beard:'full', beardColor:0x9a948c, glasses:'sun', skin:0xe0aa7c },
+  { name:'Ray le Barde Conteur', short:'Ray', x:-4, z:-66, look:{ robe:0x2a6a9a, accessory:'lute', hair:'bald', beard:'full', beardColor:0x9a948c, skin:0xe0aa7c },
     lines:[
-      "Ma boule de cristal répond à toutes mes questions. Parfois même avant que je les pose.",
-      "Je suis indépendant : je conte pour Perceval, jamais pour Modul'r. Leur histoire n'a ni début, ni fin, ni sens. Surtout pas de fin.",
-      "Chaque soir je conte tes exploits. J'embellis à peine. Disons 20%. Bon… 40.",
-      "J'ai demandé à ma boule pourquoi Modul'r bug autant. Elle a affiché un sablier. Elle aussi.",
-      "Elle prédit tout, sauf le prochain plantage Modul'r. Trop aléatoire. Même pour la magie.",
-      "Hier je lui ai demandé la météo. Elle m'a répondu en alexandrins. On ne s'ennuie jamais, tous les deux.",
+      "Ma boule de cristal — pardon, mon IA — répond à toutes mes questions. Parfois même avant que je les pose.",
+      "Pour voir loin j'ai deux outils : mon drone, qui monte plus haut que le donjon, et l'IA, qui voit encore plus loin que lui.",
+      "Je fais voler mon drone au-dessus du royaume chaque matin. De là-haut, même les bugs de Modul'r ont l'air petits. À peine.",
+      "J'ai demandé à l'IA pourquoi Modul'r plante autant. Elle a réfléchi… puis affiché un sablier. Elle aussi, donc.",
+      "Mon drone filme tes exploits, l'IA en écrit la ballade, et moi je n'ai plus qu'à embellir. À peine. Disons 40%.",
+      "Hier j'ai demandé la météo à l'IA : réponse en alexandrins. Puis j'ai sorti le drone pour vérifier. On ne s'ennuie jamais.",
     ]},
 ];
 
@@ -3236,6 +3236,27 @@ function buildFaceFeatures(look){
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.165, 0.013, 8, 24),
       new THREE.MeshStandardMaterial({ color:0xd9b13b, metalness:0.7, roughness:0.3 }));
     band.rotation.x = Math.PI/2 - 0.3; band.position.set(0, 0.12, -0.04); f.add(band);
+  } else if(hair === 'tied'){
+    // cheveux attachés : queue de cheval / petit chignon à l'arrière + élastique (Guillaume)
+    const hairMat = mat(hairColor, { roughness:0.74 });
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(0.072, 11, 9), hairMat);
+    bun.position.set(0, 0.02, -0.17); bun.scale.set(0.95, 1.0, 1.0); f.add(bun);
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.05, 9, 8), hairMat);
+    tail.position.set(0, -0.17, -0.17); tail.scale.set(0.7, 1.7, 0.7); f.add(tail);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.014, 6, 16),
+      new THREE.MeshStandardMaterial({ color:0x2a2a30, roughness:0.6 }));
+    band.rotation.x = Math.PI/2; band.position.set(0, 0.03, -0.14); f.add(band);
+  }
+  // yeux colorés (ex. Agathe : bleus) — petits globes posés sur les yeux peints
+  if(look.eyes){
+    const white = new THREE.MeshStandardMaterial({ color:0xf4f4ee, roughness:0.45 });
+    const iris  = new THREE.MeshStandardMaterial({ color:look.eyes, roughness:0.32, metalness:0.05 });
+    const pupil = new THREE.MeshStandardMaterial({ color:0x10131a, roughness:0.4 });
+    for(const sx of [-0.052, 0.052]){
+      const e  = new THREE.Mesh(new THREE.SphereGeometry(0.027, 12, 9), white); e.position.set(sx, 0.035, 0.136); e.scale.set(1, 1, 0.55); f.add(e);
+      const ir = new THREE.Mesh(new THREE.SphereGeometry(0.015, 12, 9), iris);  ir.position.set(sx, 0.035, 0.151); ir.scale.set(1, 1, 0.4); f.add(ir);
+      const pu = new THREE.Mesh(new THREE.SphereGeometry(0.0065, 8, 6), pupil);  pu.position.set(sx, 0.035, 0.157); pu.scale.set(1, 1, 0.4); f.add(pu);
+    }
   }
   if(beard === 'long'){
     const b = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 8), mat(beardColor, { roughness:0.9 }));
@@ -3244,18 +3265,14 @@ function buildFaceFeatures(look){
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), mat(beardColor, { roughness:0.9 }));
     b.position.set(0, -0.07, 0.11); f.add(b);
   } else if(beard === 'full'){
-    // barbe fournie et sculptée : mâchoire + bouc pointu + moustache + favoris (Ray)
-    const bm = mat(beardColor, { roughness:0.95 });
-    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 10), bm);
-    jaw.position.set(0, -0.085, 0.03); jaw.scale.set(1.14, 0.94, 1.0); f.add(jaw);
-    const chin = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.17, 8), bm);
-    chin.position.set(0, -0.205, 0.05); chin.rotation.x = 0.22; f.add(chin);
-    const mous = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.042, 0.05), bm);
-    mous.position.set(0, 0.002, 0.13); f.add(mous);
-    for(const sx of [-0.125, 0.125]){
-      const sb = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.15, 0.05), bm);
-      sb.position.set(sx, 0.02, 0.065); f.add(sb);
-    }
+    // barbe nette et arrondie : mâchoire + menton + fine moustache (Ray)
+    const bm = mat(beardColor, { roughness:0.92 });
+    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 11), bm);
+    jaw.position.set(0, -0.075, 0.02); jaw.scale.set(1.12, 0.92, 1.02); f.add(jaw);
+    const chin = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), bm);
+    chin.position.set(0, -0.185, 0.07); chin.scale.set(1.0, 1.1, 0.9); f.add(chin);
+    const mous = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.035, 0.045), bm);
+    mous.position.set(0, 0.0, 0.135); f.add(mous);
   }
   if(glasses === 'round'){
     const frameMat = new THREE.MeshStandardMaterial({ color:0x3a3530, metalness:0.6, roughness:0.4 });
@@ -3437,57 +3454,72 @@ for(const def of NPC_DEFS){
 /* ==================== LA DELOREAN (cachée derrière le château, conduisible) ==================== */
 const delorean = (()=>{
   const g = new THREE.Group();
-  const steel  = new THREE.MeshStandardMaterial({ color:0xc2c6cf, metalness:0.9, roughness:0.3 });
-  const dark   = new THREE.MeshStandardMaterial({ color:0x12141c, metalness:0.4, roughness:0.25 });
-  const tire   = new THREE.MeshStandardMaterial({ color:0x0e0e12, roughness:0.85 });
-  const rim    = new THREE.MeshStandardMaterial({ color:0x9aa0aa, metalness:0.9, roughness:0.3 });
-  const fluxMat= new THREE.MeshStandardMaterial({ color:0x10324a, emissive:0x55ccff, emissiveIntensity:1.4 });
-  const tailMat= new THREE.MeshStandardMaterial({ color:0x5a0e10, emissive:0xff3322, emissiveIntensity:1.2 });
-  const headMat= new THREE.MeshStandardMaterial({ color:0xfff4d6, emissive:0xffe9b0, emissiveIntensity:1.2 });
-  // châssis + bas de caisse
-  bx(g, 1.95, 0.5, 3.9, steel, 0, 0.62, 0);
-  bx(g, 2.05, 0.22, 3.95, dark, 0, 0.40, 0, false);
-  // capot avant en biseau + grille
-  const hood = bx(g, 1.85, 0.26, 1.5, steel, 0, 0.74, 1.55); hood.rotation.x = -0.16;
-  bx(g, 1.5, 0.04, 0.9, dark, 0, 0.90, 1.7, false);
-  // cabine + vitrages inclinés
-  bx(g, 1.7, 0.5, 1.7, steel, 0, 1.06, -0.15);
-  const wsh = bx(g, 1.5, 0.6, 0.08, dark, 0, 1.2, 0.75); wsh.rotation.x = -0.62;
-  const rear = bx(g, 1.5, 0.55, 0.08, dark, 0, 1.18, -1.05); rear.rotation.x = 0.5;
-  bx(g, 0.1, 0.5, 1.6, dark, 0.82, 1.1, -0.15, false);
-  bx(g, 0.1, 0.5, 1.6, dark, -0.82, 1.1, -0.15, false);
-  bx(g, 1.55, 0.08, 1.2, steel, 0, 1.34, -0.2);
-  // portes papillon relevées
+  const steel  = new THREE.MeshStandardMaterial({ color:0xbabec8, metalness:0.95, roughness:0.22 });   // inox brossé
+  const steelD = new THREE.MeshStandardMaterial({ color:0x9296a0, metalness:0.92, roughness:0.34 });
+  const dark   = new THREE.MeshStandardMaterial({ color:0x101218, metalness:0.5, roughness:0.3 });
+  const glass  = new THREE.MeshStandardMaterial({ color:0x0d2030, metalness:0.6, roughness:0.08, transparent:true, opacity:0.72 });
+  const tire   = new THREE.MeshStandardMaterial({ color:0x0d0d11, roughness:0.9 });
+  const rim    = new THREE.MeshStandardMaterial({ color:0xc6ccd4, metalness:0.95, roughness:0.22 });
+  const chrome = new THREE.MeshStandardMaterial({ color:0xe8edf2, metalness:1.0, roughness:0.12 });
+  const fluxMat= new THREE.MeshStandardMaterial({ color:0x10324a, emissive:0x66ddff, emissiveIntensity:1.6 });
+  const tailMat= new THREE.MeshStandardMaterial({ color:0x5a0e10, emissive:0xff3322, emissiveIntensity:1.3 });
+  const headMat= new THREE.MeshStandardMaterial({ color:0xfff4d6, emissive:0xffe9b0, emissiveIntensity:1.3 });
+  const glowMat= new THREE.MeshStandardMaterial({ color:0x0a2230, emissive:0x33ddff, emissiveIntensity:1.4 });
+  // --- soubassement + corps (profil « wedge ») ---
+  bx(g, 2.0, 0.30, 4.0, dark, 0, 0.40, 0, false);
+  bx(g, 1.96, 0.34, 3.86, steel, 0, 0.66, 0);
+  for(const sx of [-1,1]) bx(g, 0.06, 0.2, 3.7, steelD, sx*0.99, 0.5, 0, false);                 // bas de caisse foncé
+  for(const sx of [-1,1]) for(let i=0;i<4;i++) bx(g, 0.05, 0.02, 0.5, dark, sx*1.0, 0.74+i*0.05, -1.0, false);  // persiennes de flanc
+  // --- capot plongeant + calandre + pare-chocs chromé ---
+  const hood = bx(g, 1.88, 0.2, 1.5, steel, 0, 0.8, 1.5); hood.rotation.x = -0.13;
+  bx(g, 1.7, 0.05, 0.9, dark, 0, 0.92, 1.72, false);
+  for(let i=-3;i<=3;i++) bx(g, 0.05, 0.13, 0.04, dark, i*0.18, 0.72, 2.16, false);                // lamelles de calandre
+  bx(g, 1.9, 0.1, 0.1, chrome, 0, 0.6, 2.2, false);
+  // --- cabine + vitrages + montants ---
+  bx(g, 1.66, 0.44, 1.7, steel, 0, 1.08, -0.15);
+  bx(g, 1.56, 0.08, 1.25, steel, 0, 1.33, -0.2);                                                  // toit
+  const wsh = bx(g, 1.46, 0.6, 0.05, glass, 0, 1.18, 0.72); wsh.rotation.x = -0.6;                // pare-brise
+  for(const sx of [-1,1]) bx(g, 0.05, 0.4, 1.35, glass, sx*0.81, 1.1, -0.15, false);              // vitres latérales
+  for(const sx of [-1,1]){ bx(g, 0.08, 0.5, 0.08, steelD, sx*0.83, 1.12, 0.58, false); bx(g, 0.08, 0.5, 0.08, steelD, sx*0.83, 1.12, -0.9, false); }
+  for(let i=0;i<6;i++){ const l = bx(g, 1.42, 0.02, 0.17, dark, 0, 1.0+i*0.058, -0.98, false); l.rotation.x = 0.5; }  // louvres arrière
+  // --- portes papillon ouvertes ---
   for(const sx of [-1, 1]){
     const door = new THREE.Group();
-    bx(door, 0.08, 0.62, 1.5, steel, 0, 0, 0);
-    bx(door, 0.05, 0.42, 1.1, dark, 0.02*sx, 0.05, 0, false);
-    door.position.set(sx*0.86, 1.5, -0.1);
-    door.rotation.z = sx*0.95; door.rotation.x = -0.12;
+    bx(door, 0.07, 0.6, 1.5, steel, 0, 0, 0);
+    bx(door, 0.04, 0.4, 1.05, glass, 0.02*sx, 0.08, 0, false);
+    bx(door, 0.05, 0.05, 1.5, chrome, 0.03*sx, 0.32, 0, false);
+    door.position.set(sx*0.85, 1.5, -0.1);
+    door.rotation.z = sx*0.95; door.rotation.x = -0.1;
     g.add(door);
   }
-  // arrière : persiennes moteur + barre de feux + Mr Fusion
-  bx(g, 1.5, 0.5, 0.12, dark, 0, 1.0, -1.62, false);
-  bx(g, 1.6, 0.1, 0.08, tailMat, 0, 1.25, -1.66, false);
-  cy(g, 0.18, 0.22, 0.3, 10, rim, 0, 1.5, -1.5);
-  const fluxCore = sp(g, 0.13, fluxMat, 0, 1.6, -1.45, 10);
-  for(const sx of [-1,1]) bx(g, 0.06, 0.16, 2.2, fluxMat, sx*0.99, 0.78, -0.2, false);
-  // phares
-  bx(g, 0.3, 0.12, 0.05, headMat, -0.6, 0.78, 2.28, false);
-  bx(g, 0.3, 0.12, 0.05, headMat,  0.6, 0.78, 2.28, false);
-  // roues
+  // --- arrière : grille moteur + barre de feux + Mr Fusion + condensateur de flux ---
+  bx(g, 1.5, 0.5, 0.1, dark, 0, 1.0, -1.6, false);
+  for(let i=0;i<7;i++) bx(g, 0.04, 0.4, 0.04, steelD, -0.6+i*0.2, 1.0, -1.64, false);             // grille verticale
+  bx(g, 1.7, 0.12, 0.06, tailMat, 0, 1.28, -1.66, false);                                         // barre de feux
+  bx(g, 1.9, 0.1, 0.1, chrome, 0, 0.62, -1.66, false);                                            // pare-chocs arrière
+  cy(g, 0.16, 0.2, 0.26, 12, chrome, 0, 1.5, -1.42);                                              // Mr Fusion
+  cy(g, 0.1, 0.13, 0.1, 12, dark, 0, 1.66, -1.42, false);
+  const fluxCore = sp(g, 0.13, fluxMat, 0, 1.62, -1.38, 12);                                      // cœur lumineux
+  for(const sx of [-1,1]) cy(g, 0.035, 0.035, 0.5, 6, fluxMat, sx*0.3, 1.62, -1.38, false);
+  for(const sx of [-1,1]) bx(g, 0.05, 0.06, 2.0, glowMat, sx*1.0, 0.84, -0.1, false);             // bandes de flux latérales
+  // --- phares ---
+  for(const sx of [-1,1]){ bx(g, 0.34, 0.13, 0.05, headMat, sx*0.62, 0.82, 2.18, false); bx(g, 0.38, 0.17, 0.04, chrome, sx*0.62, 0.82, 2.15, false); }
+  // --- roues : pneu + jante chromée + cabochon + boulons (tournent avec le pneu) ---
   const wheels = [];
-  for(const [wx,wz] of [[-0.98,1.3],[0.98,1.3],[-0.98,-1.3],[0.98,-1.3]]){
+  for(const [wx,wz] of [[-1.0,1.3],[1.0,1.3],[-1.0,-1.3],[1.0,-1.3]]){
     const w = new THREE.Group();
-    const tireM = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.34,14), tire);
+    const tireM = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.32,18), tire);
+    const rimD = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.34,16), rim); tireM.add(rimD);
+    const capD = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.36,10), chrome); tireM.add(capD);
+    for(let s=0;s<5;s++){ const a = s/5*Math.PI*2; for(const fy of [-0.16,0.16]){ const bolt = new THREE.Mesh(new THREE.SphereGeometry(0.03,6,5), chrome); bolt.position.set(Math.cos(a)*0.2, fy, Math.sin(a)*0.2); tireM.add(bolt); } }
     tireM.rotation.z = Math.PI/2; tireM.castShadow = true; w.add(tireM);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.36,8), rim);
-    hub.rotation.z = Math.PI/2; w.add(hub);
     w.position.set(wx, 0.42, wz);
     g.add(w); wheels.push({ grp:w, tire:tireM });
   }
-  const fluxLight = new THREE.PointLight(0x66ccff, 0.6, 6, 2);
-  fluxLight.position.set(0, 1.5, -1.4); g.add(fluxLight);
+  // --- éclairages : condensateur + under-glow ---
+  const fluxLight = new THREE.PointLight(0x66ccff, 0.6, 6, 2); fluxLight.position.set(0, 1.5, -1.4); g.add(fluxLight);
+  const underGlow = new THREE.PointLight(0x33ddff, 0.45, 4, 2); underGlow.position.set(0, 0.2, 0); g.add(underGlow);
+  bx(g, 1.6, 0.03, 3.4, glowMat, 0, 0.26, 0, false);                                              // bande lumineuse sous la voiture
   g.position.set(-14, 0, -61);   // dans l'herbe à côté du château, près de Ray
   g.rotation.y = 0.35;
   scene.add(g);
