@@ -117,9 +117,11 @@
     display:flex; flex-direction:column; gap:4px; pointer-events:none; z-index:6; }
   #chatLog .cmsg { background:rgba(40,53,129,0.72); color:#fff; align-self:flex-start;
     border-radius:10px; padding:4px 10px; font-size:13px; max-width:100%;
-    box-shadow:0 2px 8px rgba(0,0,0,0.25); animation:cfade 0.2s ease; }
+    box-shadow:0 2px 8px rgba(0,0,0,0.25); animation:cfade 0.25s ease;
+    transition:opacity .5s ease, transform .5s ease; }
   #chatLog .cmsg b { color:#ffd44d; }
-  @keyframes cfade { from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none; } }
+  #chatLog .cmsg.out { opacity:0 !important; transform:translateY(-16px); }   /* part vers le haut en fondu */
+  @keyframes cfade { from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:none; } }
   #chatBar { position:absolute; bottom:108px; left:50%; transform:translateX(-50%);
     width:min(560px,86vw); display:none; align-items:center; gap:8px; z-index:7;
     background:rgba(40,53,129,0.92); border-radius:14px; padding:10px 14px; pointer-events:auto; }
@@ -5507,13 +5509,28 @@ function showChatBubble(group, text){
   b.position.y = 3.0; group.add(b); group.userData._bub = b;
   return b;
 }
+function fadeOutChatMsg(m){
+  if(!m || m.classList.contains('out')) return;
+  m.classList.add('out');                                   // remonte + s'efface
+  setTimeout(()=>{ if(m.parentNode) m.parentNode.removeChild(m); }, 520);
+}
+function gradeChatLog(){
+  const log = document.getElementById('chatLog'); if(!log) return;
+  const msgs = Array.from(log.querySelectorAll('.cmsg:not(.out)'));
+  const n = msgs.length;                                    // les plus anciens (en haut) sont plus fondus
+  msgs.forEach((m, i)=>{ const ageFromNew = n - 1 - i; m.style.opacity = Math.max(0.18, 1 - ageFromNew*0.2).toFixed(2); });
+}
 function pushChatLog(name, text){
   const log = document.getElementById('chatLog'); if(!log) return;
   const d = document.createElement('div'); d.className = 'cmsg';
   d.innerHTML = '<b>' + name.replace(/[<>&]/g,'') + ' :</b> ' + text.replace(/[<>&]/g,'');
   log.appendChild(d);
-  while(log.children.length > 5) log.removeChild(log.firstChild);
-  setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); }, 9000);
+  gradeChatLog();                                           // dégradé d'opacité du plus ancien au plus récent
+  // au-delà de 5 messages : le plus ancien remonte vers le haut en fondu et disparaît
+  let live = log.querySelectorAll('.cmsg:not(.out)');
+  while(live.length > 5){ fadeOutChatMsg(live[0]); live = log.querySelectorAll('.cmsg:not(.out)'); }
+  // sans nouveau message, chaque ligne finit par s'effacer aussi
+  setTimeout(()=>{ fadeOutChatMsg(d); }, 12000);
 }
 function onChat(c){
   if(!c || c.id === MY_ID) return;
