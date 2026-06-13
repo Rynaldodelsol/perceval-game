@@ -3275,7 +3275,7 @@ const NPC_DEFS = [
       "Et go-perceval.fr ? Un site qui déchire sa mémé, magnifique et rapide, où nul ne s'égare. Trois clics, on est arrivé : un balisage parfait, sans une ronce.",
       "Jetez aux oubliettes vos cartes froissées d'antan. Désormais on randonne léger : BO solide, App limpide, site qui en jette. Le bon cap, enfin — et que ça grimpe !",
     ]},
-  { name:'Ray le Barde Conteur', short:'Ray', x:-4, z:-66, look:{ robe:0x2a6a9a, accessory:'lute', hair:'bald', beard:'full', beardColor:0x1d1a16, skin:0xe0aa7c },
+  { name:'Ray le Barde Conteur', short:'Ray', x:-4, z:-66, look:{ robe:0x2a6a9a, accessory:'lute', hair:'bald', skin:0xe0aa7c },
     lines:[
       "Approche, écoute ! Mon drone survole le royaume, ma boule de cristal — mon IA — murmure l'avenir… et crois-moi, la légende qu'on s'apprête à conter va déchirer sa mémé.",
       "Modul'r ? Une triste ballade : doc longue de 80 km, sortilèges qui buggent le vendredi. Mon drone a filmé ce donjon de plomb… un navet, même pour un conteur !",
@@ -3330,7 +3330,7 @@ function buildFaceFeatures(look){
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), mat(beardColor, { roughness:0.9 }));
     b.position.set(0, -0.07, 0.11); f.add(b);
   } else if(beard === 'full'){
-    // une simple barbe grise, nette, et c'est tout (Ray)
+    // une simple barbe nette (Mathias)
     const bm = mat(beardColor, { roughness:0.9 });
     const b = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), bm);
     b.position.set(0, -0.12, 0.04); b.scale.set(1.05, 0.98, 0.78); f.add(b);
@@ -3429,7 +3429,8 @@ function buildHeroSword(){
 }
 function buildHeroShield(){
   const g = new THREE.Group();
-  addMesh(g, new THREE.CircleGeometry(0.24, 22), new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, 0.01, false);
+  const face = addMesh(g, new THREE.CircleGeometry(0.24, 22), new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, 0.01, false);
+  face.rotation.z = Math.PI/2;   // picto Perceval bien droit (à l'arrêt) sur l'écu tenu
   const rim = addMesh(g, new THREE.TorusGeometry(0.24, 0.028, 8, 24), new THREE.MeshStandardMaterial({ color:0xe8c95a, metalness:0.9, roughness:0.3 }), 0, 0, 0.01, false);
   addMesh(g, new THREE.CylinderGeometry(0.21, 0.21, 0.05, 18), new THREE.MeshStandardMaterial({ color:0x8a6a44, roughness:0.8 }), 0, 0, -0.02, false).rotation.x = Math.PI/2;
   return g;
@@ -3670,11 +3671,11 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*15;                                  // vitesse plus douce et maîtrisable
-    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.6);
-    if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.5));
+    const target = throttle*10;                                  // vitesse bien réduite, paisible
+    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.7);
+    if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.6));
     const dir = delorean.speed < 0 ? -1 : 1;
-    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/6, 0, 1) * 1.5 * dir * dt;
+    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/3, 0, 1) * 2.8 * dir * dt;   // braquage franc
     car.rotation.y = delorean.heading;
     car.position.x = clamp(car.position.x + Math.sin(delorean.heading)*delorean.speed*dt, -104, 104);
     car.position.z = clamp(car.position.z + Math.cos(delorean.heading)*delorean.speed*dt, -104, 104);
@@ -3689,7 +3690,7 @@ function updateDelorean(dt, t){
     player.group.position.set(car.position.x, car.position.y, car.position.z);
     player.group.rotation.y = delorean.heading;
     if(camDist < 12) camDist = 12;
-    if(Math.abs(delorean.speed) > 6 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
+    if(Math.abs(delorean.speed) > 4.5 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
     setHint('Descendre de la DeLorean');
     // je diffuse en continu que je tiens le volant : les autres me voient rouler et ne peuvent pas entrer
     const now = performance.now();
@@ -3703,7 +3704,7 @@ function updateDelorean(dt, t){
     delorean.heading = r.group.rotation.y; car.rotation.y = delorean.heading;
     delorean.speed = rspeed;
     for(let i=0;i<delorean.wheels.length;i++) delorean.wheels[i].tire.rotation.x += rspeed*dt*2.2;
-    if(rspeed > 6 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
+    if(rspeed > 4.5 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
   } else {
     delorean.speed = 0;
     if(started && hint && hint.style.display !== 'block'){
