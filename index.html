@@ -3254,14 +3254,10 @@ function buildFaceFeatures(look){
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), mat(beardColor, { roughness:0.9 }));
     b.position.set(0, -0.07, 0.11); f.add(b);
   } else if(beard === 'full'){
-    // barbe nette et arrondie : mâchoire + menton + fine moustache (Ray)
-    const bm = mat(beardColor, { roughness:0.92 });
-    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 11), bm);
-    jaw.position.set(0, -0.075, 0.02); jaw.scale.set(1.12, 0.92, 1.02); f.add(jaw);
-    const chin = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), bm);
-    chin.position.set(0, -0.185, 0.07); chin.scale.set(1.0, 1.1, 0.9); f.add(chin);
-    const mous = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.035, 0.045), bm);
-    mous.position.set(0, 0.0, 0.135); f.add(mous);
+    // une simple barbe grise, nette, et c'est tout (Ray)
+    const bm = mat(beardColor, { roughness:0.9 });
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), bm);
+    b.position.set(0, -0.12, 0.04); b.scale.set(1.05, 0.98, 0.78); f.add(b);
   }
   if(glasses === 'round'){
     const frameMat = new THREE.MeshStandardMaterial({ color:0x3a3530, metalness:0.6, roughness:0.4 });
@@ -3520,27 +3516,12 @@ const delorean = (()=>{
 delorean.driverId = null;          // qui conduit (MY_ID = moi). null = voiture libre
 delorean.passenger = false;        // suis-je monté comme passager ?
 delorean.net = { active:false, x:0, z:0, h:0, last:0 };   // dernière position reçue d'un conducteur distant
-function carHasRemoteDriver(){
-  return delorean.driverId && delorean.driverId !== MY_ID && delorean.net.active && (performance.now() - delorean.net.last < 6000);
-}
-function onCarData(d){
-  if(!d || d.id === MY_ID) return;
-  if(d.release){            // le conducteur descend : voiture libérée
-    if(delorean.driverId === d.id){ delorean.driverId = null; delorean.net.active = false; }
-    if(delorean.passenger){ delorean.passenger = false; player.group.visible = true; }   // le chauffeur est parti
-    return;
-  }
-  delorean.driverId = d.id;
-  delorean.net.x = d.x; delorean.net.z = d.z; delorean.net.h = d.h; delorean.net.active = true; delorean.net.last = performance.now();
-}
+// DeLorean LOCALE à chaque joueur : pas de synchro conducteur/passager (elle était « volée »/téléportée
+// par des sessions fantômes du salon partagé → injouable). Chacun conduit la sienne, toujours pilotable.
+function carHasRemoteDriver(){ return false; }
+function onCarData(d){ /* ignoré : la voiture est locale à chaque joueur */ }
 function enterCar(){
-  if(delorean.driving || delorean.passenger) return;
-  if(carHasRemoteDriver()){
-    delorean.passenger = true;                 // un copain conduit déjà → je monte en passager
-    if(SFX.shield) SFX.shield();
-    showToast('🚗 Passager de la DeLorean — E pour descendre');
-    return;
-  }
+  if(delorean.driving) return;
   delorean.driving = true;
   delorean.driverId = MY_ID;
   delorean.heading = delorean.group.rotation.y;
@@ -3548,45 +3529,20 @@ function enterCar(){
   player.group.visible = false;
   SFX.shield();
   showToast('🚗⚡ DeLorean — 88 mph, et en avant !');
-  mpSend('car', { id:MY_ID, x:+delorean.group.position.x.toFixed(2), z:+delorean.group.position.z.toFixed(2), h:+delorean.heading.toFixed(2) });
 }
 function exitCar(){
-  if(delorean.passenger){
-    delorean.passenger = false;
-    player.group.visible = true;
-    const ang = delorean.group.rotation.y;
-    const px = clamp(delorean.group.position.x + Math.cos(ang)*2.4, -104, 104);
-    const pz = clamp(delorean.group.position.z - Math.sin(ang)*2.4, -104, 104);
-    player.group.position.set(px, getGroundY(px, pz), pz);
-    showToast('Vous descendez de la DeLorean.');
-    return;
-  }
   if(!delorean.driving) return;
   delorean.driving = false;
-  if(delorean.driverId === MY_ID) delorean.driverId = null;
+  delorean.driverId = null;
   player.group.visible = true;
   const px = clamp(delorean.group.position.x + Math.cos(delorean.heading)*2.4, -104, 104);
   const pz = clamp(delorean.group.position.z - Math.sin(delorean.heading)*2.4, -104, 104);
   player.group.position.set(px, getGroundY(px, pz), pz);
   showToast('Vous descendez de la DeLorean.');
-  mpSend('car', { id:MY_ID, release:true });
 }
 function updateDelorean(dt, t){
   if(!delorean) return;
   const car = delorean.group;
-  const remoteDrive = carHasRemoteDriver();
-  // un copain conduit : j'anime sa voiture d'après le réseau (je n'y touche pas)
-  if(remoteDrive && !delorean.driving){
-    const k = Math.min(1, dt*10);
-    car.position.x += (delorean.net.x - car.position.x) * k;
-    car.position.z += (delorean.net.z - car.position.z) * k;
-    car.position.y = getGroundY(car.position.x, car.position.z);
-    car.rotation.y = lerpAngle(car.rotation.y, delorean.net.h, k);
-    delorean.heading = car.rotation.y;
-    for(let i=0;i<delorean.wheels.length;i++) delorean.wheels[i].tire.rotation.x += 6*dt;
-  } else if(delorean.driverId && delorean.driverId !== MY_ID && (performance.now() - delorean.net.last > 6000)){
-    delorean.driverId = null; delorean.net.active = false;     // conducteur distant disparu → voiture libre
-  }
   const pulse = 1.0 + Math.sin(t*8)*0.4 + (delorean.driving ? Math.min(1.6, Math.abs(delorean.speed)*0.08) : 0);
   delorean.fluxCore.material.emissiveIntensity = pulse;
   delorean.fluxLight.intensity = 0.35 + pulse*0.3;
@@ -3598,8 +3554,8 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*13;                                  // vitesse réduite : bien plus pilotable
-    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.7);
+    const target = throttle*17;                                  // vitesse intermédiaire : pilotable sans être lente
+    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.9);
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.4));
     const dir = delorean.speed < 0 ? -1 : 1;
     delorean.heading -= steer * clamp(Math.abs(delorean.speed)/6, 0, 1) * 1.7 * dir * dt;
@@ -3624,29 +3580,18 @@ function updateDelorean(dt, t){
         burst(p, 0xff7a1e, 4, 2, 0.24, 0.5, 1.5);
       }
     }
-    const now = performance.now();
-    if(mpChannel && now - mpCarSend > 80){   // ~12 envois / seconde de la position de la voiture
-      mpCarSend = now;
-      mpSend('car', { id:MY_ID, x:+car.position.x.toFixed(2), z:+car.position.z.toFixed(2), h:+delorean.heading.toFixed(2) });
-    }
-    setHint('Descendre de la DeLorean');
-  } else if(delorean.passenger){
-    // collé au véhicule, visible (les autres me voient dedans) — je ne peux que descendre
-    player.group.position.set(car.position.x, car.position.y + 0.1, car.position.z);
-    player.group.rotation.y = car.rotation.y;
-    if(camDist < 12) camDist = 12;
-    setHint('Descendre de la DeLorean');
+    setHint('Descendre de la DeLorean');   // voiture locale : plus de diffusion réseau
   } else {
     delorean.speed = 0;
     if(started && hint && hint.style.display !== 'block'){
       const d = Math.hypot(player.group.position.x - car.position.x, player.group.position.z - car.position.z);
       if(d < 4.4 && !nearestNpc()){
-        setHint(remoteDrive ? 'Monter en passager' : 'Conduire la DeLorean ⏱️');
+        setHint('Conduire la DeLorean ⏱️');
       }
     }
   }
   delorean.carCol.x = car.position.x; delorean.carCol.z = car.position.z;
-  delorean.carCol.r = (delorean.driving || delorean.passenger || remoteDrive) ? 0 : 1.7;
+  delorean.carCol.r = delorean.driving ? 0 : 1.7;
 }
 
 // le cheval de Mathias
