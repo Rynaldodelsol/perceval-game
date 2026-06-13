@@ -128,6 +128,9 @@
   #chatBar .ct { color:#ffd44d; font-weight:800; font-size:13px; white-space:nowrap; }
   #chatInput { flex:1; border:none; outline:none; border-radius:9px; padding:9px 12px;
     font-size:15px; background:rgba(255,255,255,0.95); color:#1c2348; }
+  #chatClose { flex:none; width:34px; height:34px; border:none; border-radius:9px; cursor:pointer;
+    background:rgba(255,255,255,0.16); color:#fff; font-size:18px; font-weight:800; line-height:1; }
+  #chatClose:hover { background:rgba(255,90,90,0.85); }
 
   /* Indication d'interaction */
   #interactHint { position:absolute; bottom:170px; left:50%; transform:translateX(-50%);
@@ -264,7 +267,7 @@
   </div>
 
   <div id="chatLog"></div>
-  <div id="chatBar"><span class="ct">Aux copains ▸</span><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Écris un message… (Entrée pour envoyer)"/></div>
+  <div id="chatBar"><span class="ct">Aux copains ▸</span><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Écris… (Entrée = envoyer, le chat reste ouvert)"/><button id="chatClose" title="Fermer le chat (Échap)">✕</button></div>
 
   <div id="toast"></div>
   <div id="vignette"></div>
@@ -406,6 +409,10 @@ const SFX = {
   death(){ tone(220, 0.5, 'sawtooth', 0.12, 0, 55); },
   victory(){ [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f, 0.28, 'triangle', 0.15, i*0.16)); },
   growl(){ tone(70, 0.6, 'sawtooth', 0.16, 0, 45); noiseBurst(0.4, 0.07); },
+  ding(){ // « bing-bong » d'ascenseur (deux cloches + harmonique d'octave)
+    tone(988, 0.5, 'sine', 0.17); tone(1976, 0.4, 'sine', 0.045);
+    tone(740, 0.75, 'sine', 0.16, 0.2); tone(1480, 0.5, 'sine', 0.04, 0.2);
+  },
 };
 
 /* --- musique d'ambiance médiévale (procédurale, en boucle douce) --- */
@@ -2051,6 +2058,14 @@ BTEX.loft = canvasTex(256, (ctx,s)=>{
   ctx.fillStyle = '#9fb4ff'; ctx.font = Math.floor(s*0.058) + 'px Arial';
   ctx.fillText('Team 10 Positif', s/2, s*0.8); ctx.fillText('go-perceval.fr', s/2, s*0.89);
 });
+// enseigne de façade : le PICTO Perceval sur panneau blanc (logo de l'immeuble)
+BTEX.facade = canvasTex(256, (ctx,s)=>{
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,s,s);
+  ctx.fillStyle = '#1b2452'; ctx.fillRect(0,0,s,s*0.1); ctx.fillRect(0,s*0.9,s,s*0.1);   // bandeaux navy
+  drawPicto(ctx, s*0.5 - s*0.23, s*0.16, s*0.46);                                          // picto bien centré
+  ctx.fillStyle = '#1b2452'; ctx.textAlign = 'center';
+  ctx.font = 'bold ' + Math.floor(s*0.14) + 'px Georgia, serif'; ctx.fillText('PERCEVAL', s/2, s*0.8);
+});
 // panneau-sprite multi-lignes (entrée / ascenseur)
 function makeSignSprite(lines, color='#ffe9a0', scale=4.2){
   const c = document.createElement('canvas'); c.width = 512; c.height = 256;
@@ -2142,15 +2157,26 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   // entrée (face ouest, vers le village) : portique sombre + porte vitrée d'ascenseur encadrée d'alu
   bx(tower, 0.34, 2.9, 2.2, navy, -W, 1.45, 0);
   const alu = new THREE.MeshStandardMaterial({ color:0xd7dbe0, metalness:0.7, roughness:0.35 });
-  bx(tower, 0.12, 2.5, 1.8, alu, -W-0.04, 1.25, 0);                                               // cadre alu
-  const glassDoor = bx(tower, 0.08, 2.3, 1.5, new THREE.MeshStandardMaterial({ color:0x183a55, metalness:0.5, roughness:0.12, transparent:true, opacity:0.7 }), -W-0.1, 1.2, 0);
-  bx(tower, 0.05, 2.3, 0.06, alu, -W-0.12, 1.2, 0);                                               // montant central de la porte
+  bx(tower, 0.12, 2.55, 1.85, alu, -W-0.04, 1.28, 0);                                             // cadre alu de la porte
+  // vraie porte d'ASCENSEUR : deux vantaux en inox brossé, joint central, rainures + linteau
+  const elevSteel = new THREE.MeshStandardMaterial({ color:0xc6cbd4, metalness:0.92, roughness:0.26 });
+  const elevDark  = new THREE.MeshStandardMaterial({ color:0x2a2f38, metalness:0.6, roughness:0.4 });
+  for(const sz of [-0.385, 0.385]){
+    bx(tower, 0.07, 2.3, 0.72, elevSteel, -W-0.1, 1.2, sz, false);                                // vantail
+    for(const ry of [0.82, 1.6, 2.05]) bx(tower, 0.075, 0.025, 0.72, elevDark, -W-0.104, ry, sz, false);  // fines rainures
+  }
+  bx(tower, 0.09, 2.32, 0.05, elevDark, -W-0.105, 1.2, 0, false);                                 // joint central
+  bx(tower, 0.06, 0.07, 1.7, alu, -W-0.12, 2.42, 0, false);                                       // linteau
+  // bandeau indicateur d'étage (chiffre lumineux) au-dessus de la porte
+  bx(tower, 0.06, 0.32, 0.66, elevDark, -W-0.12, 2.64, 0, false);
+  const floorInd = addMesh(tower, new THREE.PlaneGeometry(0.46, 0.2), new THREE.MeshStandardMaterial({ color:0x081a0e, emissive:0x35e070, emissiveIntensity:1.3 }), -W-0.155, 2.64, 0, false);
+  floorInd.rotation.y = -Math.PI/2;
   // enseigne Perceval (vraie identité : balance + nom) au-dessus de l'entrée
-  const sign = addMesh(tower, new THREE.PlaneGeometry(1.9, 1.5), new THREE.MeshBasicMaterial({ map:BTEX.sign }), -W-0.09, 3.6, 0, false);
+  const sign = addMesh(tower, new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map:BTEX.facade }), -W-0.09, 3.6, 0, false);
   sign.rotation.y = -Math.PI/2;
   bx(tower, 0.05, 1.66, 2.06, alu, -W-0.05, 3.6, 0, false);                                       // cadre de l'enseigne
   // grande enseigne sur la façade sud
-  const sign2 = addMesh(tower, new THREE.PlaneGeometry(2.0, 1.6), new THREE.MeshBasicMaterial({ map:BTEX.sign }), 0, H*0.6, D+0.09, false);
+  const sign2 = addMesh(tower, new THREE.PlaneGeometry(1.8, 1.8), new THREE.MeshBasicMaterial({ map:BTEX.facade }), 0, H*0.6, D+0.09, false);
   bx(tower, 2.14, 1.74, 0.05, alu, 0, H*0.6, D+0.05, false);
   // plaque "Résidence Athénée" (plus grande, encadrée, bien visible) + bouton d'appel lumineux
   const plaque = addMesh(tower, new THREE.PlaneGeometry(1.5, 0.9), new THREE.MeshBasicMaterial({ map:BTEX.plaque }), -W-0.1, 2.2, 1.7, false);
@@ -3131,84 +3157,84 @@ function buildVillager({ robe=0x9a86c9, skin=0xf2c79a, hat=null, hatColor=BLEU, 
 const NPC_DEFS = [
   { name:'Guillaume — PO & CEO de Perceval', short:'Guillaume', x:3, z:9, look:{ robe:0x3a4aa8, accessory:'scroll', hair:'tied', hairColor:0x9a5a30, skin:0xf2c79a },
     lines:[
-      "On me dit de lever le pied. J'ai répondu que le backlog ne se priorise pas tout seul — et non, je ne touche pas au code, ce n'est pas mon métier, c'est mon angoisse.",
-      "Trois nuits que l'API Modul'r me hante. La seule chose qui me sort des oubliettes, c'est l'IA. Et un café. Surtout un café.",
-      "Mon équilibre vie pro / vie perso ? Le matin je priorise, le midi je signe les chèques, le soir je relance la Team 10 Positif. L'IA appelle ça « une journée », moi « le sprint ».",
-      "Modul'r est tombé un vendredi soir, pile à l'heure de l'apéro. La Team 10 Positif a dégainé. Moi je ne code pas une ligne — mais je tiens la lampe et le moral, c'est déjà un job.",
-      "Vacances ? J'ai essayé. Au bout d'une heure de plage je demandais à l'IA si le back-office tenait toujours. Spoiler : il tenait pas.",
-      "Un jour mon back-office tiendra une semaine entière. Ce jour-là, je ferme le laptop, je laisse l'IA veiller, et je regarde enfin le coucher de soleil. En attendant : nouveau ticket Modul'r.",
+      "Pas besoin d'épée : je consulte l'IA, je priorise le backlog, je tiens le moral de la Team 10 Positif. Le trésor se conquiert au sprint, pas au pifomètre.",
+      "Je ne code pas une ligne, mais quand je vois la Team forger du beau code, je signe les chèques les yeux brillants. La belle technique, c'est mon dragon préféré.",
+      "Je rêve d'un BO maison taillé dans le roc : rapide, solide, zéro downtime. Un donjon qui ne tombe jamais le vendredi, contrairement à ce vieux Modul'r.",
+      "Mon obsession du moment : une App Perceval à l'UX si fluide qu'on glisse de page en page comme sur un cheval au galop. L'utilisateur d'abord, toujours.",
+      "Et go-perceval.fr ? Je le veux magnifique, véloce, un site qui déchire sa mémé et fait dire « waouh » dès la herse franchie. On vise le chef-d'œuvre.",
+      "Jetez aux oubliettes ce que vous pensiez savoir des assurances : BO béton, App folle, site qui en jette. La Team 10 Positif bâtit la légende, je finance le rêve.",
     ]},
   { name:"Merlin l'Enchanteur", short:'Merlin', x:-4, z:11, look:{ robe:0x4C53BD, hat:'pointy', hatColor:0x4C53BD, accessory:'staff', beard:'long' },
     lines:[
-      "Bienvenue, jeune Perceval ! Clic droit pour regarder le monde, ZQSD pour le parcourir. La magie, c'est surtout de l'ergonomie.",
-      "Les Oubliettes, au sud-ouest… C'est là que Modul'r déverse ses logs d'erreur. Personne ne les lit jamais. Alors elles se sont organisées.",
-      "Un bon chevalier lit les petites lignes. Un bon dev lit la doc Modul'r. Le chevalier a plus de chance : les petites lignes, elles, existent.",
-      "La Team 10 Positif, c'est notre magie : dix bugs corrigés, dix sourires. Le moral est un sort de protection comme un autre.",
-      "J'ai connu les contrats signés au sang. Puis le PDF. Puis Modul'r. Parfois, le progrès recule.",
-      "Le Dragon Modul'r garde le Contrat Sacré. Son souffle ? Des timeouts. Sa fureur ? Une mise à jour non documentée un vendredi.",
+      "Bienvenue, jeune Perceval ! Clic droit pour regarder le monde, ZQSD pour le parcourir. La vraie magie, ce n'est pas la poudre d'étoiles, c'est l'ergonomie. Retiens-la.",
+      "J'ai lu mille grimoires, dont la doc de Modul'r, longue de 80 km. Un sortilège qu'on ne comprend pas n'est pas de la magie, c'est juste un bug le vendredi.",
+      "Je vois venir un Back-Office forgé par la Team 10 Positif : solide comme un donjon, rapide comme l'éclair, zéro downtime. Un grimoire qui ne plante jamais.",
+      "Mon œil prophétise une App à l'UX si fluide qu'elle devine tes désirs. Chaque geste coule de source : la magie, te dis-je, c'est l'ergonomie faite royaume.",
+      "Et il s'élèvera un site, go-perceval.fr, qui déchire sa mémé : magnifique, véloce, éclatant. Les voyageurs en resteront bouche bée devant tant de splendeur.",
+      "Allez, mon brave. Jetez aux oubliettes ce que vous pensiez savoir des assurances, et taille la légende. Le vieux Merlin veille, malicieux, sur ta route.",
     ]},
   { name:'Agathe la Chasseuse de Maléfices', short:'Agathe', x:9, z:19, look:{ robe:0x4a8a5c, hair:'long', hairColor:0xd8a84c, skin:0xf6d2ac },
     lines:[
-      "Une seconde, je finis mon niveau sur ma Switch… voilà. Maintenant on traque le vrai boss : un bug de Modul'r planqué dans un recoin.",
-      "Je ne code pas une seule ligne — mais montre-moi une appli et je te trouve LE truc qui cloche en trente secondes. Paraît que c'est un don.",
-      "Mon dada, c'est l'expérience utilisateur : si la personne galère, c'est pas elle le problème, c'est l'écran. Modul'r devrait s'en souvenir.",
-      "File-moi des pâtes et je te déniche trois bugs avant qu'elles refroidissent. Je chasse toujours mieux le ventre plein.",
-      "La doc de Modul'r fait 80 km ? J'ai fini des jeux plus courts sur ma Switch — et au moins, eux, le parcours était pensé pour le joueur.",
-      "Tiens, une potion de soin offerte ! Pendant que l'API se relève, je te signale au passage ce bouton illisible… et je remange des pâtes.",
+      "Moi, je code que dalle, mais un pixel de travers, je le repère à dix lieues. Le moindre maléfice dans l'interface, je le débusque avant qu'il morde l'utilisateur.",
+      "Pause pâtes, manette en main : entre deux niveaux de Switch, je traque les bugs comme des gobelins planqués sous les menus. Patience de chasseuse, œil de faucon.",
+      "Mon rêve ? Une App Perceval à l'UX si fluide qu'on glisse d'un écran à l'autre comme une lame dans son fourreau. Zéro friction, zéro grimace : tout coule.",
+      "J'imagine un BO Perceval taillé dans le roc par la Team 10 Positif : solide, rapide, zéro downtime. Fini les vendredis maudits où Modul'r rendait l'âme à l'apéro.",
+      "Et go-perceval.fr ? Un site qui déchire sa mémé : si beau, si rapide qu'on dirait un vitrail enchanté. Tu cliques, ça file, ça en jette dès la première seconde.",
+      "Tiens, une potion de soin offerte ! Demain je chasse les bugs dans une appli pensée pour l'humain — là, ma quête a enfin du sens. Et je remange des pâtes.",
     ], heal:true },
   { name:'Jojo le Forgeron Compulsif', short:'Jojo', x:-5.5, z:12, look:{ robe:0x8a5a3a, accessory:'hammer', beard:'short', beardColor:0x3a2e24, hair:'cap', hairColor:0x2e2620, glasses:'round', skin:0xeec096 },
     lines:[
-      "Ma forge sent le diesel et le terreau : je code, je bine, je roule. Trois soupapes contre la lenteur de Modul'r.",
-      "J'ai planté des tomates pendant que l'API de Modul'r dormait. Elles, au moins, elles poussent la nuit.",
-      "Rien ne me calme comme une grosse bécane à pleins gaz. Sauf un webhook de Modul'r retrouvé vivant.",
-      "Je jardine pour me reconnecter à l'essentiel, puis je recode tout à 3h du matin. L'équilibre, façon Team 10 Positif.",
-      "Modul'r a sorti une mise à jour un vendredi soir. J'ai pris la moto et roulé jusqu'à oublier le numéro de version.",
-      "J'ai forgé un bouton « Réessayer » en acier trempé : c'est notre arme contre Modul'r. Mes mains sentent la terre, le cambouis et le clavier brûlant.",
+      "Tiens, faut que j'arrose mes tomates avant la nuit. Après, atelier : un peu de code, un peu de cambouis, et la forge tourne jusqu'à l'aube. La routine du bricoleur.",
+      "Modul'r, c'était ma vieille bécane diesel : ça fumait, ça calait le vendredi, et la doc faisait 80 km de notice illisible. J'ai rendu les clés. Bon vent.",
+      "Mon rêve ? Forger de mes mains un BO Perceval en acier trempé. Solide à l'enclume, rapide comme l'étincelle, zéro downtime. Du back-office qui sonne clair sous le marteau.",
+      "Et l'App Perceval, je la veux fluide comme une chaîne huilée : tu glisses d'un écran à l'autre sans un grincement. Une UX pensée pour l'utilisateur, pas pour l'ingénieur.",
+      "go-perceval.fr, je le vois tourner comme une belle mécanique : magnifique, rapide, ça déchire sa mémé. Un site qui démarre au quart de tour, sans toux ni fumée noire.",
+      "Allez, je remets du terreau dans la machine et je rallume la forge. Team 10 Positif, on martèle ça ensemble : du costaud, du beau, du maison. Aux oubliettes l'ancien temps.",
     ]},
   { name:'Roro le Capitaine de la Garde', short:'Roro', x:0, z:-2, look:{ robe:0x5a6378, hat:'helmet', accessory:'spear' },
     lines:[
-      "Moi c'est Romain, mais la Garde m'appelle Roro. Ma fille m'a tenu éveillé toute la nuit : à ce stade, le café, je le veux en perfusion comme une API qui tient enfin debout.",
-      "À l'origine j'écrivais des sagas épiques, des héros, des dragons. Puis j'ai goûté au code. Maintenant mon seul dragon, c'est Modul'r, et il crache des bugs le vendredi.",
-      "Tenez le rempart pendant que je finis mon burger ! Un siège, ça s'affronte le ventre plein. Un déploiement Modul'r aussi, on sait jamais quand on remange.",
-      "Mon plan de bataille tient en trois actes, comme un bon scénario : on attaque, on encaisse, on triomphe. Spoiler : la Team 10 Positif gagne toujours au troisième.",
-      "La nuit, ma fille pleure ; la nuit, l'API de Modul'r tombe. Entre les deux, je ne dors plus, mais au moins j'ai un McDo ouvert 24h.",
-      "Soldats, gravez ceci sur vos boucliers : jetez aux oubliettes ce que vous pensiez savoir des assurances. Et passez-moi des frites, la victoire ça creuse.",
+      "Moi c'est Romain, mais la Garde m'appelle Roro. Café en perfusion : ma fille tient le siège la nuit, Modul'r tenait le siège le vendredi. Devine lequel je préfère.",
+      "À l'origine j'écrivais des sagas épiques, des héros, des dragons. Puis j'ai goûté au code. Aujourd'hui mon meilleur personnage, c'est un commit propre. Et un burger en récompense.",
+      "Mon rêve de scénariste : un BO Perceval qui tient le siège comme une forteresse imprenable. Zéro downtime, rapide comme une flèche, pas une faille dans le rempart.",
+      "Une App Perceval dont l'UX se lit comme un bon scénario : chaque écran appelle le suivant, fluide, sans cul-de-sac. L'utilisateur ne lâche jamais l'histoire.",
+      "Et go-perceval.fr ? Magnifique, rapide, qui déchire sa mémé. Le genre de page d'accueil qu'on garde en plein écran rien que pour le panache. Passez-moi des frites.",
+      "Soldats, gravez ceci sur vos boucliers : jetez aux oubliettes ce que vous pensiez savoir des assurances. La Team 10 Positif écrit la suite, et ce chapitre finit bien.",
     ]},
   { name:'Mathias le Messager à Cheval', short:'Mathias', x:6, z:-38, look:{ robe:0xc9803a, hair:'cap', hairColor:0x16130f, beard:'full', beardColor:0x1d1a16, skin:0xd9a06e },
     lines:[
-      "Désolé du retard, j'ai poussé Galopin à fond. Avant je gérais les directs sur M6, là au moins le planning plantait moins souvent que les webhooks Modul'r.",
-      "J'ai un message pour toi, calé quelque part entre ici et le royaume. Comme ma grosse cylindrée, ça envoie du couple, mais Modul'r a perdu le virage.",
-      "J'ai quitté la télé pour la liberté de la route. Aujourd'hui je galope, et la Team 10 Positif rame autant que moi sur un archivage qui plante une fois sur deux.",
-      "Ce parchemin t'attend depuis vendredi. Mise à jour Modul'r non documentée, forcément ; j'aurais préféré rouler en moto que d'attendre l'API.",
-      "Galopin n'a pas la cavalerie d'une grosse cylindrée, mais au moins lui répond. L'API Modul'r, elle, est en maintenance exceptionnelle depuis cette nuit.",
-      "À M6 je livrais le 20h à l'heure. Ici, entre Galopin et un webhook Modul'r égaré, disons que Merlin attend toujours sa quête.",
+      "Mathias, à vous l'antenne ! Pardon du retard, Galopin a calé au feu rouge… mais top chrono, on est presque à l'heure. Presque.",
+      "En régie sur M6, un direct qui décroche, c'est la cata en mondovision. Modul'r, c'est ça : le faux départ un vendredi soir, devant tout le royaume.",
+      "Mon rêve ? Un BO Perceval qui livre à l'heure pile, comme le 20h : à la seconde près, zéro downtime, le générique tombe nickel. Galopin n'en revient pas.",
+      "Une App Perceval fluide comme une belle ligne droite à moto : tu ouvres les gaz, l'UX file sans accroc, pas un nid-de-poule. Là, même moi j'arrive en avance.",
+      "Et go-perceval.fr ? Un site qui déchire sa mémé : il démarre au quart de tour, magnifique, rapide. Le genre de bolide qui te double pendant que tu cherches tes clés.",
+      "La Team 10 Positif tient les rênes, et moi je porte la bonne nouvelle de fief en fief : jetez aux oubliettes ce que vous pensiez savoir des assurances !",
     ]},
   { name:'Antoine le Barde Sage', short:'Antoine', x:3, z:19, look:{ robe:0x7a4ab0, accessory:'lute', hair:'cap', hairColor:0x241f1a, skin:0xe2b182 },
     lines:[
-      "♪ Au Japon, le métro est à l'heure… contrairement à l'API Modul'r ♪ — et pourtant je n'ai jamais raté un boss.",
-      "Mes Dr. Martens écrasent les bugs comme des champignons : un pas, deux pas, le BO repart.",
-      "Je stream mes quêtes en direct, mais le vendredi je coupe : Modul'r déploie sans prévenir, et même mon chat refuse de regarder ça.",
-      "♪ Patient comme un moine de Kyoto, j'attends le webhook perdu… il ne reviendra jamais, alors la Team 10 Positif l'a recodé ♪",
-      "J'ai farmé 200 heures sur ma console, mais le vrai donjon sans fin, c'est la doc Modul'r de 80 km.",
-      "Je collectionne les fringues rares et les correctifs encore plus rares : aujourd'hui, l'archivage a marché du premier coup. Screenshot pour la postérité.",
+      "♪ Au Japon j'ai vu des temples zen, mais rien d'aussi paisible qu'un BO Perceval bien codé… zéro downtime, ô doux silence ! ♪",
+      "Mes Dr. Martens, ma manette, mon café : le combo du barde. Et un vendredi sans Modul'r qui plante ? Là, mon ami, c'est le vrai endgame.",
+      "Une App Perceval au level design parfait : chaque écran fluide comme un combo bien timé, l'UX pensée pour le joueur. Là, je pose la manette et j'applaudis.",
+      "♪ go-perceval.fr déchire sa mémé : soigné comme un jeu culte, rapide comme un speedrun, beau à en faire pleurer un collectionneur ! ♪",
+      "Modul'r et sa doc de 80 km ? Un donjon sans fast-travel. La Team 10 Positif, elle, code une map nette où on ne se perd jamais.",
+      "Jetez aux oubliettes ce que vous pensiez savoir : un BO solide, une App fluide, un site qui en jette. Mon meilleur loot, c'est ce rêve-là.",
     ]},
   { name:"Bobby l'Éclaireur des Montagnes", short:'Bobby', x:14, z:4, look:{ robe:0x6b7d4a, hat:'hood', hatColor:0x556339, accessory:'backpack', beard:'short', beardColor:0x6b5a3a },
     lines:[
-      "Je reviens d'expédition. 80 kilomètres. À pied. Dans la montagne.",
-      "La prochaine fois je pars plus loin. C'est toujours plus court que le bout d'un log d'erreur Modul'r.",
-      "Un conseil d'éclaireur : le danger, c'est toujours au sud-ouest. Toujours. Vérifie ta carte.",
-      "J'ai exploré la doc Modul'r. 80 km de pages, aucune à jour. Même la montagne est mieux balisée.",
-      "Mes bottes ont fait trois fois le tour du royaume. Le ticket Modul'r n°1, lui, n'a toujours pas bougé de la colonne « To Do ».",
-      "Note tout, trace tout. Modul'r ne trace rien : c'est comme ça qu'on perd des dossiers en montagne. Enfin, en base.",
+      "Quatre-vingts bornes au compteur ce matin ! Chaque sentier consigné, chaque source pointée sur ma carte. Un éclaireur ne laisse jamais un chemin sans repère.",
+      "Modul'r ? Une forêt sans balises, où les bugs du vendredi poussent comme ronces. J'y suis entré à la boussole, j'en suis ressorti à tâtons. Plus jamais sans carte.",
+      "Mon rêve : un BO Perceval balisé comme mon plus beau GR. Chaque log net comme un cairn sur la crête, zéro downtime, et l'on retrouve sa route les yeux fermés.",
+      "Une App Perceval à l'UX si fluide qu'on la dévale comme un sentier de rêve ! Chaque geste évident, pas un faux pas. La Team 10 Positif trace droit au sommet.",
+      "Et go-perceval.fr ? Un site qui déchire sa mémé, magnifique et rapide, où nul ne s'égare. Trois clics, on est arrivé : un balisage parfait, sans une ronce.",
+      "Jetez aux oubliettes vos cartes froissées d'antan. Désormais on randonne léger : BO solide, App limpide, site qui en jette. Le bon cap, enfin — et que ça grimpe !",
     ]},
   { name:'Ray le Barde Conteur', short:'Ray', x:-4, z:-66, look:{ robe:0x2a6a9a, accessory:'lute', hair:'bald', beard:'full', beardColor:0x9a948c, skin:0xe0aa7c },
     lines:[
-      "Ma boule de cristal — pardon, mon IA — répond à toutes mes questions. Parfois même avant que je les pose.",
-      "Pour voir loin j'ai deux outils : mon drone, qui monte plus haut que le donjon, et l'IA, qui voit encore plus loin que lui.",
-      "Je fais voler mon drone au-dessus du royaume chaque matin. De là-haut, même les bugs de Modul'r ont l'air petits. À peine.",
-      "J'ai demandé à l'IA pourquoi Modul'r plante autant. Elle a réfléchi… puis affiché un sablier. Elle aussi, donc.",
-      "Mon drone filme tes exploits, l'IA en écrit la ballade, et moi je n'ai plus qu'à embellir. À peine. Disons 40%.",
-      "Hier j'ai demandé la météo à l'IA : réponse en alexandrins. Puis j'ai sorti le drone pour vérifier. On ne s'ennuie jamais.",
+      "Approche, écoute ! Mon drone survole le royaume, ma boule de cristal — mon IA — murmure l'avenir… et crois-moi, la légende qu'on s'apprête à conter va déchirer sa mémé.",
+      "Modul'r ? Une triste ballade : doc longue de 80 km, sortilèges qui buggent le vendredi. Mon drone a filmé ce donjon de plomb… un navet, même pour un conteur !",
+      "J'ai rêvé, vu du ciel : un BO Perceval taillé dans le diamant. Zéro panne, rapide comme ma nacelle, solide comme un donjon. Mon IA en a versé une larme.",
+      "Et l'App ! Une UX si fluide qu'on glisse de page en page comme mon drone dans l'azur. Pensée pour l'utilisateur, céleste… un conte que je n'ai même pas à embellir.",
+      "Mon drone a piqué sur go-perceval.fr : magnifique, véloce, ça en jette ! Un site qui déchire sa mémé. La Team 10 Positif a forgé un chef-d'œuvre, foi de barde.",
+      "Jetez aux oubliettes ce que vous pensiez savoir des assurances ! Mon IA le promet, mon drone l'a vu : la plus belle épopée de Perceval ne fait que commencer.",
     ]},
 ];
 
@@ -3556,8 +3582,8 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*17;                                  // vitesse intermédiaire : pilotable sans être lente
-    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.9);
+    const target = throttle*26;                                  // conduite d'origine (punchy) — comme au début
+    delorean.speed += (target - delorean.speed) * Math.min(1, dt*2.2);
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.4));
     const dir = delorean.speed < 0 ? -1 : 1;
     delorean.heading -= steer * clamp(Math.abs(delorean.speed)/6, 0, 1) * 1.7 * dir * dt;
@@ -3575,7 +3601,7 @@ function updateDelorean(dt, t){
     player.group.position.set(car.position.x, car.position.y, car.position.z);
     player.group.rotation.y = delorean.heading;
     if(camDist < 12) camDist = 12;
-    if(Math.abs(delorean.speed) > 9 && Math.random() < 0.6){
+    if(Math.abs(delorean.speed) > 15 && Math.random() < 0.6){
       const bx2 = -Math.sin(delorean.heading)*2.1, bz2 = -Math.cos(delorean.heading)*2.1;
       for(const sx of [-0.8, 0.8]){
         const p = V3(car.position.x + bx2 + Math.cos(delorean.heading)*sx, 0.45, car.position.z + bz2 - Math.sin(delorean.heading)*sx);
@@ -4387,14 +4413,16 @@ addEventListener('keydown', (e)=>{
 });
 addEventListener('keyup', (e)=>{ keys[e.code] = false; });
 addEventListener('contextmenu', (e)=>e.preventDefault());
-// saisie du chat entre copains
+// saisie du chat entre copains : Entrée = envoyer (le chat RESTE ouvert), ✕ ou Échap = fermer
 {
   const ci = document.getElementById('chatInput');
   if(ci) ci.addEventListener('keydown', (e)=>{
     e.stopPropagation();
-    if(e.code === 'Enter') sendChat();
+    if(e.code === 'Enter') sendChat();          // envoie puis laisse le chat ouvert
     else if(e.code === 'Escape') closeChat();
   });
+  const cx = document.getElementById('chatClose');
+  if(cx) cx.addEventListener('click', (e)=>{ e.stopPropagation(); closeChat(); });
 }
 
 renderer.domElement.addEventListener('mousedown', (e)=>{
@@ -4563,6 +4591,7 @@ function goUpTower(){
   playerOnRoof = true;
   if(player.sitting) player.sitting = false;
   roofLights.forEach(l=>{ l.visible = true; });          // on allume les lumières du toit
+  if(SFX.ding) SFX.ding();                                // ding ! l'ascenseur arrive à l'étage
   player.group.position.set(roofExit.x, TOWER.y, roofExit.z - 2.8);   // sur le toit, devant la cage d'escalier
   player.vy = 0; player.onGround = true;
   showToast('🏢 Loft Perceval — le QG des devs (et la piscine) !');
@@ -4571,6 +4600,7 @@ function goDownTower(){
   playerOnRoof = false;
   if(player.sitting) player.sitting = false;
   roofLights.forEach(l=>{ l.visible = false; });         // on éteint les lumières du toit (économie GPU au sol)
+  if(SFX.ding) SFX.ding();                                // ding ! retour au rez-de-chaussée
   player.group.position.set(towerDoor.x - 4.0, 0, towerDoor.z);       // au sol, à bonne distance de l'entrée (pas de remontée immédiate)
   player.vy = 0; player.onGround = true;
 }
@@ -5523,14 +5553,23 @@ function gradeChatLog(){
 function pushChatLog(name, text){
   const log = document.getElementById('chatLog'); if(!log) return;
   const d = document.createElement('div'); d.className = 'cmsg';
+  d.dataset.born = '' + performance.now();                  // pour garantir ≥ 6 s à l'écran
   d.innerHTML = '<b>' + name.replace(/[<>&]/g,'') + ' :</b> ' + text.replace(/[<>&]/g,'');
   log.appendChild(d);
   gradeChatLog();                                           // dégradé d'opacité du plus ancien au plus récent
-  // au-delà de 5 messages : le plus ancien remonte vers le haut en fondu et disparaît
-  let live = log.querySelectorAll('.cmsg:not(.out)');
-  while(live.length > 5){ fadeOutChatMsg(live[0]); live = log.querySelectorAll('.cmsg:not(.out)'); }
-  // sans nouveau message, chaque ligne finit par s'effacer aussi
-  setTimeout(()=>{ fadeOutChatMsg(d); }, 12000);
+  pruneChatLog();
+  // chaque message reste affiché (≥ 6 s garanties), puis s'efface tout seul même sans nouveau message
+  setTimeout(()=>{ fadeOutChatMsg(d); }, 9000);
+}
+// au-delà de 5 messages, le plus ancien remonte en fondu — mais seulement s'il a vécu ≥ 6 s
+function pruneChatLog(){
+  const log = document.getElementById('chatLog'); if(!log) return;
+  const now = performance.now();
+  let live = Array.from(log.querySelectorAll('.cmsg:not(.out)'));
+  while(live.length > 5 && (now - (+live[0].dataset.born) >= 6000 || live.length > 8)){
+    fadeOutChatMsg(live[0]);
+    live = Array.from(log.querySelectorAll('.cmsg:not(.out)'));
+  }
 }
 function onChat(c){
   if(!c || c.id === MY_ID) return;
@@ -5563,7 +5602,8 @@ function sendChat(){
     player._bubT = 6;
     pushChatLog(myName, text);
   }
-  closeChat();
+  // le chat RESTE ouvert : on vide le champ et on garde le focus pour enchaîner les messages
+  if(inp){ inp.value = ''; inp.focus(); }
 }
 
 function connectMultiplayer(){
