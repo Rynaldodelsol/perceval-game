@@ -46,6 +46,9 @@
     transition:transform .12s, border-color .12s, background .12s; text-align:center; }
   .charBtn:hover { transform:translateY(-2px); background:rgba(255,255,255,0.18); }
   .charBtn.sel { border-color:#ffd44d; background:rgba(255,212,77,0.22); box-shadow:0 4px 16px rgba(255,212,77,0.3); }
+  .charBtn.taken { opacity:0.34; cursor:not-allowed; filter:grayscale(0.7); }
+  .charBtn.taken:hover { transform:none; background:rgba(255,255,255,0.10); }
+  .charBtn.taken .cbRole::after { content:' · pris'; color:#ff9a9a; }
   .charBtn .cbName { font-size:15px; font-weight:800; }
   .charBtn .cbRole { font-size:10px; color:#cdd3ff; margin-top:2px; }
   #pseudo { margin-top:12px; width:min(280px, 80%); padding:9px 14px; border-radius:999px; border:2px solid rgba(255,255,255,0.35);
@@ -108,6 +111,21 @@
   #dlgName { color:#ffd44d; font-weight:800; font-size:14px; margin-bottom:4px; }
   #dlgText { font-size:15px; line-height:1.5; }
   #dlgHint { font-size:11px; color:#aab2e8; margin-top:7px; }
+
+  /* Chat entre joueurs en ligne */
+  #chatLog { position:absolute; bottom:210px; left:14px; width:min(320px,70vw);
+    display:flex; flex-direction:column; gap:4px; pointer-events:none; z-index:6; }
+  #chatLog .cmsg { background:rgba(40,53,129,0.72); color:#fff; align-self:flex-start;
+    border-radius:10px; padding:4px 10px; font-size:13px; max-width:100%;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25); animation:cfade 0.2s ease; }
+  #chatLog .cmsg b { color:#ffd44d; }
+  @keyframes cfade { from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:none; } }
+  #chatBar { position:absolute; bottom:108px; left:50%; transform:translateX(-50%);
+    width:min(560px,86vw); display:none; align-items:center; gap:8px; z-index:7;
+    background:rgba(40,53,129,0.92); border-radius:14px; padding:10px 14px; pointer-events:auto; }
+  #chatBar .ct { color:#ffd44d; font-weight:800; font-size:13px; white-space:nowrap; }
+  #chatInput { flex:1; border:none; outline:none; border-radius:9px; padding:9px 12px;
+    font-size:15px; background:rgba(255,255,255,0.95); color:#1c2348; }
 
   /* Indication d'interaction */
   #interactHint { position:absolute; bottom:170px; left:50%; transform:translateX(-50%);
@@ -242,6 +260,9 @@
     <div id="dlgText"></div>
     <div id="dlgHint">E pour continuer · s'éloigner pour fermer</div>
   </div>
+
+  <div id="chatLog"></div>
+  <div id="chatBar"><span class="ct">Aux copains ▸</span><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Écris un message… (Entrée pour envoyer)"/></div>
 
   <div id="toast"></div>
   <div id="vignette"></div>
@@ -1941,8 +1962,158 @@ buildHouse( 11, 37, Math.PI+0.4, 4.4, 4);
 // la forge de Jojo
 buildHouse(-14, 15, Math.PI/2, 4.5, 4, 0x555a66);
 
+/* ==================== TEXTURES DE L'IMMEUBLE (enseigne, tapis, carrelage, déco) ==================== */
+const BTEX = {};
+// enseigne Perceval fidèle à la vraie façade : balance de la justice + nom + sous-titre, panneau bleu cerclé blanc
+BTEX.sign = canvasTex(256, (ctx,s)=>{
+  ctx.fillStyle = '#1f6fc0'; ctx.fillRect(0,0,s,s);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s*0.035; ctx.strokeRect(s*0.05, s*0.05, s*0.9, s*0.9);
+  // balance de la justice
+  const cx = s*0.5, cy = s*0.31, u = s*0.16;
+  ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = s*0.016; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx, cy-u*1.0); ctx.lineTo(cx, cy+u*0.95); ctx.stroke();           // mât
+  ctx.beginPath(); ctx.moveTo(cx-u*0.55, cy+u*0.95); ctx.lineTo(cx+u*0.55, cy+u*0.95); ctx.stroke(); // socle
+  ctx.beginPath(); ctx.moveTo(cx-u, cy-u*0.7); ctx.lineTo(cx+u, cy-u*0.7); ctx.stroke();          // fléau
+  ctx.beginPath(); ctx.arc(cx, cy-u*1.08, u*0.1, 0, 7); ctx.fill();                                // pommeau
+  for(const sx of [-1,1]){ const bx = cx + sx*u;
+    ctx.beginPath(); ctx.moveTo(bx, cy-u*0.7); ctx.lineTo(bx-u*0.34, cy-u*0.02); ctx.moveTo(bx, cy-u*0.7); ctx.lineTo(bx+u*0.34, cy-u*0.02); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, cy-u*0.02, u*0.36, 0.15, Math.PI-0.15); ctx.stroke();             // plateaux
+  }
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+  ctx.font = 'bold ' + Math.floor(s*0.15) + 'px Georgia, serif'; ctx.fillText('PERCEVAL', cx, s*0.66);
+  ctx.font = Math.floor(s*0.05) + 'px Arial, sans-serif';
+  ctx.fillText('SOCIÉTÉ DE COURTAGE', cx, s*0.79); ctx.fillText('EN ASSURANCE', cx, s*0.865);
+});
+// plaque "Résidence Athénée"
+BTEX.plaque = canvasTex(128, (ctx,s)=>{
+  ctx.fillStyle = '#2f6fb0'; ctx.fillRect(0,0,s,s);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.strokeRect(5,5,s-10,s-10);
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+  ctx.font = 'bold ' + Math.floor(s*0.13) + 'px Arial'; ctx.fillText('RÉSIDENCE', s/2, s*0.42);
+  ctx.font = 'italic bold ' + Math.floor(s*0.2) + 'px Georgia, serif'; ctx.fillText('Athénée', s/2, s*0.66);
+});
+// tapis persan vif (rouge éclatant + bleu roi + or) — sous la table du bureau
+BTEX.rug = canvasTex(256, (ctx,s)=>{
+  ctx.fillStyle = '#a81818'; ctx.fillRect(0,0,s,s);                          // rouge vif
+  let off = 0;
+  for(const [col,w] of [['#0e2a6e',0.085],['#f0c64a',0.025],['#c81e1e',0.05],['#f0c64a',0.025],['#0e2a6e',0.03]]){
+    const p = w*s; ctx.strokeStyle = col; ctx.lineWidth = p; ctx.strokeRect(off+p/2, off+p/2, s-off*2-p, s-off*2-p); off += p;
+  }
+  ctx.fillStyle = '#f0c64a'; for(let i=0;i<34;i++){ ctx.beginPath(); ctx.arc(rand(s*0.18,s*0.82), rand(s*0.18,s*0.82), 2.4, 0, 7); ctx.fill(); }
+  const cx = s/2, cy = s/2;
+  // médaillon central en losange (bleu roi / or / rouge)
+  const diamond = (rx,ry,col)=>{ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(cx,cy-ry); ctx.lineTo(cx+rx,cy); ctx.lineTo(cx,cy+ry); ctx.lineTo(cx-rx,cy); ctx.closePath(); ctx.fill(); };
+  diamond(s*0.2, s*0.31, '#0e2a6e'); diamond(s*0.13, s*0.2, '#f0c64a'); diamond(s*0.07, s*0.11, '#c81e1e');
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, s*0.018, 0, 7); ctx.fill();
+  // écoinçons dorés dans les coins
+  ctx.fillStyle = '#0e2a6e';
+  for(const [qx,qy] of [[0.26,0.26],[0.74,0.26],[0.26,0.74],[0.74,0.74]]){ ctx.beginPath(); ctx.arc(s*qx, s*qy, s*0.045, 0, 7); ctx.fill(); }
+});
+// carrelage terracotta rouge (terrasse + margelle)
+BTEX.tile = canvasTex(256, (ctx,s)=>{
+  ctx.fillStyle = '#b9583c'; ctx.fillRect(0,0,s,s);
+  const n = 4, c = s/n;
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+    const k = 0.84 + Math.random()*0.26;
+    ctx.fillStyle = 'rgb(' + Math.floor(0xc0*k) + ',' + Math.floor(0x5c*k) + ',' + Math.floor(0x3e*k) + ')';
+    ctx.fillRect(i*c+2, j*c+2, c-4, c-4);
+  }
+  ctx.strokeStyle = '#e7dcc6'; ctx.lineWidth = 3;
+  for(let i=0;i<=n;i++){ ctx.beginPath(); ctx.moveTo(i*c,0); ctx.lineTo(i*c,s); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i*c); ctx.lineTo(s,i*c); ctx.stroke(); }
+}, 5, 6);
+// cible de fléchettes
+BTEX.dart = canvasTex(128, (ctx,s)=>{
+  const cx = s/2, cy = s/2;
+  ctx.fillStyle = '#111'; ctx.fillRect(0,0,s,s);
+  for(let r=s*0.46; r>2; r-=s*0.058){ ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fillStyle = (Math.round(r/(s*0.058))%2)?'#e8e0cf':'#1a1a1a'; ctx.fill(); }
+  ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 1;
+  for(let a=0;a<20;a++){ const an=a/20*6.283; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(an)*s*0.46, cy+Math.sin(an)*s*0.46); ctx.stroke(); }
+  ctx.fillStyle = '#1a7a3a'; ctx.beginPath(); ctx.arc(cx,cy,s*0.06,0,7); ctx.fill();
+  ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(cx,cy,s*0.028,0,7); ctx.fill();
+});
+function artTex(bg, cols){ return canvasTex(128, (ctx,s)=>{
+  ctx.fillStyle = bg; ctx.fillRect(0,0,s,s);
+  for(let i=0;i<14;i++){ ctx.fillStyle = cols[i%cols.length]; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.ellipse(rand(0,s), rand(0,s), rand(7,26), rand(7,26), rand(0,3), 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+}); }
+BTEX.art1 = artTex('#27303e', ['#c0392b','#e8b34a','#3a6ea5','#e8e0cf']);
+BTEX.art2 = artTex('#37281f', ['#8a5a2a','#c98a3a','#d8c8a8','#5a3a22']);
+// logo Perceval (le picto déjà dessiné) pour le loft — l'identité du QG des devs
+BTEX.loft = canvasTex(256, (ctx,s)=>{
+  ctx.fillStyle = '#1b2452'; ctx.fillRect(0,0,s,s);
+  ctx.strokeStyle = '#5a63d8'; ctx.lineWidth = s*0.03; ctx.strokeRect(s*0.05, s*0.05, s*0.9, s*0.9);
+  drawPicto(ctx, s*0.5 - s*0.18, s*0.1, s*0.36);                       // picto centré
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+  ctx.font = 'bold ' + Math.floor(s*0.14) + 'px Georgia, serif'; ctx.fillText('PERCEVAL', s/2, s*0.66);
+  ctx.fillStyle = '#9fb4ff'; ctx.font = Math.floor(s*0.058) + 'px Arial';
+  ctx.fillText('Team 10 Positif', s/2, s*0.8); ctx.fillText('go-perceval.fr', s/2, s*0.89);
+});
+// panneau-sprite multi-lignes (entrée / ascenseur)
+function makeSignSprite(lines, color='#ffe9a0', scale=4.2){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const n = lines.length, lh = 220/n;
+  for(let i=0;i<n;i++){
+    const L = lines[i];
+    ctx.font = '700 ' + (L.big ? 58 : 40) + 'px "Segoe UI", system-ui, sans-serif';
+    ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(22,28,70,0.92)';
+    ctx.strokeText(L.t, 256, 30 + lh*(i+0.5));
+    ctx.fillStyle = L.c || color; ctx.fillText(L.t, 256, 30 + lh*(i+0.5));
+  }
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false }));
+  sp.scale.set(scale, scale/2, 1);
+  return sp;
+}
+// plan horizontal texturé (tapis, sol) posé à plat
+function addFloorPlane(parent, w, d, material, x, y, z){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), material);
+  m.rotation.x = -Math.PI/2; m.position.set(x, y, z); m.receiveShadow = false;
+  parent.add(m); return m;
+}
+// écran de code du loft (animé : le texte défile) — redessiné dans updateBuilding
+const CODE_LINES = [
+  'const Perceval = require("./team10")',
+  'async function deploy() {',
+  '  await goPerceval.build()',
+  '  const bo = await Modulr.fetch()',
+  '  if (bo.bug) bo.fix()   // encore lui…',
+  '  return "Contrat Sacré ✓"',
+  '}',
+  'app.listen(80, ()=> log("BO up"))',
+  '// Team 10 Positif — zéro downtime',
+  'while (coffee.isEmpty) refill()',
+  '$ git commit -m "ship it 🚀"',
+  '$ git push origin main',
+  'export default Perceval',
+];
+function drawLoftScreen(){
+  if(!loftScreen) return;
+  const s = 256, ctx = loftScreen.ctx, n = CODE_LINES.length;
+  ctx.fillStyle = '#0c1424'; ctx.fillRect(0, 0, s, s);
+  ctx.font = '13px monospace';
+  const cols = ['#7fd1ff','#9ae6a0','#ffd479','#ff9ec4'];
+  const off = Math.floor(loftScreen.scroll);
+  let lastLen = 0;
+  for(let row=0; row<16; row++){
+    const li = ((row + off) % n + n) % n;
+    ctx.fillStyle = cols[li % 4];
+    const line = CODE_LINES[li];
+    ctx.fillText(line, 8, 18 + row*15);
+    if(row === 15) lastLen = line.length;
+  }
+  if(Math.floor(loftScreen.scroll * 3) % 2 === 0){      // curseur clignotant
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(8 + lastLen*7.3, 18 + 15*15 - 11, 7, 13);
+  }
+  loftScreen.tex.needsUpdate = true;
+}
+
 /* ==================== IMMEUBLE PERCEVAL (bureaux + loft/piscine sur le toit) ==================== */
 let towerDoor = { x:32.2, z:8 }, roofExit = { x:40, z:15.5 };
+// ancres d'interaction du toit (coordonnées MONDE) — remplies à la construction
+let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null, towerCallBtn = null, roofLights = [], loftScreen = null;
 {
   const BX = TOWER.x, BZ = TOWER.z, W = TOWER.w, D = TOWER.d, H = TOWER.y;   // demi-dimensions, hauteur du toit
   const sky    = new THREE.MeshStandardMaterial({ color:0x5aa8e0, roughness:0.7, metalness:0.05 });
@@ -1966,117 +2137,207 @@ let towerDoor = { x:32.2, z:8 }, roofExit = { x:40, z:15.5 };
     bx(tower, 0.12, fh*0.42, D*2-0.6, glassD, W, y0 + fh*0.62, 0);
     bx(tower, 0.12, fh*0.42, D*2-0.6, glassD, -W, y0 + fh*0.62, 0);
   }
-  // entrée (face ouest, vers le village)
-  bx(tower, 0.3, 2.6, 1.8, navy, -W, 1.3, 0);
-  const door = bx(tower, 0.2, 2.3, 1.5, new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, roughness:0.7 }), -W-0.06, 1.15, 0);
-  // enseigne Perceval (panneau crème + logo) au-dessus de l'entrée
-  const sign = addMesh(tower, new THREE.PlaneGeometry(2.4, 1.3), new THREE.MeshBasicMaterial({ map:TEX.banner }), -W-0.07, 3.4, 0, false);
+  // entrée (face ouest, vers le village) : portique sombre + porte vitrée d'ascenseur encadrée d'alu
+  bx(tower, 0.34, 2.9, 2.2, navy, -W, 1.45, 0);
+  const alu = new THREE.MeshStandardMaterial({ color:0xd7dbe0, metalness:0.7, roughness:0.35 });
+  bx(tower, 0.12, 2.5, 1.8, alu, -W-0.04, 1.25, 0);                                               // cadre alu
+  const glassDoor = bx(tower, 0.08, 2.3, 1.5, new THREE.MeshStandardMaterial({ color:0x183a55, metalness:0.5, roughness:0.12, transparent:true, opacity:0.7 }), -W-0.1, 1.2, 0);
+  bx(tower, 0.05, 2.3, 0.06, alu, -W-0.12, 1.2, 0);                                               // montant central de la porte
+  // enseigne Perceval (vraie identité : balance + nom) au-dessus de l'entrée
+  const sign = addMesh(tower, new THREE.PlaneGeometry(1.9, 1.5), new THREE.MeshBasicMaterial({ map:BTEX.sign }), -W-0.09, 3.6, 0, false);
   sign.rotation.y = -Math.PI/2;
+  bx(tower, 0.05, 1.66, 2.06, alu, -W-0.05, 3.6, 0, false);                                       // cadre de l'enseigne
   // grande enseigne sur la façade sud
-  const sign2 = addMesh(tower, new THREE.PlaneGeometry(3.2, 1.7), new THREE.MeshBasicMaterial({ map:TEX.banner }), 0, H*0.62, D+0.07, false);
+  const sign2 = addMesh(tower, new THREE.PlaneGeometry(2.0, 1.6), new THREE.MeshBasicMaterial({ map:BTEX.sign }), 0, H*0.6, D+0.09, false);
+  bx(tower, 2.14, 1.74, 0.05, alu, 0, H*0.6, D+0.05, false);
+  // plaque "Résidence Athénée" (plus grande, encadrée, bien visible) + bouton d'appel lumineux
+  const plaque = addMesh(tower, new THREE.PlaneGeometry(1.5, 0.9), new THREE.MeshBasicMaterial({ map:BTEX.plaque }), -W-0.1, 2.2, 1.7, false);
+  plaque.rotation.y = -Math.PI/2;
+  const plFrame = bx(tower, 0.05, 1.0, 1.6, alu, -W-0.06, 2.2, 1.7, false);                 // cadre alu de la plaque
+  const callBtn = addMesh(tower, new THREE.CircleGeometry(0.15, 16), new THREE.MeshStandardMaterial({ color:0xffe07a, emissive:0xffc83a, emissiveIntensity:1.4 }), -W-0.11, 1.4, 1.7, false);
+  callBtn.rotation.y = -Math.PI/2;
+  towerCallBtn = callBtn;   // pulse lumineux pour attirer l'œil (animé)
 
   // --- TOIT-TERRASSE ---
-  bx(tower, W*2, 0.3, D*2, beige, 0, H-0.15, 0);                          // dalle de la terrasse
+  // SOL : carrelage terracotta rouge sur toute la terrasse (photos)
+  const tileMat = new THREE.MeshStandardMaterial({ map:BTEX.tile, roughness:0.85, metalness:0.02 });
+  bx(tower, W*2, 0.3, D*2, tileMat, 0, H-0.15, 0);
   // garde-corps en verre (4 côtés)
   const railMeta = new THREE.MeshStandardMaterial({ color:0x9aa0aa, metalness:0.8, roughness:0.3 });
-  for(const [sx,sz,len,horiz] of [[0,D,W,true],[0,-D,W,true],[W,0,D,false],[-W,0,D,false]]){
-    const panel = bx(tower, horiz? W*2:0.06, 1.0, horiz?0.06:D*2, railG, sx, H+0.5, sz, false);
+  for(const [sx,sz,horiz] of [[0,D,true],[0,-D,true],[W,0,false],[-W,0,false]]){
+    bx(tower, horiz? W*2:0.06, 1.0, horiz?0.06:D*2, railG, sx, H+0.5, sz, false);
     bx(tower, horiz? W*2:0.1, 0.06, horiz?0.1:D*2, railMeta, sx, H+1.02, sz, false);   // main courante
   }
-  // === piscine (côté avant/sud, forme allongée à liseré lumineux) ===
+
+  // ============ PISCINE (sud-ouest) : liseré lumineux + margelle rouge + transats ============
   const poolMat = new THREE.MeshStandardMaterial({ color:0x37b6e8, emissive:0x1f8fc8, emissiveIntensity:0.7, metalness:0.2, roughness:0.15, transparent:true, opacity:0.92 });
   const edge = new THREE.MeshStandardMaterial({ color:0xeaf6ff, emissive:0x9fe0ff, emissiveIntensity:1.6 });
-  const px = BX-2.6, pz = BZ+4.2, pw = 3.4, pd = 1.7;   // local (sera dans tower)
-  const PL = -2.6, PZ = 4.2;
-  // bassin (eau) : rectangle + 2 demi-cercles aux bouts
-  bx(tower, pw, 0.34, pd*2, poolMat, PL, H+0.05, PZ, false);
-  cy(tower, pd, pd, 0.34, 16, poolMat, PL-pw/2, H+0.05, PZ, false);
-  cy(tower, pd, pd, 0.34, 16, poolMat, PL+pw/2, H+0.05, PZ, false);
-  // liseré lumineux du bord
-  for(const ez of [PZ-pd, PZ+pd]) bx(tower, pw, 0.06, 0.1, edge, PL, H+0.02, ez, false);
-  const pl = new THREE.PointLight(0x6fd0ff, 0.9, 7, 2); pl.position.set(PL, H+0.4, PZ); tower.add(pl);
-  // margelle beige autour
-  bx(tower, pw+1.4, 0.06, pd*2+1.4, new THREE.MeshStandardMaterial({ color:0xded2b8, roughness:0.9 }), PL, H+0.16, PZ, false);
-  bx(tower, pw, 0.34, pd*2, poolMat, PL, H+0.05, PZ, false);    // re-dessus eau (par-dessus margelle)
-  // yucca en pot (déco de la photo)
-  cy(tower, 0.28, 0.34, 0.5, 8, new THREE.MeshStandardMaterial({ color:0x2a2d33, roughness:0.6 }), PL-pw/2-0.9, H+0.4, PZ-1.2, false);
-  for(let i=0;i<7;i++){ const bl=cn(tower, 0.06, 0.9, 4, fmat(0x4f9a44), PL-pw/2-0.9, H+1.1, PZ-1.2); bl.rotation.set(rand(-0.4,0.4), i, rand(-0.4,0.4)); }
+  const PL = -2.6, PZ = 4.2, pw = 3.4, pd = 1.7;
+  bx(tower, pw+1.5, 0.1, pd*2+1.5, tileMat, PL, H+0.06, PZ, false);                  // margelle carrelée rouge
+  bx(tower, pw, 0.34, pd*2, poolMat, PL, H+0.1, PZ, false);
+  cy(tower, pd, pd, 0.34, 16, poolMat, PL-pw/2, H+0.08, PZ, false);                  // bouts arrondis (légèrement sous la nappe)
+  cy(tower, pd, pd, 0.34, 16, poolMat, PL+pw/2, H+0.08, PZ, false);
+  // liseré lumineux émergé sur tout le pourtour (effet à débordement de la photo)
+  for(const ez of [PZ-pd, PZ+pd]) bx(tower, pw, 0.06, 0.1, edge, PL, H+0.12, ez, false);
+  for(const ex of [PL-pw/2, PL+pw/2]) bx(tower, 0.1, 0.06, pd*2, edge, ex, H+0.12, PZ, false);
+  for(const ex of [PL-pw/2, PL+pw/2]){ const tr = addMesh(tower, new THREE.TorusGeometry(pd, 0.04, 6, 18), edge, ex, H+0.13, PZ, false); tr.rotation.x = Math.PI/2; }
+  const pl = new THREE.PointLight(0x6fd0ff, 0.9, 7, 2); pl.position.set(PL, H+0.4, PZ); pl.visible = false; roofLights.push(pl); tower.add(pl);
+  // 2 transats rouges au bord de la piscine
+  const lounge = new THREE.MeshStandardMaterial({ color:0xc23b2b, roughness:0.7 });
+  const mattress = new THREE.MeshStandardMaterial({ color:0xd8503e, roughness:0.85 });
+  for(const lzz of [PZ-0.9, PZ+0.9]){
+    const lxx = PL - pw/2 - 1.7;
+    bx(tower, 1.5, 0.1, 0.62, lounge, lxx, H+0.34, lzz, false);                       // cadre
+    bx(tower, 1.4, 0.1, 0.56, mattress, lxx, H+0.42, lzz, false);                     // matelas
+    const back = bx(tower, 0.72, 0.1, 0.56, mattress, lxx-0.72, H+0.6, lzz, false); back.rotation.z = 0.82;  // dossier incliné
+    for(const fx of [-0.6,0.55]) for(const fz of [-0.22,0.22]) cy(tower, 0.03, 0.03, 0.3, 6, railMeta, lxx+fx, H+0.18, lzz+fz, false);
+  }
 
-  // === coin salon + pergola arrondie (le "toit arrondi") ===
-  const LX = BX+3.2, LZ = BZ-4.5, lx = 3.2, lz = -4.5;
-  // canapé d'angle (assises sombres, structure bois)
+  // ============ SALON + PERGOLA ARRONDIE (nord-est, le « toit arrondi ») ============
   const sofaWood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a6a48, roughness:0.7 });
-  const cushion = new THREE.MeshStandardMaterial({ color:0x3a3d44, roughness:0.85 });
-  bx(tower, 2.6, 0.4, 0.9, sofaWood, lx, H+0.45, lz, false);
+  const cushion  = new THREE.MeshStandardMaterial({ color:0x3a3d44, roughness:0.85 });
+  const lx = 3.6, lz = -4.8;
+  bx(tower, 2.6, 0.4, 0.9, sofaWood, lx, H+0.45, lz, false);                         // canapé teck
   bx(tower, 2.4, 0.3, 0.7, cushion, lx, H+0.68, lz, false);
-  bx(tower, 2.4, 0.5, 0.18, cushion, lx, H+0.85, lz-0.36, false);        // dossier
-  // table basse + bougie/plante
-  bx(tower, 1.0, 0.3, 0.6, sofaWood, lx, H+0.5, lz+1.1, false);
-  // pergola arrondie au-dessus du salon
-  for(const [cx,cz] of [[lx-1.4,lz-0.6],[lx+1.4,lz-0.6],[lx-1.4,lz+1.4],[lx+1.4,lz+1.4]]) cy(tower, 0.08, 0.08, 2.2, 6, railMeta, cx, H+1.1, cz, false);
-  const arch = addMesh(tower, new THREE.CylinderGeometry(1.6, 1.6, 3.0, 16, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color:0xf0ece2, roughness:0.85, side:THREE.DoubleSide }), lx, H+2.2, lz+0.4, false);
-  arch.rotation.z = Math.PI/2; arch.scale.set(1, 1, 1);
-  const pergLight = new THREE.PointLight(0xffd9a0, 0.5, 6, 2); pergLight.position.set(lx, H+1.9, lz); tower.add(pergLight);
+  bx(tower, 2.4, 0.55, 0.18, cushion, lx, H+0.86, lz-0.36, false);                   // dossier
+  for(const cxp of [-0.8,0.8]) bx(tower, 0.4, 0.3, 0.4, new THREE.MeshStandardMaterial({ color:0xb56b4a, roughness:0.85 }), lx+cxp, H+0.84, lz-0.18, false); // coussins déco
+  for(const ax of [lx-1.9, lx+1.9]){                                                 // 2 fauteuils teck
+    bx(tower, 0.7, 0.35, 0.8, sofaWood, ax, H+0.42, lz+1.3, false);
+    bx(tower, 0.66, 0.28, 0.6, cushion, ax, H+0.62, lz+1.3, false);
+    bx(tower, 0.7, 0.45, 0.14, cushion, ax, H+0.78, lz+1.0, false);
+  }
+  bx(tower, 1.2, 0.06, 0.7, sofaWood, lx, H+0.52, lz+1.2, false);                    // table basse
+  cy(tower, 0.4, 0.4, 0.5, 6, sofaWood, lx, H+0.27, lz+1.2, false);
+  for(const [cx,cz] of [[lx-1.5,lz-0.7],[lx+1.5,lz-0.7],[lx-1.5,lz+1.7],[lx+1.5,lz+1.7]]) cy(tower, 0.08, 0.08, 2.4, 6, railMeta, cx, H+1.2, cz, false);
+  const arch = addMesh(tower, new THREE.CylinderGeometry(1.7, 1.7, 3.2, 18, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color:0xf2eee4, roughness:0.85, side:THREE.DoubleSide }), lx, H+2.4, lz+0.5, false);
+  arch.rotation.z = Math.PI/2;
+  const pergLight = new THREE.PointLight(0xffd9a0, 0.5, 6, 2); pergLight.position.set(lx, H+2.0, lz); pergLight.visible = false; roofLights.push(pergLight); tower.add(pergLight);
 
-  // === loft de code (grande table, écrans, chaises rouges, TV) ===
-  const wood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x9a6f44, roughness:0.7 });
-  const TLX = BX-2.5, tlx = -2.5, tlz = -4.5;
-  // grande table de code
-  bx(tower, 3.4, 0.16, 1.7, wood, tlx, H+0.78, tlz, false);
-  for(const [ox,oz] of [[-1.5,-0.7],[1.5,-0.7],[-1.5,0.7],[1.5,0.7]]) cy(tower, 0.07, 0.07, 0.78, 6, wood, tlx+ox, H+0.39, tlz+oz, false);
-  // laptops + écrans (planches sombres + écrans qui brillent)
+  // ============ BUREAU / LOFT DE CODE (nord-ouest) — fidèle aux photos ============
+  const wood     = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x9a6f44, roughness:0.7 });
+  const woodDark = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x6b4a2c, roughness:0.7 });
   const screenMat = new THREE.MeshStandardMaterial({ color:0x0a1830, emissive:0x2aa0e0, emissiveIntensity:0.9 });
   const silver = new THREE.MeshStandardMaterial({ color:0xc8ccd2, metalness:0.7, roughness:0.4 });
-  for(let i=0;i<4;i++){
-    const ox = -1.1 + (i%2)*2.2, oz = -0.45 + Math.floor(i/2)*0.9;
-    bx(tower, 0.5, 0.03, 0.34, silver, tlx+ox, H+0.87, tlz+oz, false);            // base laptop
-    const scr = bx(tower, 0.5, 0.32, 0.025, screenMat, tlx+ox, H+1.04, tlz+oz-0.16, false); scr.rotation.x = -0.35;
+  const red    = new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.7 });
+  const black  = new THREE.MeshStandardMaterial({ color:0x18181c, roughness:0.6 });
+  const tlx = -3.5, tlz = -4.7;
+  // tapis persan sous la table
+  addFloorPlane(tower, 4.9, 3.1, new THREE.MeshStandardMaterial({ map:BTEX.rug, roughness:0.94 }), tlx, H+0.03, tlz);
+  // grande table en bois à pieds tournés
+  bx(tower, 3.6, 0.16, 1.8, wood, tlx, H+0.78, tlz, false);
+  bx(tower, 3.5, 0.08, 1.7, woodDark, tlx, H+0.69, tlz, false);                      // ceinture
+  for(const [ox,oz] of [[-1.55,-0.72],[1.55,-0.72],[-1.55,0.72],[1.55,0.72]]){
+    cy(tower, 0.08, 0.06, 0.7, 8, wood, tlx+ox, H+0.35, tlz+oz, false);
+    cy(tower, 0.12, 0.12, 0.1, 8, woodDark, tlx+ox, H+0.62, tlz+oz, false);          // bagues du pied tourné
+    cy(tower, 0.1, 0.1, 0.08, 8, woodDark, tlx+ox, H+0.46, tlz+oz, false);
   }
-  // chaises rouges (mesh assises rouges)
-  const red = new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.7 });
-  const black = new THREE.MeshStandardMaterial({ color:0x18181c, roughness:0.6 });
-  for(const [ox,oz] of [[-1.5,1.5],[0,1.6],[1.5,1.5],[-1.5,-1.6],[1.5,-1.6]]){
-    bx(tower, 0.5, 0.1, 0.5, red, tlx+ox, H+0.5, tlz+oz, false);
-    bx(tower, 0.5, 0.5, 0.1, red, tlx+ox, H+0.78, tlz+oz+(oz>0?0.22:-0.22), false);
-    cy(tower, 0.04, 0.04, 0.5, 6, black, tlx+ox, H+0.25, tlz+oz, false);
+  // un laptop devant CHAQUE chaise (côtés où l'on s'assoit), écran tourné vers la personne
+  for(const [ox,oz,ry] of [[-1.0,0.58,0],[0.4,0.58,0],[1.5,0.58,0],[-1.0,-0.58,Math.PI],[0.6,-0.58,Math.PI]]){
+    const g = new THREE.Group(); g.position.set(tlx+ox, H+0.87, tlz+oz); g.rotation.y = ry; tower.add(g);
+    bx(g, 0.5, 0.03, 0.34, silver, 0, 0, 0, false);
+    bx(g, 0.46, 0.015, 0.3, black, 0, 0.022, 0.02, false);
+    const lid = bx(g, 0.5, 0.32, 0.025, silver, 0, 0.17, -0.16, false); lid.rotation.x = -0.35;
+    const sc  = bx(g, 0.44, 0.27, 0.012, screenMat, 0, 0.18, -0.145, false); sc.rotation.x = -0.35;
   }
-  // TV murale avec du "code" (sur la façade nord, à l'intérieur du loft)
-  const codeTex = canvasTex(256, (ctx,s)=>{
-    ctx.fillStyle='#0c1424'; ctx.fillRect(0,0,s,s);
-    const cols=['#7fd1ff','#9ae6a0','#ffd479','#ff9ec4'];
-    ctx.font='13px monospace';
-    for(let l=0;l<16;l++){ ctx.fillStyle=cols[l%4]; ctx.fillText('  '.repeat((l*7)%6)+['const','function go(){','return Perceval','// BO Modul\'r','app.listen(80)','if(bug) fix()'][l%6], 8, 20+l*15); }
-  });
-  const tv = addMesh(tower, new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshBasicMaterial({ map:codeTex }), tlx, H+1.6, -D+0.12, false);
+  // écran externe (bout est) + clavier + souris
+  cy(tower, 0.05, 0.05, 0.35, 6, black, tlx+1.75, H+1.05, tlz, false);
+  bx(tower, 0.5, 0.06, 0.22, black, tlx+1.75, H+0.9, tlz, false);
+  bx(tower, 0.08, 0.62, 1.04, black, tlx+1.84, H+1.4, tlz, false);                   // dos écran
+  bx(tower, 0.04, 0.56, 0.98, screenMat, tlx+1.78, H+1.4, tlz, false);               // dalle
+  bx(tower, 0.42, 0.03, 0.16, black, tlx+1.18, H+0.88, tlz, false);                  // clavier
+  bx(tower, 0.08, 0.03, 0.12, black, tlx+0.92, H+0.88, tlz+0.28, false);             // souris
+  // 3 mugs blancs
+  for(const [mx,mz] of [[-0.6,0.35],[0.75,-0.25],[0.05,0.55]]) cy(tower, 0.06, 0.05, 0.1, 8, mat(0xf2efe8), tlx+mx, H+0.91, tlz+mz, false);
+  // chaises de bureau (mesh) — assise rouge, dossier noir, pied étoile — + ancres « s'asseoir »
+  function officeChair(px, pz, ry){
+    const g = new THREE.Group(); g.position.set(tlx+px, H, tlz+pz); g.rotation.y = ry; tower.add(g);
+    cy(g, 0.3, 0.34, 0.04, 5, black, 0, 0.04, 0, false);                             // base étoile
+    cy(g, 0.045, 0.045, 0.42, 8, new THREE.MeshStandardMaterial({ color:0x2a2a30, metalness:0.6, roughness:0.4 }), 0, 0.27, 0, false);
+    bx(g, 0.5, 0.09, 0.5, red, 0, 0.5, 0, false);                                    // assise
+    const back  = bx(g, 0.5, 0.56, 0.05, new THREE.MeshStandardMaterial({ color:0x202024, roughness:0.6 }), 0, 0.83, -0.25, false); back.rotation.x = 0.13;   // dossier incliné
+    const backR = bx(g, 0.42, 0.46, 0.03, new THREE.MeshStandardMaterial({ color:0x8a241c, roughness:0.7 }), 0, 0.81, -0.21, false); backR.rotation.x = 0.13; // garniture résille rouge
+    for(const ax2 of [-0.28, 0.28]){ bx(g, 0.06, 0.04, 0.34, black, ax2, 0.58, 0.02, false); cy(g, 0.025, 0.025, 0.14, 6, black, ax2, 0.5, 0.18, false); }  // accoudoirs
+    loftChairs.push({ x:BX+tlx+px, z:BZ+tlz+pz, ry:ry });
+  }
+  officeChair(-1.0, 1.7, Math.PI); officeChair(0.4, 1.8, Math.PI); officeChair(1.55, 1.7, Math.PI);
+  officeChair(-1.0, -1.85, 0);     officeChair(0.6, -1.9, 0);
+  // mur déco du fond (nord) : TV code + cible + 2 tableaux + buffet + spots
+  const wallMat = new THREE.MeshStandardMaterial({ map:TEX.plaster, normalMap:NTEX.plaster, color:0xe9e7df, roughness:0.95 });
+  const wz0 = -7.7;
+  bx(tower, 6.4, 2.9, 0.16, wallMat, tlx, H+1.5, wz0, false);
+  // TV de code DYNAMIQUE (le texte défile) — canvas réactualisé dans updateBuilding
+  { const c = document.createElement('canvas'); c.width = c.height = 256;
+    const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+    loftScreen = { ctx:c.getContext('2d'), tex:tex, scroll:0, last:0 }; drawLoftScreen(); }
+  bx(tower, 2.16, 1.36, 0.04, black, tlx-1.5, H+1.7, wz0+0.09, false);               // cadre TV
+  addMesh(tower, new THREE.PlaneGeometry(2.0, 1.2), new THREE.MeshBasicMaterial({ map:loftScreen.tex }), tlx-1.5, H+1.7, wz0+0.12, false);
+  addMesh(tower, new THREE.CircleGeometry(0.4, 24), new THREE.MeshBasicMaterial({ map:BTEX.dart }), tlx+1.1, H+1.85, wz0+0.12, false);  // cible
+  // un tableau + le LOGO Perceval (picto) — l'identité du QG dev
+  bx(tower, 0.78, 0.58, 0.04, woodDark, tlx+2.3, H+2.25, wz0+0.09, false);
+  addMesh(tower, new THREE.PlaneGeometry(0.7, 0.5), new THREE.MeshBasicMaterial({ map:BTEX.art1 }), tlx+2.3, H+2.25, wz0+0.12, false);
+  bx(tower, 0.86, 0.86, 0.04, new THREE.MeshStandardMaterial({ color:0x4C53BD, roughness:0.5 }), tlx+0.15, H+2.3, wz0+0.09, false);   // cadre logo
+  addMesh(tower, new THREE.PlaneGeometry(0.78, 0.78), new THREE.MeshBasicMaterial({ map:BTEX.loft }), tlx+0.15, H+2.3, wz0+0.12, false);
+  bx(tower, 3.0, 0.8, 0.5, woodDark, tlx-1.2, H+0.4, wz0+0.4, false);                // buffet
+  for(let i=0;i<6;i++) bx(tower, 0.42, 0.3, 0.03, wood, tlx-2.4+(i%3)*0.85, H+0.4+(i<3?0.16:-0.18), wz0+0.69, false); // tiroirs
+  bx(tower, 3.0, 0.06, 0.55, wood, tlx-1.2, H+0.83, wz0+0.4, false);                 // plateau du buffet
+  // rail de spots au-dessus de la table
+  bx(tower, 3.0, 0.05, 0.05, black, tlx, H+2.55, tlz, false);
+  for(const ox of [-1.0, 0, 1.0]){
+    cy(tower, 0.07, 0.05, 0.12, 8, new THREE.MeshStandardMaterial({ color:0x202024, metalness:0.6, roughness:0.4 }), tlx+ox, H+2.47, tlz, false);
+    const spot = addMesh(tower, new THREE.CircleGeometry(0.05, 10), new THREE.MeshStandardMaterial({ color:0xfff2d0, emissive:0xffe6a8, emissiveIntensity:1.3 }), tlx+ox, H+2.4, tlz, false); spot.rotation.x = -Math.PI/2;
+  }
+  const loftLight = new THREE.PointLight(0xfff0d8, 0.55, 8, 2); loftLight.position.set(tlx, H+2.3, tlz); loftLight.visible = false; roofLights.push(loftLight); tower.add(loftLight);
+  const sitMark = makeSignSprite([{ t:"💻 S'asseoir pour coder", big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#cfe8ff', 2.6); sitMark.position.set(tlx, H+2.05, tlz+0.1); tower.add(sitMark);
 
-  // === machine à café + pizzas ===
+  // ============ BAR À CAFÉ (sud-est) — prenable ============
   const metal = new THREE.MeshStandardMaterial({ color:0xccd2da, metalness:0.85, roughness:0.3 });
-  // comptoir café (coin nord-est de la terrasse)
-  const cfx = 4.2, cfz = 4.5;
-  bx(tower, 1.8, 0.9, 0.7, wood, cfx, H+0.45, cfz, false);
-  bx(tower, 0.8, 0.5, 0.5, metal, cfx-0.4, H+1.15, cfz, false);                    // machine espresso
-  bx(tower, 0.85, 0.1, 0.55, new THREE.MeshStandardMaterial({ color:0x3a2a1c }), cfx-0.4, H+1.42, cfz, false);
-  for(let i=0;i<3;i++) cy(tower, 0.06, 0.05, 0.09, 8, mat(0xfaf6ee), cfx+0.3+i*0.18, H+0.96, cfz, false);  // tasses
-  // pizzas (sur une petite table)
-  bx(tower, 1.2, 0.7, 0.7, wood, cfx, H+0.35, cfz+1.4, false);
-  for(const oz of [-0.18, 0.2]){
-    cy(tower, 0.32, 0.32, 0.04, 16, new THREE.MeshStandardMaterial({ color:0xe6b65c, roughness:0.8 }), cfx, H+0.73, cfz+1.4+oz, false);   // pâte
-    cy(tower, 0.28, 0.28, 0.05, 16, new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.8 }), cfx, H+0.75, cfz+1.4+oz, false);   // sauce
-    for(let i=0;i<6;i++) cy(tower, 0.04, 0.04, 0.04, 6, mat(0xd23b2b), cfx+Math.cos(i)*0.18, H+0.78, cfz+1.4+oz+Math.sin(i)*0.18, false); // pepperoni
+  const cfx = 5.2, cfz = 4.4;
+  bx(tower, 2.0, 0.9, 0.7, woodDark, cfx, H+0.45, cfz, false);                       // comptoir
+  bx(tower, 2.04, 0.06, 0.74, wood, cfx, H+0.92, cfz, false);                        // plan
+  bx(tower, 0.7, 0.5, 0.5, metal, cfx-0.55, H+1.2, cfz, false);                      // machine espresso
+  bx(tower, 0.5, 0.16, 0.3, black, cfx-0.55, H+1.0, cfz+0.08, false);                // groupe
+  for(let i=0;i<4;i++){ const mx=cfx+0.15+(i%2)*0.24, mz=cfz+(i<2?-0.13:0.15);
+    cy(tower, 0.06, 0.05, 0.09, 8, mat(0xf6f1ea), mx, H+0.99, mz, false);            // tasse
+    cy(tower, 0.045, 0.045, 0.01, 8, mat(0x3a241a), mx, H+1.035, mz, false);          // café
   }
+  roofCoffee = { x:BX+cfx, z:BZ+cfz };
+  const cofMark = makeSignSprite([{ t:'☕ Café', big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#ffe0b0', 2.6); cofMark.position.set(cfx, H+2.0, cfz); tower.add(cofMark);
 
-  // === cage d'escalier / accès (où l'on monte/descend) sur le toit ===
+  // ============ TABLE À PIZZAS (extérieur) — 4 pizzas maison distinctes, à manger (E) ============
+  const ptx = 2.6, ptz = 6.2;
+  bx(tower, 2.3, 0.08, 2.1, wood, ptx, H+0.74, ptz, false);
+  for(const [ox,oz] of [[-0.95,-0.85],[0.95,-0.85],[-0.95,0.85],[0.95,0.85]]) cy(tower, 0.06, 0.06, 0.74, 6, woodDark, ptx+ox, H+0.37, ptz+oz, false);
+  const pizzaDefs = [
+    { name:'Margherita',  sauce:0xc0392b, top:0xeae6d0, tn:7 },
+    { name:'Pepperoni',   sauce:0xb83227, top:0xc0392b, tn:8 },
+    { name:'Champignons', sauce:0xcf6b3a, top:0xb9a07a, tn:8 },
+    { name:'Végétarienne',sauce:0xc0392b, top:0x4f9a44, tn:9 },
+  ];
+  const pizSlots = [[-0.62,-0.55],[0.62,-0.55],[-0.62,0.55],[0.62,0.55]];
+  for(let pi=0; pi<4; pi++){
+    const [ox,oz] = pizSlots[pi], def = pizzaDefs[pi];
+    const grp = new THREE.Group(); grp.position.set(ptx+ox, H+0.82, ptz+oz); tower.add(grp);
+    cy(grp, 0.32, 0.34, 0.05, 18, new THREE.MeshStandardMaterial({ color:0xe7c06a, roughness:0.85 }), 0, 0, 0, false);  // pâte
+    cy(grp, 0.27, 0.27, 0.055, 18, new THREE.MeshStandardMaterial({ color:def.sauce, roughness:0.8 }), 0, 0.006, 0, false); // sauce
+    for(let k=0;k<def.tn;k++){ const a=k/def.tn*6.283, r=0.06+(k%2)*0.11; cy(grp, 0.045, 0.045, 0.03, 6, mat(def.top), Math.cos(a)*r+ (k? 0.04:0), 0.05, Math.sin(a)*r, false); }
+    roofPizzas.push({ x:BX+ptx+ox, z:BZ+ptz+oz, group:grp, eaten:false, name:def.name });
+  }
+  const pizMark = makeSignSprite([{ t:'🍕 Pizzas maison', big:true }, { t:'Appuyez sur E pour manger', c:'#cfe0ff' }], '#ffd9a0', 2.8); pizMark.position.set(ptx, H+1.7, ptz); tower.add(pizMark);
+
+  // ============ CAGE D'ESCALIER (descendre) ============
   const stair = bx(tower, 2.2, 2.4, 2.0, white, roofExit.x-BX, H+1.2, roofExit.z-BZ, false);
   bx(tower, 0.12, 2.0, 1.2, navy, roofExit.x-BX-1.1, H+1.0, roofExit.z-BZ, false);   // porte
-  // flèche/marqueur "descendre"
-  const dn = makeTextSprite('▼ Descendre', '#ffe9a0', 2.4); dn.position.set(roofExit.x-BX, H+2.9, roofExit.z-BZ); tower.add(dn);
+  const dn = makeSignSprite([{ t:'▼ DESCENDRE', big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#ffe9a0', 2.6);
+  dn.position.set(roofExit.x-BX, H+4.0, roofExit.z-BZ); tower.add(dn);   // bien au-dessus de la cage d'escalier
 
   tower.position.set(BX, 0, BZ);     // tout est construit en LOCAL, le groupe est posé à (BX, BZ)
   scene.add(tower);
   // colliders : on bloque le contour du bâtiment au sol (le joueur fait le tour, l'entrée est gérée par E)
   for(let a=0; a<16; a++){ const an=a/16*Math.PI*2; addCollider(BX+Math.cos(an)*W*1.02, BZ+Math.sin(an)*D*1.02, 1.4); }
-  // marqueur d'entrée
-  const up = makeTextSprite('▲ Loft Perceval', '#ffe9a0', 3.0); up.position.set(towerDoor.x, 3.4, towerDoor.z); scene.add(up);
+  // marqueur d'entrée explicite (ascenseur + appel à l'action)
+  const up = makeSignSprite([{ t:'▲ LOFT PERCEVAL', big:true }, { t:'Appuyez sur E — Ascenseur', c:'#cfe0ff' }], '#ffe9a0', 3.8);
+  up.position.set(towerDoor.x - 2.6, 3.4, towerDoor.z); scene.add(up);   // devant l'entrée, à l'écart de la façade
+  towerSignSprite = up;   // pulsé légèrement pour attirer l'œil
 }
 
 // place du village pavée + fontaine à jets + mobilier
@@ -2247,6 +2508,39 @@ function takeCoffee(){
   burst(V3(coffeeStand.x, 1.7, coffeeStand.z), 0xfff0d8, 16, 2, 0.12, 0.7, 1);
   addFloatText(player.group.position.clone().setY(2.3), '☕ +Café', '#e0b483');
   updateHUD();
+}
+// animation + indices d'interaction de l'immeuble Perceval (entrée, loft, pizzas, café, chaises)
+function updateBuilding(dt, t){
+  if(towerCallBtn) towerCallBtn.material.emissiveIntensity = 1.0 + Math.sin(t*3)*0.6;   // bouton d'appel qui pulse
+  if(towerSignSprite) towerSignSprite.position.y = 3.4 + Math.sin(t*1.6)*0.12;          // enseigne qui flotte
+  // pizzas mangées : réapparition après 25 s (le four maison tourne)
+  for(const p of roofPizzas){ if(p.eaten && performance.now() - (p.eatenAt||0) > 25000){ p.eaten = false; if(p.group) p.group.visible = true; } }
+  // écran de code qui défile (uniquement quand on est sur le toit, pour économiser)
+  if(playerOnRoof && loftScreen){ loftScreen.scroll += dt*1.3; if(t - loftScreen.last > 0.12){ loftScreen.last = t; drawLoftScreen(); } }
+  if(!started || player.dead || gameOver || chatting) return;
+  const hint = document.getElementById('interactHint');
+  if(!hint) return;
+  const px = player.group.position.x, pz = player.group.position.z;
+  if(player.sitting){ hint.style.display = 'block'; document.getElementById('interactTxt').textContent = 'Se lever'; return; }
+  if(hint.style.display === 'block') return;   // déjà occupé par un autre indice (PNJ, ami…)
+  let txt = null;
+  if(playerOnRoof){
+    const ch = nearestChair(), pzz = nearestPizza();
+    const _de = Math.hypot(px-roofExit.x, pz-roofExit.z), dExit = _de < 1.8 ? _de : 999;
+    const dChair = ch  ? Math.hypot(px-ch.x,  pz-ch.z)  : 999;
+    const dPizza = pzz ? Math.hypot(px-pzz.x, pz-pzz.z) : 999;
+    const _dc = roofCoffee ? Math.hypot(px-roofCoffee.x, pz-roofCoffee.z) : 999, dCof = _dc < 2.4 ? _dc : 999;
+    const m = Math.min(dExit, dChair, dPizza, dCof);
+    if(m < 900){
+      if(m === dExit) txt = 'Descendre (ascenseur) ▼';
+      else if(m === dChair) txt = "S'asseoir pour coder 💻";
+      else if(m === dPizza) txt = 'Manger une pizza ' + pzz.name + ' 🍕';
+      else txt = 'Prendre un café ☕';
+    }
+  } else if(Math.hypot(px-towerDoor.x, pz-towerDoor.z) < 3.7 && !nearestNpc()){
+    txt = "Prendre l'ascenseur du Loft Perceval ▲";
+  }
+  if(txt){ hint.style.display = 'block'; document.getElementById('interactTxt').textContent = txt; }
 }
 
 // --- les Oubliettes (grotte sombre au sud-ouest) ---
@@ -2835,12 +3129,12 @@ function buildVillager({ robe=0x9a86c9, skin=0xf2c79a, hat=null, hatColor=BLEU, 
 const NPC_DEFS = [
   { name:'Guillaume — PO & CEO de Perceval', short:'Guillaume', x:3, z:9, look:{ robe:0x3a4aa8, accessory:'scroll', hair:'cap', hairColor:0x9a5a30, skin:0xf2c79a },
     lines:[
-      "Ah, Perceval ! Trois nouveaux tickets Modul'r ce matin. Leur API est encore tombée cette nuit. C'est urgent. Urgent-normal.",
-      "Je suis PO et CEO : je priorise le backlog ET je signe les chèques. Pratique — je ne suis jamais d'accord avec moi-même.",
-      "Le Contrat Sacré ne se signera pas tout seul. Surtout si Modul'r plante à l'étape signature. Comme la dernière fois.",
-      "La Team 10 Positif a passé la nuit sur le back-office : Modul'r a changé son API sans prévenir. Sans documenter. Sans s'excuser.",
-      "Mon rêve ? Un BO qui tienne une semaine. Mon quotidien ? Modul'r. Tu comprends pourquoi je t'envoie tuer leur dragon.",
-      "Tu avances bien ! Du coup je t'ai rajouté un petit ticket. P1. Enfin… P1-normal. P1, quoi.",
+      "On me dit de lever le pied. J'ai répondu que mon drone vole déjà très haut, merci, et que le backlog ne se priorise pas tout seul.",
+      "Trois nuits que l'API Modul'r me hante. La seule chose qui me sort des oubliettes, c'est un message de Lia. Et un café. Surtout un café.",
+      "Mon équilibre vie pro vie perso ? Le matin je code, le midi je signe les chèques, le soir je pilote mon drone. Lia appelle ça « une journée », moi j'appelle ça « le sprint ».",
+      "Modul'r est tombé un vendredi soir, pile à l'heure de l'apéro. La Team 10 Positif a dégainé. Moi aussi, hélas, j'avais promis cette soirée à Lia.",
+      "Vacances ? J'ai essayé. Au bout d'une heure de plage je faisais voler le drone au-dessus du BO pour vérifier que tout tenait. Spoiler : ça tenait pas.",
+      "Un jour mon back-office tiendra une semaine entière. Ce jour-là, je range le clavier, j'attrape le drone, et j'emmène Lia voir le coucher de soleil. En attendant : nouveau ticket Modul'r.",
     ]},
   { name:"Merlin l'Enchanteur", short:'Merlin', x:-4, z:11, look:{ robe:0x4C53BD, hat:'pointy', hatColor:0x4C53BD, accessory:'staff', beard:'long' },
     lines:[
@@ -2853,48 +3147,48 @@ const NPC_DEFS = [
     ]},
   { name:'Agathe la Chasseuse de Maléfices', short:'Agathe', x:9, z:19, look:{ robe:0x4a8a5c, hair:'long', hairColor:0xd8a84c, skin:0xf6d2ac },
     lines:[
-      "Je flaire un maléfice… ou un bug Modul'r. Même odeur : ça ne marche pas, et personne ne sait pourquoi.",
-      "Tiens, une potion de soin, offerte ! J'ai pas fini de tester la caisse de toute façon.",
-      "Je suis indépendante : je chasse les bugs là où ils se cachent. Devine qui m'appelle le plus ? Indice : ça commence par « Modul ».",
-      "Les Spectres du Sinistre ? Des dossiers que Modul'r a perdus pendant une synchro. Ils errent entre deux bases de données.",
-      "J'ai audité le pont. Le piège, c'est qu'il est relié au back-office : quand Modul'r tombe, le péage triple.",
-      "Si tu vois un truc bizarre, dis-le-moi. Si c'est dans Modul'r, prends plutôt un ticket… et la file d'attente.",
+      "Une seconde, je finis mon donjon sur ma DS… voilà. Maintenant on s'occupe du vrai boss : Modul'r en maintenance exceptionnelle.",
+      "Je chasse mieux le ventre plein. File-moi des pâtes et je t'exorcise trois webhooks perdus avant qu'elles refroidissent.",
+      "La doc de Modul'r fait 80 km ? J'ai fini des RPG plus courts sur ma Nintendo DS, et au moins eux avaient une fin.",
+      "Un sortilège qui frappe le vendredi soir sans prévenir ? C'est pas un maléfice, c'est une mise à jour non documentée. Classique.",
+      "La Team 10 Positif m'a recrutée parce que je save avant chaque combat. Eux, ils déployaient sans backup… le vendredi, en plus.",
+      "Tiens, une potion de soin offerte ! Merlin me lance une quête, l'API tombe en pleine nuit. Du coup je mange des pâtes en attendant que le sort se relève.",
     ], heal:true },
   { name:'Jojo le Forgeron Compulsif', short:'Jojo', x:-5.5, z:12, look:{ robe:0x8a5a3a, accessory:'hammer', beard:'short', beardColor:0x3a2e24, hair:'cap', hairColor:0x2e2620, glasses:'round', skin:0xeec096 },
     lines:[
-      "La forge est fermée. Mais je forge quand même. Comme la Team 10 Positif : le sprint est fini, on corrige encore.",
-      "Ton épée ? 2% plus brillante, c'est faisable. Le back-office 2% plus stable ? Faudrait déjà que Modul'r décroche.",
-      "Je me poste près de la fontaine maintenant. On me trouvait trop caché à la forge. Guillaume en avait fait un ticket.",
-      "Modul'r m'a livré une enclume en kit. Il manquait les vis. Et la notice. Et l'enclume.",
-      "Mille coups de marteau pour une bonne lame. Mille F5 pour une page Modul'r. Mes bras tiennent mieux que leurs serveurs.",
-      "J'ai forgé un bouton « Réessayer » en acier trempé. C'est notre arme la plus utilisée contre Modul'r.",
+      "Ma forge sent le diesel et le terreau : je code, je bine, je roule. Trois soupapes contre la lenteur de Modul'r.",
+      "J'ai planté des tomates pendant que l'API de Modul'r dormait. Elles, au moins, elles poussent la nuit.",
+      "Rien ne me calme comme une grosse bécane à pleins gaz. Sauf un webhook de Modul'r retrouvé vivant.",
+      "Je jardine pour me reconnecter à l'essentiel, puis je recode tout à 3h du matin. L'équilibre, façon Team 10 Positif.",
+      "Modul'r a sorti une mise à jour un vendredi soir. J'ai pris la moto et roulé jusqu'à oublier le numéro de version.",
+      "J'ai forgé un bouton « Réessayer » en acier trempé : c'est notre arme contre Modul'r. Mes mains sentent la terre, le cambouis et le clavier brûlant.",
     ]},
   { name:'Roro le Capitaine de la Garde', short:'Roro', x:0, z:-2, look:{ robe:0x5a6378, hat:'helmet', accessory:'spear' },
     lines:[
-      "La garde tient la position ! Comme la prod un soir de mise à jour Modul'r : on ne touche à RIEN et on respire doucement.",
-      "Procédure officielle : frappe d'abord, archive ensuite. Sauf dans Modul'r — l'archivage plante une fois sur deux.",
-      "Le village dort tranquille tant que je veille. Et je veille TOUT le temps. Sauf à la sieste. Elle est stratégique, la sieste.",
-      "Les sbires Modul'r passent par le pont du sud. Comme leurs bugs : toujours par l'endroit qu'on ne surveille pas.",
-      "Plan de défense en trois points. Le troisième, c'est toi. Le premier, c'est de débrancher Modul'r.",
-      "La Team 10 Positif garde le back-office comme moi le village : tout le temps, et personne ne dit merci.",
+      "Moi c'est Romain, mais la Garde m'appelle Roro. Ma fille m'a tenu éveillé toute la nuit : à ce stade, le café, je le veux en perfusion comme une API qui tient enfin debout.",
+      "À l'origine j'écrivais des sagas épiques, des héros, des dragons. Puis j'ai goûté au code. Maintenant mon seul dragon, c'est Modul'r, et il crache des bugs le vendredi.",
+      "Tenez le rempart pendant que je finis mon burger ! Un siège, ça s'affronte le ventre plein. Un déploiement Modul'r aussi, on sait jamais quand on remange.",
+      "Mon plan de bataille tient en trois actes, comme un bon scénario : on attaque, on encaisse, on triomphe. Spoiler : la Team 10 Positif gagne toujours au troisième.",
+      "La nuit, ma fille pleure ; la nuit, l'API de Modul'r tombe. Entre les deux, je ne dors plus, mais au moins j'ai un McDo ouvert 24h.",
+      "Soldats, gravez ceci sur vos boucliers : jetez aux oubliettes ce que vous pensiez savoir des assurances. Et passez-moi des frites, la victoire ça creuse.",
     ]},
   { name:'Mathias le Messager à Cheval', short:'Mathias', x:6, z:-38, look:{ robe:0xc9803a, hair:'cap', hairColor:0x16130f, beard:'full', beardColor:0x1d1a16, skin:0xd9a06e },
     lines:[
-      "Désolé du retard ! Pourtant Galopin est trop rapide. C'est ça le problème, je crois.",
-      "Message urgent pour toi… resté au château. Comme les exports Modul'r : envoyés, jamais arrivés.",
-      "On dit que je suis lent. Non. C'est le monde qui est pressé.",
-      "Hier j'ai doublé un webhook Modul'r. Il était parti lundi. On est jeudi.",
-      "Galopin connaît trois vitesses : vite, très vite, et « synchro Modul'r ». La troisième, on l'évite.",
-      "Un jour j'arriverai avant la notification Modul'r. Bon… elle n'arrive jamais. Ça aide.",
+      "Désolé du retard, j'ai poussé Galopin à fond. Avant je gérais les directs sur M6, là au moins le planning plantait moins souvent que les webhooks Modul'r.",
+      "J'ai un message pour toi, calé quelque part entre ici et le royaume. Comme ma grosse cylindrée, ça envoie du couple, mais Modul'r a perdu le virage.",
+      "J'ai quitté la télé pour la liberté de la route. Aujourd'hui je galope, et la Team 10 Positif rame autant que moi sur un archivage qui plante une fois sur deux.",
+      "Ce parchemin t'attend depuis vendredi. Mise à jour Modul'r non documentée, forcément ; j'aurais préféré rouler en moto que d'attendre l'API.",
+      "Galopin n'a pas la cavalerie d'une grosse cylindrée, mais au moins lui répond. L'API Modul'r, elle, est en maintenance exceptionnelle depuis cette nuit.",
+      "À M6 je livrais le 20h à l'heure. Ici, entre Galopin et un webhook Modul'r égaré, disons que Merlin attend toujours sa quête.",
     ]},
   { name:'Antoine le Barde Sage', short:'Antoine', x:3, z:19, look:{ robe:0x7a4ab0, accessory:'lute', hair:'cap', hairColor:0x241f1a, skin:0xe2b182 },
     lines:[
-      "♪ Un gobelin s'avance… et il repart en pleurant ♪",
-      "Le secret de la sagesse ? Continuer à jouer. Même quand Modul'r est « en maintenance exceptionnelle ». Surtout à ce moment-là.",
-      "Ma ballade sur toi dure quatre heures. C'est court : celle sur les bugs Modul'r est une trilogie. Avec un spin-off.",
-      "♪ Le BO est tombé, tombé… mais la Team 10 Positif l'a relevé ♪ — ça marche à tous les stand-ups.",
-      "Modul'r voulait son hymne. J'ai lu leur changelog : il n'y avait rien dedans. Comme dans leurs correctifs.",
-      "♪ Et Perceval brandit sa lame… et la paperasse rendit l'âme ♪ — j'y travaille encore.",
+      "♪ Au Japon, le métro est à l'heure… contrairement à l'API Modul'r ♪ — et pourtant je n'ai jamais raté un boss.",
+      "Mes Dr. Martens écrasent les bugs comme des champignons : un pas, deux pas, le BO repart.",
+      "Je stream mes quêtes en direct, mais le vendredi je coupe : Modul'r déploie sans prévenir, et même mon chat refuse de regarder ça.",
+      "♪ Patient comme un moine de Kyoto, j'attends le webhook perdu… il ne reviendra jamais, alors la Team 10 Positif l'a recodé ♪",
+      "J'ai farmé 200 heures sur ma console, mais le vrai donjon sans fin, c'est la doc Modul'r de 80 km.",
+      "Je collectionne les fringues rares et les correctifs encore plus rares : aujourd'hui, l'archivage a marché du premier coup. Screenshot pour la postérité.",
     ]},
   { name:"Bobby l'Éclaireur des Montagnes", short:'Bobby', x:14, z:4, look:{ robe:0x6b7d4a, hat:'hood', hatColor:0x556339, accessory:'backpack', beard:'short', beardColor:0x6b5a3a },
     lines:[
@@ -2950,8 +3244,18 @@ function buildFaceFeatures(look){
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.1, 0.06), mat(beardColor, { roughness:0.9 }));
     b.position.set(0, -0.07, 0.11); f.add(b);
   } else if(beard === 'full'){
-    const b = new THREE.Mesh(new THREE.SphereGeometry(0.125, 9, 8), mat(beardColor, { roughness:0.95 }));
-    b.position.set(0, -0.075, 0.04); b.scale.set(1.08, 0.8, 0.95); f.add(b);
+    // barbe fournie et sculptée : mâchoire + bouc pointu + moustache + favoris (Ray)
+    const bm = mat(beardColor, { roughness:0.95 });
+    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 10), bm);
+    jaw.position.set(0, -0.085, 0.03); jaw.scale.set(1.14, 0.94, 1.0); f.add(jaw);
+    const chin = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.17, 8), bm);
+    chin.position.set(0, -0.205, 0.05); chin.rotation.x = 0.22; f.add(chin);
+    const mous = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.042, 0.05), bm);
+    mous.position.set(0, 0.002, 0.13); f.add(mous);
+    for(const sx of [-0.125, 0.125]){
+      const sb = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.15, 0.05), bm);
+      sb.position.set(sx, 0.02, 0.065); f.add(sb);
+    }
   }
   if(glasses === 'round'){
     const frameMat = new THREE.MeshStandardMaterial({ color:0x3a3530, metalness:0.6, roughness:0.4 });
@@ -2962,15 +3266,19 @@ function buildFaceFeatures(look){
     const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.008, 0.008), frameMat);
     bridge.position.set(0, 0.02, 0.145); f.add(bridge);
   } else if(glasses === 'sun'){
-    const dark = new THREE.MeshStandardMaterial({ color:0x14181f, metalness:0.5, roughness:0.15 });
-    for(const sx of [-0.055, 0.055]){
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.012, 12), dark);
-      lens.rotation.x = Math.PI/2;
-      lens.position.set(sx, 0.02, 0.135); f.add(lens);
+    // lunettes de soleil de barde : verres sombres cerclés + branches (Ray)
+    const dark  = new THREE.MeshStandardMaterial({ color:0x0d1014, metalness:0.6, roughness:0.12 });
+    const frame = new THREE.MeshStandardMaterial({ color:0x26221e, metalness:0.75, roughness:0.35 });
+    for(const sx of [-0.058, 0.058]){
+      const ring = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.064, 0.014), frame);
+      ring.position.set(sx, 0.02, 0.134); f.add(ring);
+      const lens = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.05, 0.02), dark);
+      lens.position.set(sx, 0.02, 0.143); f.add(lens);
+      const temple = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.012, 0.012), frame);
+      temple.position.set(sx*1.85, 0.03, 0.082); temple.rotation.y = sx > 0 ? -0.5 : 0.5; f.add(temple);
     }
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.01, 0.01),
-      new THREE.MeshStandardMaterial({ color:0x4a4540, metalness:0.8, roughness:0.3 }));
-    bridge.position.set(0, 0.035, 0.14); f.add(bridge);
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.012, 0.012), frame);
+    bridge.position.set(0, 0.03, 0.145); f.add(bridge);
   }
   return f;
 }
@@ -3055,8 +3363,10 @@ function graftSwordShield(rootObj){
     if(o.isBone){ if(o.name === 'handslotr') hr = o; else if(o.name === 'handslotl') hl = o; }
     else if((o.isMesh || o.isSkinnedMesh) && GEAR_RX.test(o.name)) o.visible = false;   // pas de double arme
   });
-  if(hr){ const s = buildHeroSword(); s.scale.setScalar(2.4); s.rotation.set(Math.PI, 0, 0); s.position.set(0, 0, 0); hr.add(s); }
-  if(hl){ const sh = buildHeroShield(); sh.scale.setScalar(2.4); sh.rotation.set(0, Math.PI/2, 0); sh.position.set(0, 0, 0); hl.add(sh); }
+  // épée main droite : lame bien verticale, pointe vers le ciel (rotation calée sur l'os KayKit)
+  if(hr){ const s = buildHeroSword(); s.scale.setScalar(2.4); s.rotation.set(0, 0, Math.PI/2); s.position.set(0, 0, 0); hr.add(s); }
+  // écu main gauche : vertical, face tournée vers l'avant, ramené devant le personnage (garde)
+  if(hl){ const sh = buildHeroShield(); sh.scale.setScalar(2.6); sh.rotation.set(2.88, 0, 0); sh.position.set(0, 0.25, 0.3); hl.add(sh); }
 }
 function buildNpcGLB(def){
   const key = NPC_BODY[def.short];
@@ -3185,39 +3495,90 @@ const delorean = (()=>{
   colliders.push(carCol);
   return { group:g, driving:false, speed:0, heading:g.rotation.y, wheels, fluxCore, fluxLight, carCol };
 })();
+// ---- état réseau de la DeLorean : un seul conducteur, des passagers, et le reste du monde qui regarde ----
+delorean.driverId = null;          // qui conduit (MY_ID = moi). null = voiture libre
+delorean.passenger = false;        // suis-je monté comme passager ?
+delorean.net = { active:false, x:0, z:0, h:0, last:0 };   // dernière position reçue d'un conducteur distant
+function carHasRemoteDriver(){
+  return delorean.driverId && delorean.driverId !== MY_ID && delorean.net.active && (performance.now() - delorean.net.last < 6000);
+}
+function onCarData(d){
+  if(!d || d.id === MY_ID) return;
+  if(d.release){            // le conducteur descend : voiture libérée
+    if(delorean.driverId === d.id){ delorean.driverId = null; delorean.net.active = false; }
+    if(delorean.passenger){ delorean.passenger = false; player.group.visible = true; }   // le chauffeur est parti
+    return;
+  }
+  delorean.driverId = d.id;
+  delorean.net.x = d.x; delorean.net.z = d.z; delorean.net.h = d.h; delorean.net.active = true; delorean.net.last = performance.now();
+}
 function enterCar(){
-  if(delorean.driving) return;
+  if(delorean.driving || delorean.passenger) return;
+  if(carHasRemoteDriver()){
+    delorean.passenger = true;                 // un copain conduit déjà → je monte en passager
+    if(SFX.shield) SFX.shield();
+    showToast('🚗 Passager de la DeLorean — E pour descendre');
+    return;
+  }
   delorean.driving = true;
+  delorean.driverId = MY_ID;
   delorean.heading = delorean.group.rotation.y;
   delorean.speed = 0;
   player.group.visible = false;
   SFX.shield();
   showToast('🚗⚡ DeLorean — 88 mph, et en avant !');
+  mpSend('car', { id:MY_ID, x:+delorean.group.position.x.toFixed(2), z:+delorean.group.position.z.toFixed(2), h:+delorean.heading.toFixed(2) });
 }
 function exitCar(){
+  if(delorean.passenger){
+    delorean.passenger = false;
+    player.group.visible = true;
+    const ang = delorean.group.rotation.y;
+    const px = clamp(delorean.group.position.x + Math.cos(ang)*2.4, -104, 104);
+    const pz = clamp(delorean.group.position.z - Math.sin(ang)*2.4, -104, 104);
+    player.group.position.set(px, getGroundY(px, pz), pz);
+    showToast('Vous descendez de la DeLorean.');
+    return;
+  }
   if(!delorean.driving) return;
   delorean.driving = false;
+  if(delorean.driverId === MY_ID) delorean.driverId = null;
   player.group.visible = true;
   const px = clamp(delorean.group.position.x + Math.cos(delorean.heading)*2.4, -104, 104);
   const pz = clamp(delorean.group.position.z - Math.sin(delorean.heading)*2.4, -104, 104);
   player.group.position.set(px, getGroundY(px, pz), pz);
   showToast('Vous descendez de la DeLorean.');
+  mpSend('car', { id:MY_ID, release:true });
 }
 function updateDelorean(dt, t){
   if(!delorean) return;
   const car = delorean.group;
+  const remoteDrive = carHasRemoteDriver();
+  // un copain conduit : j'anime sa voiture d'après le réseau (je n'y touche pas)
+  if(remoteDrive && !delorean.driving){
+    const k = Math.min(1, dt*10);
+    car.position.x += (delorean.net.x - car.position.x) * k;
+    car.position.z += (delorean.net.z - car.position.z) * k;
+    car.position.y = getGroundY(car.position.x, car.position.z);
+    car.rotation.y = lerpAngle(car.rotation.y, delorean.net.h, k);
+    delorean.heading = car.rotation.y;
+    for(let i=0;i<delorean.wheels.length;i++) delorean.wheels[i].tire.rotation.x += 6*dt;
+  } else if(delorean.driverId && delorean.driverId !== MY_ID && (performance.now() - delorean.net.last > 6000)){
+    delorean.driverId = null; delorean.net.active = false;     // conducteur distant disparu → voiture libre
+  }
   const pulse = 1.0 + Math.sin(t*8)*0.4 + (delorean.driving ? Math.min(1.6, Math.abs(delorean.speed)*0.08) : 0);
   delorean.fluxCore.material.emissiveIntensity = pulse;
   delorean.fluxLight.intensity = 0.35 + pulse*0.3;
   const hint = document.getElementById('interactHint');
+  const setHint = (txt)=>{ if(hint){ hint.style.display = 'block'; document.getElementById('interactTxt').textContent = txt; } };
   if(delorean.driving){
     const up = (keys['KeyW']||keys['ArrowUp'])?1:0, dn = (keys['KeyS']||keys['ArrowDown'])?1:0;
     let throttle = up - dn;
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*26;
-    delorean.speed += (target - delorean.speed) * Math.min(1, dt*2.2);
+    const target = throttle*13;                                  // vitesse réduite : bien plus pilotable
+    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.7);
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.4));
     const dir = delorean.speed < 0 ? -1 : 1;
     delorean.heading -= steer * clamp(Math.abs(delorean.speed)/6, 0, 1) * 1.7 * dir * dt;
@@ -3235,26 +3596,36 @@ function updateDelorean(dt, t){
     player.group.position.set(car.position.x, car.position.y, car.position.z);
     player.group.rotation.y = delorean.heading;
     if(camDist < 12) camDist = 12;
-    if(Math.abs(delorean.speed) > 15 && Math.random() < 0.6){
+    if(Math.abs(delorean.speed) > 9 && Math.random() < 0.6){
       const bx2 = -Math.sin(delorean.heading)*2.1, bz2 = -Math.cos(delorean.heading)*2.1;
       for(const sx of [-0.8, 0.8]){
         const p = V3(car.position.x + bx2 + Math.cos(delorean.heading)*sx, 0.45, car.position.z + bz2 - Math.sin(delorean.heading)*sx);
         burst(p, 0xff7a1e, 4, 2, 0.24, 0.5, 1.5);
       }
     }
-    if(hint){ hint.style.display = 'block'; document.getElementById('interactTxt').textContent = 'Descendre de la DeLorean'; }
+    const now = performance.now();
+    if(mpChannel && now - mpCarSend > 80){   // ~12 envois / seconde de la position de la voiture
+      mpCarSend = now;
+      mpSend('car', { id:MY_ID, x:+car.position.x.toFixed(2), z:+car.position.z.toFixed(2), h:+delorean.heading.toFixed(2) });
+    }
+    setHint('Descendre de la DeLorean');
+  } else if(delorean.passenger){
+    // collé au véhicule, visible (les autres me voient dedans) — je ne peux que descendre
+    player.group.position.set(car.position.x, car.position.y + 0.1, car.position.z);
+    player.group.rotation.y = car.rotation.y;
+    if(camDist < 12) camDist = 12;
+    setHint('Descendre de la DeLorean');
   } else {
     delorean.speed = 0;
     if(started && hint && hint.style.display !== 'block'){
       const d = Math.hypot(player.group.position.x - car.position.x, player.group.position.z - car.position.z);
       if(d < 4.4 && !nearestNpc()){
-        hint.style.display = 'block';
-        document.getElementById('interactTxt').textContent = 'Conduire la DeLorean ⏱️';
+        setHint(remoteDrive ? 'Monter en passager' : 'Conduire la DeLorean ⏱️');
       }
     }
   }
   delorean.carCol.x = car.position.x; delorean.carCol.z = car.position.z;
-  delorean.carCol.r = delorean.driving ? 0 : 1.7;
+  delorean.carCol.r = (delorean.driving || delorean.passenger || remoteDrive) ? 0 : 1.7;
 }
 
 // le cheval de Mathias
@@ -4038,6 +4409,7 @@ let orbiting = false;
 let started = false;
 
 addEventListener('keydown', (e)=>{
+  if(chatting){ if(e.code === 'Escape') closeChat(); return; }   // saisie du chat : on ne pilote pas
   if(e.code === 'Space') e.preventDefault();
   keys[e.code] = true;
   if(!started || player.dead || gameOver) return;
@@ -4047,6 +4419,15 @@ addEventListener('keydown', (e)=>{
 });
 addEventListener('keyup', (e)=>{ keys[e.code] = false; });
 addEventListener('contextmenu', (e)=>e.preventDefault());
+// saisie du chat entre copains
+{
+  const ci = document.getElementById('chatInput');
+  if(ci) ci.addEventListener('keydown', (e)=>{
+    e.stopPropagation();
+    if(e.code === 'Enter') sendChat();
+    else if(e.code === 'Escape') closeChat();
+  });
+}
 
 renderer.domElement.addEventListener('mousedown', (e)=>{
   if(!started) return;
@@ -4204,6 +4585,7 @@ let dlgNpc = null;
 function nearestNpc(){
   let best = null, bd = 3.6;
   for(const n of npcs){
+    if(n.group && n.group.visible === false) continue;   // PNJ masqué (déjà incarné par un joueur)
     const d = n.group.position.distanceTo(player.group.position);
     if(d < bd){ bd = d; best = n; }
   }
@@ -4211,23 +4593,87 @@ function nearestNpc(){
 }
 function goUpTower(){
   playerOnRoof = true;
+  if(player.sitting) player.sitting = false;
+  roofLights.forEach(l=>{ l.visible = true; });          // on allume les lumières du toit
   player.group.position.set(roofExit.x, TOWER.y, roofExit.z - 2.8);   // sur le toit, devant la cage d'escalier
   player.vy = 0; player.onGround = true;
   showToast('🏢 Loft Perceval — le QG des devs (et la piscine) !');
 }
 function goDownTower(){
   playerOnRoof = false;
-  player.group.position.set(towerDoor.x - 1.6, 0, towerDoor.z);       // au sol, devant l'entrée
+  if(player.sitting) player.sitting = false;
+  roofLights.forEach(l=>{ l.visible = false; });         // on éteint les lumières du toit (économie GPU au sol)
+  player.group.position.set(towerDoor.x - 4.0, 0, towerDoor.z);       // au sol, à bonne distance de l'entrée (pas de remontée immédiate)
   player.vy = 0; player.onGround = true;
 }
+// --- interactions du loft : s'asseoir, manger une pizza, prendre un café ---
+function nearestChair(maxD){
+  let best = null, bd = maxD || 1.9;
+  for(const c of loftChairs){ const d = Math.hypot(player.group.position.x - c.x, player.group.position.z - c.z); if(d < bd){ bd = d; best = c; } }
+  return best;
+}
+function nearestPizza(maxD){
+  let best = null, bd = maxD || 1.7;
+  for(const p of roofPizzas){ if(p.eaten) continue; const d = Math.hypot(player.group.position.x - p.x, player.group.position.z - p.z); if(d < bd){ bd = d; best = p; } }
+  return best;
+}
+function sitDown(c){
+  player.sitting = true;
+  player.group.position.set(c.x, TOWER.y - 0.32, c.z);   // assis à la table (le bas du corps est masqué par la table)
+  player.group.rotation.y = c.ry;
+  player.vy = 0;
+  for(const k in keys) keys[k] = false;
+  touchMove.active = false; touchMove.x = 0; touchMove.y = 0;   // lâche aussi le joystick tactile
+  if(SFX.shield) SFX.shield();
+  showToast('💻 Au boulot avec la Team 10 Positif ! (E ou se déplacer pour te relever)');
+}
+function standUp(){
+  player.sitting = false;
+  player.group.position.y = getGroundY(player.group.position.x, player.group.position.z);
+}
+function eatPizza(p){
+  p.eaten = true; p.eatenAt = performance.now();
+  if(p.group) p.group.visible = false;
+  player.hp = Math.min(player.maxhp, player.hp + 40);
+  player.mana = player.maxmana;
+  SFX.pickup();
+  showToast('🍕 Pizza ' + p.name + ' maison — +40 PV ! On code mieux le ventre plein.');
+  addFloatText(player.group.position.clone().setY(2.3), '🍕 +40 PV', '#ffcf6a');
+  burst(V3(p.x, TOWER.y + 1.0, p.z), 0xffcf6a, 12, 2, 0.12, 0.6, 1);
+  updateHUD();
+}
+function takeRoofCoffee(){
+  player.hp = player.maxhp; player.mana = player.maxmana; player.coffeeBoost = 7;
+  SFX.pickup();
+  showToast('☕ Café du Loft — +100 % de motivation, zéro downtime (lui au moins) !');
+  if(roofCoffee) burst(V3(roofCoffee.x, TOWER.y + 1.2, roofCoffee.z), 0xfff0d8, 14, 2, 0.12, 0.7, 1);
+  addFloatText(player.group.position.clone().setY(2.3), '☕ +Café', '#e0b483');
+  updateHUD();
+}
 function interact(){
-  if(delorean.driving){ exitCar(); return; }
-  // immeuble Perceval : monter au loft / en redescendre
+  if(player.sitting){ standUp(); return; }
+  if(delorean.driving || delorean.passenger){ exitCar(); return; }
+  // immeuble Perceval : monter au loft / en redescendre / interactions du toit (la plus proche gagne)
   if(playerOnRoof){
-    if(Math.hypot(player.group.position.x - roofExit.x, player.group.position.z - roofExit.z) < 3){ goDownTower(); return; }
+    const px = player.group.position.x, pz = player.group.position.z;
+    const ch = nearestChair(), pzz = nearestPizza();
+    const _de = Math.hypot(px-roofExit.x, pz-roofExit.z), dExit = _de < 1.8 ? _de : 999;
+    const dChair = ch  ? Math.hypot(px-ch.x,  pz-ch.z)  : 999;
+    const dPizza = pzz ? Math.hypot(px-pzz.x, pz-pzz.z) : 999;
+    const _dc = roofCoffee ? Math.hypot(px-roofCoffee.x, pz-roofCoffee.z) : 999, dCof = _dc < 2.4 ? _dc : 999;
+    const m = Math.min(dExit, dChair, dPizza, dCof);
+    if(m < 900){
+      if(m === dExit) goDownTower();
+      else if(m === dChair) sitDown(ch);
+      else if(m === dPizza) eatPizza(pzz);
+      else takeRoofCoffee();
+      return;
+    }
   } else if(Math.hypot(player.group.position.x - towerDoor.x, player.group.position.z - towerDoor.z) < 3.4){
     goUpTower(); return;
   }
+  // discuter avec un copain en ligne tout proche
+  if(!nearestNpc() && nearestRemote(3.0)){ openChat(); return; }
   if(!nearestNpc()){
     const d = Math.hypot(player.group.position.x - delorean.group.position.x, player.group.position.z - delorean.group.position.z);
     if(d < 4.4){ enterCar(); return; }
@@ -4263,11 +4709,19 @@ function updateDialogue(){
     dlgNpc = null;
     document.getElementById('dialogue').style.display = 'none';
   }
+  // sur le toit / assis / en voiture : on laisse les indices aux gestionnaires dédiés (updateBuilding, etc.)
+  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger))) return;
   const n = nearestNpc();
   const hint = document.getElementById('interactHint');
   if(n && !dlgNpc){
     document.getElementById('interactTxt').textContent = 'Parler à ' + n.def.short;
     hint.style.display = 'block';
+  } else if(!dlgNpc && !chatting){
+    const friend = nearestRemote(3.0);
+    if(friend){
+      document.getElementById('interactTxt').textContent = 'Discuter avec ' + friend.name;
+      hint.style.display = 'block';
+    } else hint.style.display = 'none';
   } else hint.style.display = 'none';
 }
 
@@ -4358,7 +4812,14 @@ function drawMinimap(){
   mmCtx.beginPath(); mmCtx.arc(wx(-75), wz(82), 13*s, 0, 7); mmCtx.fill();
   // PNJ
   mmCtx.fillStyle = '#ffd44d';
-  for(const n of npcs) mmCtx.fillRect(wx(n.group.position.x)-2, wz(n.group.position.z)-2, 4, 4);
+  for(const n of npcs){ if(n.group && n.group.visible === false) continue; mmCtx.fillRect(wx(n.group.position.x)-2, wz(n.group.position.z)-2, 4, 4); }
+  // amis en ligne (joueurs distants) — pastilles cyan cerclées de blanc
+  for(const id in remotePlayers){
+    const rp = remotePlayers[id];
+    mmCtx.beginPath(); mmCtx.arc(wx(rp.group.position.x), wz(rp.group.position.z), 3.4, 0, 7);
+    mmCtx.fillStyle = '#39d6ff'; mmCtx.fill();
+    mmCtx.lineWidth = 1.4; mmCtx.strokeStyle = '#ffffff'; mmCtx.stroke();
+  }
   // ennemis
   mmCtx.fillStyle = '#e85a5a';
   for(const e of enemies){
@@ -4492,23 +4953,86 @@ function startRainSound(){
   rainSound = { gain:g };
 }
 // coup de tonnerre : grondement de bruit filtré qui descend, décalé (distance de l'éclair)
+// impulse de réverbération synthétique (bruit qui décroît) — mis en cache, donne la traîne naturelle du tonnerre
+let _thunderIR = null;
+function thunderIR(){
+  if(_thunderIR) return _thunderIR;
+  const sr = audioCtx.sampleRate, dur = 3.4, n = Math.floor(sr*dur);
+  const buf = audioCtx.createBuffer(2, n, sr);
+  for(let ch=0; ch<2; ch++){
+    const d = buf.getChannelData(ch); let lp = 0;
+    for(let i=0;i<n;i++){
+      const env = Math.pow(1 - i/n, 2.2);
+      const v = (Math.random()*2-1)*env;
+      lp += (v - lp) * 0.22;            // lissage passe-bas : traîne boueuse, pas métallique
+      d[i] = lp;
+    }
+  }
+  _thunderIR = buf;
+  return buf;
+}
 function thunder(delay){
   if(!audioCtx) return;
   const t0 = audioCtx.currentTime + Math.max(0, delay);
-  const dur = rand(1.4, 2.6);
-  const n = Math.floor(audioCtx.sampleRate*dur);
-  const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
-  const d = buf.getChannelData(0);
-  for(let i=0;i<n;i++){ const env = Math.pow(1 - i/n, 1.4); d[i] = (Math.random()*2-1)*env; }
-  const src = audioCtx.createBufferSource(); src.buffer = buf;
-  const lp = audioCtx.createBiquadFilter(); lp.type='lowpass';
-  lp.frequency.setValueAtTime(700, t0); lp.frequency.exponentialRampToValueAtTime(80, t0+dur);
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(0.38, t0+0.04);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-  src.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
-  src.start(t0); src.stop(t0+dur+0.1);
+  const sr = audioCtx.sampleRate;
+  const close = Math.random() < 0.4;                  // coup proche (sec) ou lointain (sourd et roulant)
+  // bus -> passe-bas adoucissant -> compresseur -> sortie, avec envoi vers la réverb
+  const out = audioCtx.createGain(); out.gain.value = close ? 1.0 : 0.78;
+  const lpM = audioCtx.createBiquadFilter(); lpM.type = 'lowpass'; lpM.frequency.value = close ? 5500 : 2400;
+  const comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.3;
+  const conv = audioCtx.createConvolver(); conv.buffer = thunderIR();
+  const wet = audioCtx.createGain(); wet.gain.value = close ? 0.5 : 0.72;
+  const dry = audioCtx.createGain(); dry.gain.value = 0.85;
+  out.connect(lpM); lpM.connect(dry); dry.connect(comp);
+  lpM.connect(conv); conv.connect(wet); wet.connect(comp);
+  comp.connect(audioCtx.destination);
+  // un « clap » = courte bouffée de bruit grave + coup de sinus très bas (le grain d'un coup de tonnerre)
+  function clap(at, gain, fHi, fLo, dur, subF){
+    const n = Math.floor(sr*dur), buf = audioCtx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1)*Math.pow(1 - i/n, 1.7);
+    const src = audioCtx.createBufferSource(); src.buffer = buf;
+    const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(fHi, at); lp.frequency.exponentialRampToValueAtTime(fLo, at+dur);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(gain, at+0.012); g.gain.exponentialRampToValueAtTime(0.0001, at+dur);
+    src.connect(lp); lp.connect(g); g.connect(out); src.start(at); src.stop(at+dur+0.05);
+    const o = audioCtx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(subF, at); o.frequency.exponentialRampToValueAtTime(subF*0.45, at+dur*0.85);
+    const og = audioCtx.createGain(); og.gain.setValueAtTime(0.0001, at); og.gain.exponentialRampToValueAtTime(gain*0.85, at+0.02); og.gain.exponentialRampToValueAtTime(0.0001, at+dur);
+    o.connect(og); og.connect(out); o.start(at); o.stop(at+dur+0.1);
+  }
+  // 1) le CRAC initial sec et brillant (surtout si l'éclair est proche)
+  if(close){
+    const cd = 0.16, n = Math.floor(sr*cd), buf = audioCtx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = (Math.random()*2-1)*Math.pow(1 - i/n, 3.6);
+    const src = audioCtx.createBufferSource(); src.buffer = buf;
+    const bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.6;
+    bp.frequency.setValueAtTime(3600, t0); bp.frequency.exponentialRampToValueAtTime(700, t0+cd);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.72, t0+0.004); g.gain.exponentialRampToValueAtTime(0.0001, t0+cd);
+    src.connect(bp); bp.connect(g); g.connect(out); src.start(t0); src.stop(t0+cd+0.05);
+  }
+  // 2) la SÉRIE de claps roulants — timing & amplitude irréguliers = le « roulé » réaliste du tonnerre
+  const nClaps = close ? 4 : 6;
+  let at = t0 + (close ? 0.04 : 0.22);
+  for(let i=0;i<nClaps;i++){
+    const prog = i/nClaps;
+    const gain = (close ? 0.55 : 0.42) * (1 - prog*0.55) * rand(0.7, 1.1);
+    clap(at, gain, rand(520, 920)*(1 - prog*0.4), rand(70, 130), rand(0.25, 0.5), rand(38, 66)*(1 - prog*0.3));
+    at += rand(0.12, 0.45);
+  }
+  // 3) le GRONDEMENT de fond, long et très grave (la traîne qui s'éteint)
+  {
+    const rd = rand(2.6, 3.9), n = Math.floor(sr*rd), buf = audioCtx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    for(let i=0;i<n;i++){ const env = Math.pow(1 - i/n, 1.4); d[i] = (Math.random()*2-1)*env; }
+    const src = audioCtx.createBufferSource(); src.buffer = buf;
+    const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(170, t0+0.1); lp.frequency.exponentialRampToValueAtTime(42, t0+rd);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t0+0.1); g.gain.exponentialRampToValueAtTime(0.4, t0+0.5); g.gain.exponentialRampToValueAtTime(0.0001, t0+rd);
+    src.connect(lp); lp.connect(g); g.connect(out); src.start(t0); src.stop(t0+rd+0.1);
+  }
 }
 // éclair : flash plein écran (double) + tonnerre décalé
 let lightningT = 0;
@@ -4525,20 +5049,23 @@ function lightningStrike(intensity){
 }
 const weather = { state:'clear', timer: rand(38, 80), intensity:0, target:0, lightTimer:0 };
 function updateWeather(dt){
-  weather.timer -= dt;
-  if(weather.timer <= 0){
-    // cycle ralenti de ~10 % (averses moins fréquentes)
-    if(weather.state === 'clear'){ weather.state='rain'; weather.target = rand(0.55, 1.0); weather.timer = rand(27, 60); }
-    else { weather.state='clear'; weather.target = 0; weather.timer = rand(50, 105); }
+  const host = !mpChannel || iAmHost();   // l'hôte décide la météo ; les autres la reçoivent (synchro)
+  if(host){
+    weather.timer -= dt;
+    if(weather.timer <= 0){
+      // cycle ralenti de ~10 % (averses moins fréquentes)
+      if(weather.state === 'clear'){ weather.state='rain'; weather.target = rand(0.55, 1.0); weather.timer = rand(27, 60); }
+      else { weather.state='clear'; weather.target = 0; weather.timer = rand(50, 105); }
+    }
   }
   weather.intensity += (weather.target - weather.intensity) * Math.min(1, dt*0.4);
   const I = weather.intensity;
   weatherWet = I;
   if(rainSound) rainSound.gain.gain.value = I*0.05;
-  // orage : éclairs + tonnerre quand l'averse est forte
-  if(I > 0.45){
+  // orage : éclairs + tonnerre quand l'averse est forte (l'hôte déclenche, et prévient tout le monde)
+  if(host && I > 0.45){
     weather.lightTimer -= dt;
-    if(weather.lightTimer <= 0){ lightningStrike(I); weather.lightTimer = rand(7, 22); }
+    if(weather.lightTimer <= 0){ lightningStrike(I); mpSend('light', { i:+I.toFixed(2) }); weather.lightTimer = rand(7, 22); }
   }
   if(lightningT > 0) lightningT -= dt;
   if(!rain) return;
@@ -4662,6 +5189,10 @@ function updatePlayer(dt, t){
   if(player.dead || gameOver || (delorean && delorean.driving)){
     player.moving = false;
     return;
+  }
+  if(player.sitting){          // assis au bureau : gelé tant qu'on ne bouge pas
+    const m = moveInput();
+    if(m.has){ standUp(); } else { player.moving = false; return; }
   }
   const { mx, mz, has } = moveInput();
   player.moving = has;
@@ -4853,8 +5384,24 @@ try {
   if(localStorage.pv_room) MULTI.room = localStorage.pv_room;
 } catch(e){}
 const MY_ID = 'p' + Math.floor(Math.random()*1e9).toString(36) + '-' + Date.now().toString(36).slice(-4);
+const mpJoinT = Date.now();        // ancienneté : sert à élire l'hôte (le plus ancien) et à départager les doublons
 const remotePlayers = {};
-let mpChannel = null, mpLastSend = 0;
+let mpChannel = null, mpLastSend = 0, mpCarSend = 0, mpWorldSend = 0;
+let mpPresence = {};               // id -> { char, name, t, started }
+function mpSend(event, payload){ if(mpChannel){ try{ mpChannel.send({ type:'broadcast', event, payload }); }catch(e){} } }
+
+// ---- hôte : le joueur présent le plus ancien pilote l'heure et la météo (sinon : moi, en solo) ----
+function mpHostId(){
+  // hôte = le joueur EN JEU le plus ancien (à défaut, le plus ancien présent) → pilote l'heure et la météo
+  let best = null, bt = Infinity, bestAny = null, btAny = Infinity;
+  for(const id in mpPresence){
+    const p = mpPresence[id], t = p.t || 0;
+    if(t < btAny || (t === btAny && (bestAny === null || id < bestAny))){ btAny = t; bestAny = id; }
+    if(p.started && (t < bt || (t === bt && (best === null || id < best)))){ bt = t; best = id; }
+  }
+  return best || bestAny || MY_ID;
+}
+function iAmHost(){ return mpHostId() === MY_ID; }
 
 // construit un avatar (corps + visage de l'équipe) SANS contrôles — pour les autres joueurs
 function buildHeroModel(charId){
@@ -4880,7 +5427,8 @@ function spawnRemote(data){
   const label = makeTextSprite((data.name || data.char || 'Joueur').slice(0,16), '#ffe9a0', 2.6);
   label.position.y = 2.45; g.add(label);
   scene.add(g);
-  return { group:g, anim:built.anim, char:data.char, target:V3(data.x, 0, data.z), ry:data.ry||0, moving:!!data.mv, last:performance.now() };
+  return { group:g, anim:built.anim, char:data.char, name:(data.name||data.char||'Joueur'),
+           target:V3(data.x, 0, data.z), ry:data.ry||0, moving:!!data.mv, last:performance.now(), bubble:null, bubbleT:0 };
 }
 function onRemoteData(data){
   if(!data || data.id === MY_ID || !started) return;
@@ -4904,24 +5452,160 @@ function updateRemotePlayers(dt){
     p.y += (ty - p.y) * k;
     r.group.rotation.y = lerpAngle(r.group.rotation.y, r.ry, k);
     if(r.anim) enemyAnim(r.anim, r.moving ? 'walk' : 'idle');
+    if(r.bubble){ r.bubbleT -= dt; if(r.bubbleT <= 0){ r.group.remove(r.bubble); r.bubble = null; } }
   }
 }
+// le joueur distant le plus proche (pour discuter avec un copain via E)
+function nearestRemote(maxD){
+  let best = null, bd = maxD || 3.4;
+  for(const id in remotePlayers){
+    const r = remotePlayers[id];
+    const d = Math.hypot(r.group.position.x - player.group.position.x, r.group.position.z - player.group.position.z);
+    if(d < bd){ bd = d; best = r; }
+  }
+  return best;
+}
+
+/* ---- présence : qui est là, quel personnage (unicité + PNJ masqués + amis sur la carte) ---- */
+function takenByOthers(){
+  const s = new Set();
+  for(const id in mpPresence){ if(id === MY_ID) continue; const c = mpPresence[id].char; if(c) s.add(c); }
+  return s;
+}
+function refreshSelectUI(){
+  const taken = takenByOthers();
+  document.querySelectorAll('#charRow .charBtn').forEach(btn=>{
+    const t = taken.has(btn.dataset.hero);
+    btn.classList.toggle('taken', t);
+    btn.disabled = t;
+  });
+}
+function applyTakenNpcs(){
+  if(!started) return;
+  const taken = new Set();   // tous les persos incarnés par quelqu'un (le PNJ correspondant disparaît)
+  for(const id in mpPresence){ const c = mpPresence[id].char; if(c && c !== 'Perceval') taken.add(c); }
+  for(const n of npcs){ if(n.group) n.group.visible = !taken.has(n.def.short); }
+}
+function ensureMyCharFree(){
+  // si un joueur plus ancien occupe déjà mon perso, je bascule sur le premier libre
+  for(const id in mpPresence){
+    if(id === MY_ID) continue;
+    if(mpPresence[id].char === chosenChar && (mpPresence[id].t || 0) < mpJoinT){
+      const taken = takenByOthers();
+      const free = heroRoster().find(h=>!taken.has(h.id));
+      if(free && free.id !== chosenChar){ selectHero(free.id); showToast('Personnage déjà pris — tu joues ' + free.name); }
+      return;
+    }
+  }
+}
+function selectHero(id){
+  chosenChar = id;
+  const row = document.getElementById('charRow');
+  if(row) row.querySelectorAll('.charBtn').forEach(x=>x.classList.toggle('sel', x.dataset.hero === id));
+  trackMe();
+}
+function trackMe(){
+  if(!mpChannel) return;
+  try{ mpChannel.track({ id:MY_ID, char:chosenChar, name:(chosenPseudo && chosenPseudo.trim()) || chosenChar, t:mpJoinT, started:started }); }catch(e){}
+}
+function refreshPresence(){
+  if(!mpChannel) return;
+  const st = mpChannel.presenceState(); const next = {};
+  for(const k in st){ (st[k] || []).forEach(m=>{ if(m && m.id) next[m.id] = { char:m.char, name:m.name, t:m.t || 0, started:!!m.started }; }); }
+  mpPresence = next;
+  if(!started) ensureMyCharFree();
+  refreshSelectUI();
+  applyTakenNpcs();
+}
+
+/* ---- synchro de l'heure, de la météo et des éclairs (l'hôte décide, les autres suivent) ---- */
+function onWorldState(w){
+  if(!w || iAmHost()) return;        // je ne suis pas l'hôte : j'adopte son monde
+  if(typeof w.dayTime === 'number') dayTime = w.dayTime;
+  if(w.ws){ weather.state = w.ws; weather.target = w.wt; weather.timer = w.wtimer; }
+}
+function broadcastWorld(){
+  if(!iAmHost()) return;
+  const now = performance.now();
+  if(now - mpWorldSend < 1200) return;
+  mpWorldSend = now;
+  mpSend('world', { dayTime:+dayTime.toFixed(4), ws:weather.state, wt:+weather.target.toFixed(2), wtimer:+weather.timer.toFixed(1) });
+}
+
+/* ---- chat entre copains : bulle au-dessus de l'avatar + petit fil de discussion ---- */
+let chatting = false;
+function showChatBubble(group, text){
+  if(!group) return;
+  const old = group.userData._bub; if(old){ group.remove(old); }
+  const b = makeTextSprite(text.slice(0,60), '#ffffff', 2.2);
+  b.position.y = 3.0; group.add(b); group.userData._bub = b;
+  return b;
+}
+function pushChatLog(name, text){
+  const log = document.getElementById('chatLog'); if(!log) return;
+  const d = document.createElement('div'); d.className = 'cmsg';
+  d.innerHTML = '<b>' + name.replace(/[<>&]/g,'') + ' :</b> ' + text.replace(/[<>&]/g,'');
+  log.appendChild(d);
+  while(log.children.length > 5) log.removeChild(log.firstChild);
+  setTimeout(()=>{ if(d.parentNode) d.parentNode.removeChild(d); }, 9000);
+}
+function onChat(c){
+  if(!c || c.id === MY_ID) return;
+  const r = remotePlayers[c.id];
+  if(r){ r.bubble = showChatBubble(r.group, c.text); r.bubbleT = 6; }
+  pushChatLog(c.name || 'Copain', c.text || '');
+  tone(560, 0.05, 'sine', 0.05);
+}
+function openChat(){
+  if(chatting || !mpChannel) return;
+  chatting = true;
+  for(const k in keys) keys[k] = false;        // on lâche les touches de déplacement pendant la saisie
+  const bar = document.getElementById('chatBar'), inp = document.getElementById('chatInput');
+  if(bar) bar.style.display = 'flex';
+  if(inp){ inp.value = ''; setTimeout(()=>inp.focus(), 0); }
+}
+function closeChat(){
+  chatting = false;
+  const bar = document.getElementById('chatBar'), inp = document.getElementById('chatInput');
+  if(bar) bar.style.display = 'none';
+  if(inp) inp.blur();
+}
+function sendChat(){
+  const inp = document.getElementById('chatInput');
+  const text = (inp ? inp.value : '').trim();
+  if(text){
+    const myName = (chosenPseudo && chosenPseudo.trim()) || chosenChar;
+    mpSend('chat', { id:MY_ID, name:myName, text:text.slice(0,120) });
+    showChatBubble(player.group, text);                       // ma propre bulle, visible localement
+    player._bubT = 6;
+    pushChatLog(myName, text);
+  }
+  closeChat();
+}
+
 function connectMultiplayer(){
-  if(!MULTI.url || !MULTI.key || !window.supabase) return;
+  if(!MULTI.url || !MULTI.key || !window.supabase || mpChannel) return;
   try{
     const client = window.supabase.createClient(MULTI.url, MULTI.key);
     mpChannel = client.channel('perceval-' + MULTI.room, { config:{ broadcast:{ self:false }, presence:{ key:MY_ID } } });
-    mpChannel.on('broadcast', { event:'p' }, ({ payload })=> onRemoteData(payload));
+    mpChannel.on('broadcast', { event:'p' },     ({ payload })=> onRemoteData(payload));
+    mpChannel.on('broadcast', { event:'world' }, ({ payload })=> onWorldState(payload));
+    mpChannel.on('broadcast', { event:'car' },   ({ payload })=> onCarData(payload));
+    mpChannel.on('broadcast', { event:'chat' },  ({ payload })=> onChat(payload));
+    mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!iAmHost() && payload) lightningStrike(payload.i || 0.7); });
+    mpChannel.on('presence', { event:'sync' },  ()=> refreshPresence());
+    mpChannel.on('presence', { event:'join' },  ()=> refreshPresence());
     mpChannel.on('presence', { event:'leave' }, ({ leftPresences })=>{
       (leftPresences || []).forEach(pr=>{ const id = pr.id || pr.presence_ref; if(id) removeRemote(id); });
+      refreshPresence();
     });
-    mpChannel.subscribe(status=>{
-      if(status === 'SUBSCRIBED'){
-        mpChannel.track({ id:MY_ID });
-        showToast('🌐 En ligne — partie « ' + MULTI.room + ' »');
-      }
-    });
+    mpChannel.subscribe(status=>{ if(status === 'SUBSCRIBED') trackMe(); });
   }catch(e){ console.warn('Multijoueur indisponible :', e); }
+}
+function initMultiplayer(){
+  if(!MULTI.url || !MULTI.key) return;
+  if(!window.supabase){ setTimeout(initMultiplayer, 400); return; }   // le script Supabase peut charger après
+  connectMultiplayer();
 }
 function broadcastSelf(){
   if(!mpChannel) return;
@@ -4929,10 +5613,12 @@ function broadcastSelf(){
   if(now - mpLastSend < 80) return;          // ~12 envois / seconde
   mpLastSend = now;
   const p = player.group.position;
-  mpChannel.send({ type:'broadcast', event:'p', payload:{
+  mpSend('p', {
     id:MY_ID, name:(chosenPseudo && chosenPseudo.trim()) || chosenChar, char:chosenChar,
     x:+p.x.toFixed(2), y:+p.y.toFixed(2), z:+p.z.toFixed(2), ry:+player.group.rotation.y.toFixed(2), mv:!!player.moving
-  }});
+  });
+  // ma bulle de chat locale s'efface au bout de quelques secondes
+  if(player._bubT > 0){ player._bubT -= 0.08; if(player._bubT <= 0 && player.group.userData._bub){ player.group.remove(player.group.userData._bub); player.group.userData._bub = null; } }
 }
 
 function startGame(){
@@ -4958,7 +5644,9 @@ function startGame(){
   startQuest(0);
   updateHUD();
   showToast('Bienvenue à Valblanche, ' + shown + ' !');
-  connectMultiplayer();   // rejoint la partie en ligne si Supabase est configuré
+  connectMultiplayer();   // au cas où la connexion lobby n'aurait pas démarré
+  trackMe();              // présence à jour : je joue maintenant ce personnage
+  applyTakenNpcs();       // masque les PNJ déjà incarnés par d'autres joueurs
 }
 document.getElementById('playBtn').addEventListener('click', ()=>{
   unlockSilentAudio(); initAudio(); startMusic(); startRainSound();
@@ -4977,18 +5665,19 @@ document.getElementById('playBtn').addEventListener('click', ()=>{
   heroRoster().forEach((h, i)=>{
     const b = document.createElement('button');
     b.className = 'charBtn' + (i === 0 ? ' sel' : '');
+    b.dataset.hero = h.id;
     b.innerHTML = '<div class="cbName">' + h.name + '</div><div class="cbRole">' + h.role + '</div>';
     b.addEventListener('click', ()=>{
-      chosenChar = h.id;
-      row.querySelectorAll('.charBtn').forEach(x=>x.classList.remove('sel'));
-      b.classList.add('sel');
+      if(b.disabled) return;
+      selectHero(h.id);                  // met à jour la présence (unicité en ligne)
       unlockSilentAudio(); initAudio();
       if(SFX && SFX.pickup) SFX.pickup();
     });
     row.appendChild(b);
   });
   const ps = document.getElementById('pseudo');
-  if(ps) ps.addEventListener('input', e=>{ chosenPseudo = e.target.value; });
+  if(ps) ps.addEventListener('input', e=>{ chosenPseudo = e.target.value; trackMe(); });
+  initMultiplayer();                     // connexion lobby dès l'écran-titre : qui est déjà là, quel perso
 })();
 document.getElementById('respawnBtn').addEventListener('click', ()=>{
   player.dead = false;
@@ -5060,6 +5749,7 @@ function animate(){
     updateCrystals(dt, t);
     updateSlashes(dt);
     broadcastSelf();            // envoie ma position aux autres joueurs
+    broadcastWorld();           // si je suis l'hôte : je diffuse l'heure + la météo
     updateRemotePlayers(dt);    // déplace/anime les autres joueurs
     updateDialogue();
     updateCooldownUI();
@@ -5075,6 +5765,7 @@ function animate(){
   updateWeather(dt);
   updateDelorean(dt, t);
   updateCoffee(dt, t);
+  updateBuilding(dt, t);
   updateCamera(dt, t);
   composer.render();
 }
