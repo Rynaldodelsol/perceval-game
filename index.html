@@ -1848,21 +1848,34 @@ function swapNature(){
     if(um){
       // robe blanc nacré (clone des matériaux pour ne pas toucher Galopin)
       um.obj.traverse(o=>{ if(o.isMesh || o.isSkinnedMesh){ o.material = o.material.clone(); if(o.material.color) o.material.color.setHex(0xf3f1fb); o.material.metalness = 0.05; } });
-      // corne spiralée dorée sur le front (le modèle KayKit regarde vers +Z)
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.6, 14),
-        new THREE.MeshStandardMaterial({ color:0xffe9a8, emissive:0xffd86a, emissiveIntensity:0.7, metalness:0.4, roughness:0.25 }));
-      horn.position.set(0, 1.95, 0.95); horn.rotation.x = 0.5; um.wrap.add(horn);
-      // crinière pastel le long de l'encolure
-      for(let i=0;i<6;i++){
-        const c = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.34, 6),
-          new THREE.MeshStandardMaterial({ color:[0xff9ed6,0xa98cff,0x8ad0ff,0x9cffd6,0xfff0a0,0xff9ed6][i], roughness:0.5 }));
-        c.position.set(0, 1.85 - i*0.14, 0.55 - i*0.05); c.rotation.x = -0.5; um.wrap.add(c);
-      }
+      // repérage des OS du squelette → corne sur la tête, crinière sur l'encolure, queue à l'arrière (placement fiable)
+      let headBone=null, neckBone=null, tailBone=null;
+      um.obj.traverse(o=>{ if(o.isBone){ const n=o.name.toLowerCase();
+        if(!headBone && n.includes('head')) headBone=o;
+        if(!neckBone && n.includes('neck')) neckBone=o;
+        if(!tailBone && n.includes('tail')) tailBone=o;
+      }});
+      const RAINBOW = [0xff2b2b,0xff9d2f,0xffe22f,0x37d23f,0x2aa7ff,0x6b5bff,0xc24bff];   // arc-en-ciel vif
+      // corne dorée
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.72, 16),
+        new THREE.MeshStandardMaterial({ color:0xffe49a, emissive:0xffcf5a, emissiveIntensity:0.85, metalness:0.5, roughness:0.2 }));
+      um.wrap.add(horn);
+      // crinière multicolore (cônes vifs le long de l'encolure)
+      const mane = [];
+      for(let i=0;i<7;i++){ const c=new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.55, 7),
+        new THREE.MeshStandardMaterial({ color:RAINBOW[i], emissive:RAINBOW[i], emissiveIntensity:0.18, roughness:0.45 }));
+        um.wrap.add(c); mane.push(c); }
+      // queue multicolore (mêmes couleurs que la crinière)
+      const tail = [];
+      for(let i=0;i<7;i++){ const c=new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.6, 7),
+        new THREE.MeshStandardMaterial({ color:RAINBOW[i], emissive:RAINBOW[i], emissiveIntensity:0.18, roughness:0.45 }));
+        um.wrap.add(c); tail.push(c); }
       um.wrap.position.set(-47, 0, 47);     // berge sud, à côté du pont
       um.wrap.rotation.y = 1.2;
       scene.add(um.wrap);
       const uanim = makeEnemyAnim(um);       // {mixer, actions, map, current} : idle / walk(galop)
-      unicorn = { wrap:um.wrap, obj:um.obj, anim:uanim, heading:1.2, speed:0, riding:false };
+      unicorn = { wrap:um.wrap, obj:um.obj, anim:uanim, heading:1.2, speed:0, riding:false,
+                  horn, mane, tail, headBone, neckBone, tailBone, scale:um.scale };
       // panneau « monter »
       const mk = makeSignSprite([{ t:'🦄 Licorne', big:true }, { t:'Appuyez sur E pour monter', c:'#ffd9f2' }], '#ffd0ee', 2.8);
       mk.position.set(-47, 3.0, 47); scene.add(mk);
@@ -4760,8 +4773,34 @@ function dismountUnicorn(){
   player.vy = 0; player.onGround = true;
   showToast('🦄 Vous descendez de la licorne.');
 }
+const _bv = new THREE.Vector3();
+function boneLocalPos(bone, wrap){ bone.getWorldPosition(_bv); wrap.worldToLocal(_bv); return _bv.clone(); }
+// place corne/crinière/queue d'après les os (repère wrap : +Z = avant du modèle)
+function updateUnicornCosmetics(t){
+  if(!unicorn) return;
+  const u = unicorn, wrap = u.wrap;
+  const head = u.headBone ? boneLocalPos(u.headBone, wrap) : V3(0, 1.95, 0.9);
+  const neck = u.neckBone ? boneLocalPos(u.neckBone, wrap) : V3(0, 1.7, 0.45);
+  const tp   = u.tailBone ? boneLocalPos(u.tailBone, wrap) : V3(0, 1.3, -1.0);
+  // CORNE : au-dessus/avant du front, dressée vers le haut-avant
+  u.horn.position.set(head.x, head.y + 0.22, head.z + 0.24);
+  u.horn.rotation.set(0.5, 0, 0);
+  // CRINIÈRE : du sommet du crâne vers le garrot, ondule
+  for(let i=0;i<u.mane.length;i++){
+    const f = i/(u.mane.length-1);
+    u.mane[i].position.set(head.x + (neck.x-head.x)*f, head.y + (neck.y-head.y)*f + 0.14, head.z + (neck.z-head.z)*f);
+    u.mane[i].rotation.set(-0.7, 0, Math.sin(t*3 + i)*0.14);
+  }
+  // QUEUE : retombe vers le bas-arrière depuis l'os de la queue, ondule
+  for(let i=0;i<u.tail.length;i++){
+    const f = i/(u.tail.length-1);
+    u.tail[i].position.set(tp.x + Math.sin(t*2 + i)*0.04, tp.y - f*0.5, tp.z - 0.1 - f*0.4);
+    u.tail[i].rotation.set(2.6, 0, Math.sin(t*2.5 + i)*0.18);
+  }
+}
 function updateUnicorn(dt, t){
-  if(!unicorn || !unicorn.riding) return;
+  if(!unicorn) return;
+  if(!unicorn.riding){ updateUnicornCosmetics(t); return; }
   const u = unicorn, wrap = u.wrap;
   const up = (keys['KeyW']||keys['ArrowUp'])?1:0, dn = (keys['KeyS']||keys['ArrowDown'])?1:0;
   let throttle = up - dn;
@@ -4790,6 +4829,7 @@ function updateUnicorn(dt, t){
   player.group.rotation.y = u.heading;
   if(player.glb) setPlayerAnim('idle');
   if(Math.abs(u.speed) > 4 && Math.random() < 0.25) burst(V3(wrap.position.x, 0.3, wrap.position.z), 0xffb0e6, 8, 2.5, 0.12, 0.6, 1);
+  updateUnicornCosmetics(t);
 }
 
 /* ============================================================
