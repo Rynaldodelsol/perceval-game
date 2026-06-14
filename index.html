@@ -3696,11 +3696,11 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*9;                                   // plus rapide (réglage demandé) — toujours maniable
+    const target = throttle*9.5;                                 // un tout petit peu plus rapide (réglage demandé) — toujours maniable
     delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.6);   // accélération douce, pas de fusée
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*2.2));   // ralentit vite quand on lâche
     const dir = delorean.speed < 0 ? -1 : 1;
-    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/2, 0, 1) * 2.8 * dir * dt;   // braque TRÈS court (rayon ~2 m) à toute vitesse
+    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/2, 0, 1) * 2.5 * dir * dt;   // braquage légèrement moins serré (rayon un peu plus large)
     car.rotation.y = delorean.heading;
     car.position.x = clamp(car.position.x + Math.sin(delorean.heading)*delorean.speed*dt, -104, 104);
     car.position.z = clamp(car.position.z + Math.cos(delorean.heading)*delorean.speed*dt, -104, 104);
