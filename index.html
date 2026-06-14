@@ -2516,8 +2516,8 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   roofCoffee = { x:BX+cfx, z:BZ+cfz };
   const cofMark = makeSignSprite([{ t:'☕ Café', big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#ffe0b0', 2.6); cofMark.position.set(cfx, H+2.0, cfz); tower.add(cofMark);
 
-  // ============ TABLE À PIZZAS (DEHORS, à côté de la piscine) — rectangulaire, 4 pizzas maison à manger (E) ============
-  const ptx = 2.4, ptz = 6.9;
+  // ============ TABLE À PIZZAS (DEHORS, contre la cloison vitrée, près de la piscine) — rectangulaire, 4 pizzas (E) ============
+  const ptx = -3.3, ptz = 2.15;
   bx(tower, 2.8, 0.08, 1.1, wood, ptx, H+0.74, ptz, false);
   for(const [ox,oz] of [[-1.25,-0.42],[1.25,-0.42],[-1.25,0.42],[1.25,0.42]]) cy(tower, 0.06, 0.06, 0.74, 6, woodDark, ptx+ox, H+0.37, ptz+oz, false);
   const pizzaDefs = [
