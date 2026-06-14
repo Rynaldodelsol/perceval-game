@@ -2362,6 +2362,11 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   // SOL : carrelage terracotta rouge sur toute la terrasse (photos)
   const tileMat = new THREE.MeshStandardMaterial({ map:BTEX.tile, roughness:0.85, metalness:0.02 });
   bx(tower, W*2, 0.3, D*2, tileMat, 0, H-0.15, 0);
+  // SOL INTÉRIEUR : parquet gris (par-dessus le carrelage ; la terrasse extérieure reste rouge)
+  const ptex = TEX.wood.clone(); ptex.wrapS = ptex.wrapT = THREE.RepeatWrapping; ptex.repeat.set(7, 5); ptex.needsUpdate = true;
+  const pnrm = NTEX.wood.clone(); pnrm.wrapS = pnrm.wrapT = THREE.RepeatWrapping; pnrm.repeat.set(7, 5); pnrm.needsUpdate = true;
+  const parquet = new THREE.MeshStandardMaterial({ map:ptex, normalMap:pnrm, color:0x8d8e93, roughness:0.82, metalness:0.04 });
+  addFloorPlane(tower, W*2, LOFT.zp + D, parquet, 0, H+0.02, (LOFT.zp - D)/2);
   // garde-corps en verre (4 côtés)
   const railMeta = new THREE.MeshStandardMaterial({ color:0x9aa0aa, metalness:0.8, roughness:0.3 });
   for(const [sx,sz,horiz] of [[0,D,true],[0,-D,true],[W,0,false],[-W,0,false]]){
