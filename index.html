@@ -2657,19 +2657,30 @@ const GUILD = { x:-26, z:23, r:10 };   // foyer : zone de repos (régén PV/mana
   fl2.position.set(fx, 0.9, fz); scene.add(fl2);
   const fireLight = new THREE.PointLight(0xff9a3a, 1.4, 16, 2); fireLight.position.set(fx, 1.5, fz); scene.add(fireLight);
   guildFire = { flame, fl2, light:fireLight };
-  // tables + bancs autour du feu
-  for(const [bxp, bzp, ry] of [[-3.6, 0, 0], [3.6, 0, 0], [0, 3.4, Math.PI/2]]){
+  // un PNJ attablé en train de boire une chope
+  function addDrinker(tg, tint){
+    const skin = mat(0xe7b58a), tunic = mat(tint), dark = mat(0x4a3320);
+    bx(tg, 0.52, 0.64, 0.34, tunic, 0, 1.0, 0.92);                       // torse assis sur le banc
+    addMesh(tg, new THREE.SphereGeometry(0.21, 12, 10), skin, 0, 1.46, 0.92);   // tête
+    bx(tg, 0.15, 0.36, 0.15, tunic, 0.27, 1.06, 0.80);                  // bras qui lève la chope
+    cy(tg, 0.08, 0.08, 0.16, 8, dark, 0.31, 1.30, 0.66);               // chope près de la bouche
+    cy(tg, 0.08, 0.08, 0.13, 8, dark, -0.45, 0.99, 0.05);             // chope posée sur la table
+  }
+  // tables + bancs autour du feu (aucune devant la porte) + buveurs attablés
+  const tint = [0x8a5a34, 0x4f7a44, 0x8a3030];
+  [[-3.6, 0, 0], [3.6, 0, 0], [0, -3.6, Math.PI/2]].forEach(([bxp, bzp, ry], i)=>{
     const tg = new THREE.Group(); tg.position.set(fx+bxp, 0, fz+bzp); tg.rotation.y = ry; scene.add(tg);
     bx(tg, 1.9, 0.16, 0.95, wood, 0, 0.9, 0);
     for(const lxp of [-0.75, 0.75]) bx(tg, 0.16, 0.9, 0.16, woodD, lxp, 0.45, 0);
     bx(tg, 2.1, 0.14, 0.42, wood, 0, 0.5, 0.95);
     for(const lxp of [-0.8, 0.8]) bx(tg, 0.12, 0.5, 0.12, woodD, lxp, 0.25, 0.95);
-  }
+    addDrinker(tg, tint[i % tint.length]);
+  });
   // bannière de guilde
   cy(scene, 0.08, 0.08, 4.0, 6, woodD, fx-4.8, 2.0, fz-1.2);
   bx(scene, 0.1, 1.8, 1.3, new THREE.MeshStandardMaterial({ color:0x4C53BD, roughness:0.6 }), fx-4.8, 3.1, fz-1.2);
-  const gMark = makeSignSprite([{ t:'⚜️ Foyer de la Guilde', big:true }, { t:'Zone de repos', c:'#ffe9b0' }], '#ffe0a0', 3.0);
-  gMark.position.set(fx, 3.0, fz); scene.add(gMark);
+  const gMark = makeSignSprite([{ t:'⚜️ Foyer de la Guilde', big:true }, { t:'Asseyez-vous et récupérez de l\'XP', c:'#ffe9b0' }], '#ffe0a0', 3.0);
+  gMark.position.set(fx, 3.6, fz); scene.add(gMark);
 }
 
 // ==================== PORTAIL DU DONJON (aux Oubliettes) ====================
@@ -6055,10 +6066,20 @@ function updatePlayer(dt, t){
     player.shieldBubble.scale.setScalar(1 + Math.sin(t*6)*0.03);
     if(player.shieldTime <= 0) player.shieldBubble.visible = false;
   }
-  // foyer de la guilde : zone de repos (régén accélérée, façon auberge WoW)
+  // foyer de la guilde : zone de repos (régén PV/mana ET gain d'XP, façon auberge WoW)
   const rested = GUILD && Math.hypot(pos.x - GUILD.x, pos.z - GUILD.z) < GUILD.r;
-  if(rested && !player._rested){ player._rested = true; showToast('💤 Foyer de la guilde — repos : PV & mana régénèrent vite.'); }
+  if(rested && !player._rested){ player._rested = true; showToast('💤 Foyer de la guilde — asseyez-vous : PV, mana et XP récupèrent vite.'); }
   else if(!rested && player._rested){ player._rested = false; }
+  // mais attention : marcher DANS le feu de camp brûle (on perd de la vie)
+  if(GUILD && Math.hypot(pos.x - GUILD.x, pos.z - GUILD.z) < 1.2){
+    player._fireDmg = (player._fireDmg || 0) + dt;
+    if(player._fireDmg >= 0.5){ player._fireDmg = 0; hurtPlayer(8); }
+  } else player._fireDmg = 0;
+  // gain d'XP au repos (lent)
+  if(rested){
+    player._restXp = (player._restXp || 0) + dt*2.5;
+    if(player._restXp >= 1){ const n = Math.floor(player._restXp); player._restXp -= n; addXP(n); }
+  }
   const boostRegen = player.buffRegenT > 0 || rested;
   const manaRegen = boostRegen ? 18 : 6;
   player.mana = Math.min(player.maxmana, player.mana + manaRegen*dt);
