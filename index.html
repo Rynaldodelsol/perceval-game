@@ -2672,6 +2672,19 @@ const GUILD = { x:-26, z:23, r:10 };   // foyer : zone de repos (régén PV/mana
   gMark.position.set(fx, 3.0, fz); scene.add(gMark);
 }
 
+// ==================== PORTAIL DU DONJON (aux Oubliettes) ====================
+const DUNGEON = { x:-71, z:73 };
+let dungeonCd = 0;
+{
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.13, 8, 32), new THREE.MeshStandardMaterial({ color:0x9a4bff, emissive:0x6a1ad8, emissiveIntensity:1.3 }));
+  ring.rotation.x = Math.PI/2; ring.position.set(DUNGEON.x, 0.12, DUNGEON.z); scene.add(ring);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.9, 32), new THREE.MeshBasicMaterial({ color:0x3a1a6a, transparent:true, opacity:0.5, depthWrite:false }));
+  disc.rotation.x = -Math.PI/2; disc.position.set(DUNGEON.x, 0.1, DUNGEON.z); scene.add(disc);
+  const dpl = new THREE.PointLight(0x9a4bff, 0.8, 12, 2); dpl.position.set(DUNGEON.x, 1.5, DUNGEON.z); scene.add(dpl);
+  const dMark = makeSignSprite([{ t:'🗝️ Donjon des Oubliettes', big:true }, { t:'E : réveiller le Gardien', c:'#e0c9ff' }], '#d9b8ff', 3.2);
+  dMark.position.set(DUNGEON.x, 3.2, DUNGEON.z); scene.add(dMark);
+}
+
 // place du village pavée + fontaine à jets + mobilier
 let fountainWater, fountainJet, coffeeStand = null;
 {
@@ -2849,6 +2862,7 @@ function updateBuilding(dt, t){
     guildFire.flame.scale.set(1, fl, 1); guildFire.fl2.scale.set(1, fl*1.12, 1);
     guildFire.light.intensity = 1.2 + Math.sin(t*11)*0.4;
   }
+  if(dungeonCd > 0) dungeonCd = Math.max(0, dungeonCd - dt);   // repos du Gardien
   if(towerCallBtn) towerCallBtn.material.emissiveIntensity = 1.0 + Math.sin(t*3)*0.6;   // bouton d'appel qui pulse
   if(towerSignSprite) towerSignSprite.position.y = 3.4 + Math.sin(t*1.6)*0.12;          // enseigne qui flotte
   // pizzas mangées : réapparition après 25 s (le four maison tourne)
@@ -4026,12 +4040,12 @@ let nextEnemyId = 1;   // ID unique par ennemi (coop : synchro hôte→clients)
 
 function registerEnemy(e){
   e.id = e.id || (MY_ID + '#' + (nextEnemyId++));
-  const bar = makeHPBar(e.type==='dragon' ? 3.4 : (e.type==='golem' ? 2.4 : 1.6));
+  const bar = makeHPBar(e.type==='dragon' ? 3.4 : ((e.type==='golem'||e.type==='gardien') ? 2.4 : 1.6));
   bar.sprite.position.y = e.barHeight;
   e.group.add(bar.sprite);
   e.bar = bar;
-  // les lieutenants Modul'r affichent leur nom
-  if(e.type === 'golem' || e.type === 'dragon'){
+  // les lieutenants Modul'r (et le Gardien) affichent leur nom
+  if(e.type === 'golem' || e.type === 'dragon' || e.type === 'gardien'){
     const tag = makeTextSprite(e.label, '#ffb8b8', e.type==='dragon' ? 6.5 : 5);
     tag.position.y = e.barHeight + (e.type==='dragon' ? 0.9 : 0.55);
     e.group.add(tag);
@@ -4225,6 +4239,25 @@ function buildGolem(x, z){
     hp:80, maxhp:80, speed:1.7, dmg:22, range:2.8, aggro:11, barHeight:3.9,
     home:V3(x,0,z), xpGain:90,
   });
+}
+// BOSS DE DONJON : Le Gardien des Oubliettes (guerrier colossal, type distinct pour ne pas toucher la quête du golem)
+function buildGardien(x, z){
+  const m = spawnModel('skelWarrior', 3.0);
+  if(m){
+    m.wrap.position.set(x, 0, z);
+    m.wrap.scale.multiplyScalar(1.4);                       // boss imposant
+    const meshes = collectMeshes(m.obj);
+    for(const o of meshes){ if(o.material){ if(o.material.color) o.material.color.setHex(0x6a3aa0); if(o.material.emissive){ o.material.emissive.setHex(0x33106a); o.material.emissiveIntensity = 0.6; } } }
+    return registerEnemy({
+      type:'gardien', label:'☠ Le Gardien des Oubliettes', group:m.wrap, bodyMeshes:meshes,
+      hp:340, maxhp:340, speed:2.0, dmg:26, range:3.2, aggro:16, barHeight:3.6,
+      home:V3(x,0,z), xpGain:300, glb:makeEnemyAnim(m),
+    });
+  }
+  // repli procédural : golem renforcé
+  const e = buildGolem(x, z);
+  if(e){ e.type='gardien'; e.label='☠ Le Gardien des Oubliettes'; e.hp=e.maxhp=340; e.dmg=26; e.aggro=16; e.speed=2.0; e.xpGain=300; e.group.scale.multiplyScalar(1.3); }
+  return e;
 }
 
 function buildDragon(x, z){
@@ -4599,7 +4632,7 @@ function damageEnemy(e, amount){
   addFloatText(e.group.position.clone().setY(e.barHeight*0.7), '-'+amount, '#ffd44d');
   // recul
   const away = V3().subVectors(e.group.position, player.group.position).setY(0).normalize();
-  e.kb.copy(away.multiplyScalar(e.type==='golem'||e.type==='dragon' ? 1.5 : 6));
+  e.kb.copy(away.multiplyScalar(e.type==='golem'||e.type==='dragon'||e.type==='gardien' ? 1.5 : 6));
   SFX.hit();
   burst(e.group.position.clone().setY(1.2), 0x4C53BD, 10, 4, 0.14, 0.4, -4);
   // coop : un non-hôte n'applique PAS les PV — il envoie le coup à l'hôte (autoritaire)
@@ -4616,6 +4649,28 @@ function killEnemy(e){
   addXP(e.xpGain);
   onEnemyKilled(e.type);
   if(e.type === 'dragon') onDragonSlain();
+  if(e.type === 'gardien') onGardienSlain();
+}
+// --- Donjon des Oubliettes : réveil du Gardien en guilde (coop : l'hôte fait foi) ---
+function gardienAlive(){ return enemies.some(e=>e.alive && e.type==='gardien'); }
+function spawnDungeon(){
+  if(gardienAlive()) return;
+  buildGardien(DUNGEON.x - 1, DUNGEON.z + 9);          // le Gardien surgit de la grotte
+  buildGobelin(DUNGEON.x + 4, DUNGEON.z + 7);
+  buildGobelin(DUNGEON.x - 5, DUNGEON.z + 7);
+  showToast('⚔️ Le Gardien des Oubliettes s\'éveille ! Terrassez-le en guilde !');
+}
+function startDungeon(){
+  if(gardienAlive()){ showToast('⚔️ Le Gardien est déjà réveillé !'); return; }
+  if(dungeonCd > 0){ showToast('🕳️ Le Gardien se repose encore ' + Math.ceil(dungeonCd) + ' s.'); return; }
+  if(!coopHost()){ mpSend('dungeon', { act:'start' }); showToast('🗝️ Vous réveillez le Gardien…'); return; }
+  spawnDungeon();
+}
+function onDungeon(d){ if(d && d.act === 'start' && coopHost()) spawnDungeon(); }
+function onGardienSlain(){
+  dungeonCd = 90;
+  showToast('🏆 Donjon vaincu — le Gardien des Oubliettes est terrassé ! (+300 XP)');
+  burst(V3(DUNGEON.x - 1, 1.5, DUNGEON.z + 9), 0xffd700, 40, 6, 0.24, 1.2, 2);
 }
 
 /* ============================================================
@@ -5138,7 +5193,7 @@ function tryAttack(){
     if(!e.alive) continue;
     const to = V3().subVectors(e.group.position, player.group.position).setY(0);
     const d = to.length();
-    const reach = e.type==='dragon' ? 5 : (e.type==='golem' ? 3.6 : 2.9);
+    const reach = e.type==='dragon' ? 5 : ((e.type==='golem'||e.type==='gardien') ? 3.6 : 2.9);
     if(d < reach && to.normalize().angleTo(facing) < 1.1){
       damageEnemy(e, playerDamage());
       hitSomething = true;
@@ -5334,6 +5389,8 @@ function interact(){
   if(!nearestNpc() && nearRiver()){ startFishing(); return; }
   // monter sur une monture proche (licorne / cheval), si elle est libre
   if(!nearestNpc()){ const fm = nearestFreeMount(3.2); if(fm){ mountRide(fm); return; } }
+  // réveiller le Gardien du donjon (portail des Oubliettes)
+  if(!nearestNpc() && Math.hypot(player.group.position.x - DUNGEON.x, player.group.position.z - DUNGEON.z) < 3.6){ startDungeon(); return; }
   // discuter avec un copain en ligne tout proche
   if(!nearestNpc() && nearestRemote(3.0)){ openChat(); return; }
   if(!nearestNpc()){
@@ -5384,6 +5441,9 @@ function updateDialogue(){
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting && fm){
     document.getElementById('interactTxt').textContent = fm.hint || 'Monter 🐎';
+    hint.style.display = 'block';
+  } else if(!dlgNpc && !chatting && Math.hypot(player.group.position.x - DUNGEON.x, player.group.position.z - DUNGEON.z) < 3.6){
+    document.getElementById('interactTxt').textContent = gardienAlive() ? 'Gardien réveillé ⚔️' : (dungeonCd > 0 ? 'Le Gardien se repose…' : 'Réveiller le Gardien ⚔️');
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting && nearRiver()){
     document.getElementById('interactTxt').textContent = 'Pêcher 🎣';
@@ -6321,6 +6381,7 @@ function spawnEnemyByType(type, x, z){
   if(type==='gobelin') return buildGobelin(x, z);
   if(type==='spectre') return buildSpectre(x, z);
   if(type==='golem')   return buildGolem(x, z);
+  if(type==='gardien') return buildGardien(x, z);
   if(type==='dragon')  return buildDragon(x, z);
   return null;
 }
@@ -6503,6 +6564,7 @@ function connectMultiplayer(){
     mpChannel.on('broadcast', { event:'car' },   ({ payload })=> onCarData(payload));
     mpChannel.on('broadcast', { event:'mount' }, ({ payload })=> onMountData(payload));
     mpChannel.on('broadcast', { event:'buff' },  ({ payload })=> onBuff(payload));
+    mpChannel.on('broadcast', { event:'dungeon' }, ({ payload })=> onDungeon(payload));
     mpChannel.on('broadcast', { event:'chat' },  ({ payload })=> onChat(payload));
     mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!iAmHost() && payload) lightningStrike(payload.i || 0.7); });
     mpChannel.on('broadcast', { event:'enemies' }, ({ payload })=> onEnemiesSnapshot(payload));   // coop : snapshot ennemis (hôte→clients)
