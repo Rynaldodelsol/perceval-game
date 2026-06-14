@@ -247,7 +247,7 @@
   <div class="controls">
     <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut (parcours de rochers ➜ cristal d'XP)<br>
     <b>Clic droit maintenu</b> : caméra &nbsp;·&nbsp; <b>Molette</b> : zoom<br>
-    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier &nbsp;·&nbsp; <b>E</b> : parler / pêcher 🎣
+    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier &nbsp;·&nbsp; <b>E</b> : parler / pêcher 🎣 / monter sur la licorne 🦄
   </div>
   <button id="playBtn">Jouer</button>
   <div id="loadWrap">
@@ -498,6 +498,7 @@ document.addEventListener('visibilitychange', ()=>{
 /* ==================== ASSETS 3D (KayKit & Quaternius, licence CC0) ==================== */
 const ASSETS = {};
 const mixers = [];
+let unicorn = null;   // la licorne montable près du pont (modèle Horse.glb + corne + crinière)
 let assetsReady = false;
 // barre de chargement : indique l'avancement réel du téléchargement des modèles 3D
 function setLoadProgress(loaded, total){
@@ -1839,6 +1840,33 @@ function swapNature(){
       scene.add(hm.wrap);
       makeEnemyAnim(hm);   // Idle en boucle
       scene.remove(horseProc);
+    }
+  }
+  // 🦄 LICORNE montable, à côté du pont (modèle Horse.glb + corne + crinière magique)
+  if(ASSETS.horse){
+    const um = spawnModel('horse', 2.3);
+    if(um){
+      // robe blanc nacré (clone des matériaux pour ne pas toucher Galopin)
+      um.obj.traverse(o=>{ if(o.isMesh || o.isSkinnedMesh){ o.material = o.material.clone(); if(o.material.color) o.material.color.setHex(0xf3f1fb); o.material.metalness = 0.05; } });
+      // corne spiralée dorée sur le front (le modèle KayKit regarde vers +Z)
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.6, 14),
+        new THREE.MeshStandardMaterial({ color:0xffe9a8, emissive:0xffd86a, emissiveIntensity:0.7, metalness:0.4, roughness:0.25 }));
+      horn.position.set(0, 1.95, 0.95); horn.rotation.x = 0.5; um.wrap.add(horn);
+      // crinière pastel le long de l'encolure
+      for(let i=0;i<6;i++){
+        const c = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.34, 6),
+          new THREE.MeshStandardMaterial({ color:[0xff9ed6,0xa98cff,0x8ad0ff,0x9cffd6,0xfff0a0,0xff9ed6][i], roughness:0.5 }));
+        c.position.set(0, 1.85 - i*0.14, 0.55 - i*0.05); c.rotation.x = -0.5; um.wrap.add(c);
+      }
+      um.wrap.position.set(-47, 0, 47);     // berge sud, à côté du pont
+      um.wrap.rotation.y = 1.2;
+      scene.add(um.wrap);
+      const uanim = makeEnemyAnim(um);       // {mixer, actions, map, current} : idle / walk(galop)
+      unicorn = { wrap:um.wrap, obj:um.obj, anim:uanim, heading:1.2, speed:0, riding:false };
+      // panneau « monter »
+      const mk = makeSignSprite([{ t:'🦄 Licorne', big:true }, { t:'Appuyez sur E pour monter', c:'#ffd9f2' }], '#ffd0ee', 2.8);
+      mk.position.set(-47, 3.0, 47); scene.add(mk);
+      unicorn.mark = mk;
     }
   }
   // trois essences d'arbres réparties sur les emplacements existants
@@ -4706,6 +4734,64 @@ function updateFishingVisual(t){
   fishLine.geometry.attributes.position.needsUpdate = true;
 }
 
+/* ==================== LICORNE — monter & galoper ==================== */
+const GALLOP_SPEED = 13;
+function mountUnicorn(){
+  if(!unicorn || unicorn.riding) return;
+  if(player.fishing) stopFishing();
+  if(player.sitting) player.sitting = false;
+  unicorn.riding = true; unicorn.speed = 0;
+  for(const k in keys) keys[k] = false;
+  touchMove.active = false; touchMove.x = 0; touchMove.y = 0;
+  if(unicorn.mark) unicorn.mark.visible = false;
+  camYaw = unicorn.heading + Math.PI; camDist = 12;
+  SFX.pickup && SFX.pickup();
+  showToast('🦄 En selle ! ZQSD/WASD pour galoper — E pour descendre.');
+}
+function dismountUnicorn(){
+  if(!unicorn || !unicorn.riding) return;
+  unicorn.riding = false; unicorn.speed = 0;
+  enemyAnim(unicorn.anim, 'idle');
+  if(unicorn.mark) unicorn.mark.visible = true;
+  const h = unicorn.heading;
+  const px = clamp(unicorn.wrap.position.x + Math.cos(h)*1.9, -104, 104);   // posé à côté
+  const pz = clamp(unicorn.wrap.position.z - Math.sin(h)*1.9, -104, 104);
+  player.group.position.set(px, getGroundY(px, pz), pz);
+  player.vy = 0; player.onGround = true;
+  showToast('🦄 Vous descendez de la licorne.');
+}
+function updateUnicorn(dt, t){
+  if(!unicorn || !unicorn.riding) return;
+  const u = unicorn, wrap = u.wrap;
+  const up = (keys['KeyW']||keys['ArrowUp'])?1:0, dn = (keys['KeyS']||keys['ArrowDown'])?1:0;
+  let throttle = up - dn;
+  let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
+  if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
+  throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
+  const target = throttle * GALLOP_SPEED;
+  u.speed += (target - u.speed) * Math.min(1, dt*2.2);
+  if(Math.abs(throttle) < 0.05) u.speed *= (1 - Math.min(1, dt*2.6));
+  const dir = u.speed < 0 ? -1 : 1;
+  u.heading -= steer * clamp(Math.abs(u.speed)/3, 0, 1) * 1.9 * dir * dt;
+  wrap.rotation.y = u.heading;
+  wrap.position.x = clamp(wrap.position.x + Math.sin(u.heading)*u.speed*dt, -106, 106);
+  wrap.position.z = clamp(wrap.position.z + Math.cos(u.heading)*u.speed*dt, -106, 106);
+  resolveCollision(wrap.position, 0.9);                 // bute sur les bâtiments / la rivière (passe par le pont)
+  wrap.position.y = getGroundY(wrap.position.x, wrap.position.z);
+  // animation : galop proportionnel à la vitesse, sinon idle
+  if(Math.abs(u.speed) > 0.6){
+    enemyAnim(u.anim, 'walk');
+    const wk = u.anim.map.walk;
+    if(wk && u.anim.actions[wk]) u.anim.actions[wk].timeScale = 0.8 + Math.abs(u.speed)*0.12;
+  } else enemyAnim(u.anim, 'idle');
+  // le cavalier sur la selle, avec le rebond du galop
+  const bob = Math.abs(u.speed) > 1 ? Math.sin(t*Math.abs(u.speed)*1.5)*0.06 : 0;
+  player.group.position.set(wrap.position.x - Math.sin(u.heading)*0.05, wrap.position.y + 1.35 + bob, wrap.position.z - Math.cos(u.heading)*0.05);
+  player.group.rotation.y = u.heading;
+  if(player.glb) setPlayerAnim('idle');
+  if(Math.abs(u.speed) > 4 && Math.random() < 0.25) burst(V3(wrap.position.x, 0.3, wrap.position.z), 0xffb0e6, 8, 2.5, 0.12, 0.6, 1);
+}
+
 /* ============================================================
    ENTRÉES — clavier & souris (style WoW)
    ============================================================ */
@@ -4965,6 +5051,7 @@ function takeRoofCoffee(){
 }
 function interact(){
   if(player.fishing){ stopFishing(); showToast('🎣 Tu remontes ta ligne.'); return; }
+  if(unicorn && unicorn.riding){ dismountUnicorn(); return; }
   if(player.sitting){ standUp(); return; }
   if(delorean.driving || delorean.passenger){ exitCar(); return; }
   // immeuble Perceval : monter au loft / en redescendre / interactions du toit (la plus proche gagne)
@@ -4988,6 +5075,9 @@ function interact(){
   }
   // pêcher au bord de la rivière (loin du pont et des PNJ)
   if(!nearestNpc() && nearRiver()){ startFishing(); return; }
+  // monter sur la licorne près du pont
+  if(!nearestNpc() && unicorn && !unicorn.riding &&
+     Math.hypot(player.group.position.x - unicorn.wrap.position.x, player.group.position.z - unicorn.wrap.position.z) < 3.2){ mountUnicorn(); return; }
   // discuter avec un copain en ligne tout proche
   if(!nearestNpc() && nearestRemote(3.0)){ openChat(); return; }
   if(!nearestNpc()){
@@ -5026,14 +5116,18 @@ function updateDialogue(){
     document.getElementById('dialogue').style.display = 'none';
   }
   // sur le toit / assis / en voiture : on laisse les indices aux gestionnaires dédiés (updateBuilding, etc.)
-  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger))) return;
+  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger)) || (unicorn && unicorn.riding)) return;
   const n = nearestNpc();
   const hint = document.getElementById('interactHint');
+  const nearUnicorn = unicorn && !unicorn.riding && Math.hypot(player.group.position.x - unicorn.wrap.position.x, player.group.position.z - unicorn.wrap.position.z) < 3.2;
   if(player.fishing){
     document.getElementById('interactTxt').textContent = 'Remonter la ligne 🎣';
     hint.style.display = 'block';
   } else if(n && !dlgNpc){
     document.getElementById('interactTxt').textContent = 'Parler à ' + n.def.short;
+    hint.style.display = 'block';
+  } else if(!dlgNpc && !chatting && nearUnicorn){
+    document.getElementById('interactTxt').textContent = 'Monter sur la licorne 🦄';
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting && nearRiver()){
     document.getElementById('interactTxt').textContent = 'Pêcher 🎣';
@@ -5508,7 +5602,7 @@ function updateAtmosphere(dt){
    MISE À JOUR DU JOUEUR (déplacement, saut, animations)
    ============================================================ */
 function updatePlayer(dt, t){
-  if(player.dead || gameOver || (delorean && delorean.driving)){
+  if(player.dead || gameOver || (delorean && delorean.driving) || (unicorn && unicorn.riding)){
     player.moving = false;
     return;
   }
@@ -6261,6 +6355,7 @@ function animate(){
   if(started){
     for(const m2 of mixers) m2.update(dt);
     updatePlayer(dt, t);
+    updateUnicorn(dt, t);
     updateNpcs(dt, t);
     updateSpawner(dt);
     for(let i=enemies.length-1;i>=0;i--){
