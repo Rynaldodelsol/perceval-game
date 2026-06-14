@@ -1186,6 +1186,9 @@ function resolveCollision(pos, r, isFloating=false){
 // hauteur du sol : 0 partout, sauf le tablier du pont (avec rampes aux extrémités)
 // immeuble Perceval (toit-terrasse accessible)
 const TOWER = { x:40, z:8, w:7.5, d:9.5, y:10.8 };   // centre, demi-largeur/profondeur, hauteur du toit
+// Loft : le toit est partagé en INTÉRIEUR (z local ≤ zp, fermé par des murs + un plafond)
+// et TERRASSE ouverte (z local ≥ zp, la piscine). Les deux communiquent par une porte centrale.
+const LOFT = { zp:1.5, door:1.7, ceil:3.2 };
 let playerOnRoof = false;
 function onRoofZone(x, z){ return Math.abs(x - TOWER.x) < TOWER.w && Math.abs(z - TOWER.z) < TOWER.d; }
 // relief doux du terrain : collines très basses, aplaties au centre (place, château, immeuble) et plus marquées vers les bords
@@ -2256,9 +2259,9 @@ function drawLoftScreen(){
 }
 
 /* ==================== IMMEUBLE PERCEVAL (bureaux + loft/piscine sur le toit) ==================== */
-let towerDoor = { x:32.2, z:8 }, roofExit = { x:40, z:15.5 };
+let towerDoor = { x:32.2, z:8 }, roofExit = { x:45.8, z:-0.2 };   // ascenseur du toit : DANS le loft (coin arrière)
 // ancres d'interaction du toit (coordonnées MONDE) — remplies à la construction
-let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null, towerCallBtn = null, roofLights = [], loftScreen = null;
+let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null, towerCallBtn = null, roofLights = [], loftScreen = null, loftCeiling = null;
 {
   const BX = TOWER.x, BZ = TOWER.z, W = TOWER.w, D = TOWER.d, H = TOWER.y;   // demi-dimensions, hauteur du toit
   const sky    = new THREE.MeshStandardMaterial({ color:0x5aa8e0, roughness:0.7, metalness:0.05 });
@@ -2364,9 +2367,6 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   }
   bx(tower, 1.2, 0.06, 0.7, sofaWood, lx, H+0.52, lz+1.2, false);                    // table basse
   cy(tower, 0.4, 0.4, 0.5, 6, sofaWood, lx, H+0.27, lz+1.2, false);
-  for(const [cx,cz] of [[lx-1.5,lz-0.7],[lx+1.5,lz-0.7],[lx-1.5,lz+1.7],[lx+1.5,lz+1.7]]) cy(tower, 0.08, 0.08, 2.4, 6, railMeta, cx, H+1.2, cz, false);
-  const arch = addMesh(tower, new THREE.CylinderGeometry(1.7, 1.7, 3.2, 18, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color:0xf2eee4, roughness:0.85, side:THREE.DoubleSide }), lx, H+2.4, lz+0.5, false);
-  arch.rotation.z = Math.PI/2;
   const pergLight = new THREE.PointLight(0xffd9a0, 0.5, 6, 2); pergLight.position.set(lx, H+2.0, lz); pergLight.visible = false; roofLights.push(pergLight); tower.add(pergLight);
 
   // ============ BUREAU / LOFT DE CODE (nord-ouest) — fidèle aux photos ============
@@ -2445,9 +2445,9 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   const loftLight = new THREE.PointLight(0xfff0d8, 0.55, 8, 2); loftLight.position.set(tlx, H+2.3, tlz); loftLight.visible = false; roofLights.push(loftLight); tower.add(loftLight);
   const sitMark = makeSignSprite([{ t:"💻 S'asseoir pour coder", big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#cfe8ff', 2.6); sitMark.position.set(tlx, H+2.05, tlz+0.1); tower.add(sitMark);
 
-  // ============ BAR À CAFÉ (sud-est) — prenable ============
+  // ============ BAR À CAFÉ (à l'intérieur, côté est) — prenable ============
   const metal = new THREE.MeshStandardMaterial({ color:0xccd2da, metalness:0.85, roughness:0.3 });
-  const cfx = 5.2, cfz = 4.4;
+  const cfx = 5.8, cfz = -1.2;
   bx(tower, 2.0, 0.9, 0.7, woodDark, cfx, H+0.45, cfz, false);                       // comptoir
   bx(tower, 2.04, 0.06, 0.74, wood, cfx, H+0.92, cfz, false);                        // plan
   bx(tower, 0.7, 0.5, 0.5, metal, cfx-0.55, H+1.2, cfz, false);                      // machine espresso
@@ -2459,8 +2459,8 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   roofCoffee = { x:BX+cfx, z:BZ+cfz };
   const cofMark = makeSignSprite([{ t:'☕ Café', big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#ffe0b0', 2.6); cofMark.position.set(cfx, H+2.0, cfz); tower.add(cofMark);
 
-  // ============ TABLE À PIZZAS (extérieur) — 4 pizzas maison distinctes, à manger (E) ============
-  const ptx = 2.6, ptz = 6.2;
+  // ============ TABLE À PIZZAS (à l'intérieur, côté ouest) — 4 pizzas maison distinctes, à manger (E) ============
+  const ptx = -5.6, ptz = -1.0;
   bx(tower, 2.3, 0.08, 2.1, wood, ptx, H+0.74, ptz, false);
   for(const [ox,oz] of [[-0.95,-0.85],[0.95,-0.85],[-0.95,0.85],[0.95,0.85]]) cy(tower, 0.06, 0.06, 0.74, 6, woodDark, ptx+ox, H+0.37, ptz+oz, false);
   const pizzaDefs = [
@@ -2484,7 +2484,36 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   const stair = bx(tower, 2.2, 2.4, 2.0, white, roofExit.x-BX, H+1.2, roofExit.z-BZ, false);
   bx(tower, 0.12, 2.0, 1.2, navy, roofExit.x-BX-1.1, H+1.0, roofExit.z-BZ, false);   // porte
   const dn = makeSignSprite([{ t:'▼ DESCENDRE', big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#ffe9a0', 2.6);
-  dn.position.set(roofExit.x-BX, H+4.0, roofExit.z-BZ); tower.add(dn);   // bien au-dessus de la cage d'escalier
+  dn.position.set(roofExit.x-BX, H+2.9, roofExit.z-BZ); tower.add(dn);   // au-dessus de la cage, sous le plafond
+
+  // ============ ENVELOPPE DU LOFT : murs vitrés + PLAFOND (intérieur fermé) ; la terrasse/piscine reste à ciel ouvert ============
+  const CH = LOFT.ceil, ZP = LOFT.zp, DH = LOFT.door;
+  const glassWall = new THREE.MeshStandardMaterial({ color:0xbfe0f0, metalness:0.25, roughness:0.06, transparent:true, opacity:0.16, side:THREE.DoubleSide });
+  const wy = H + CH/2;                       // centre vertical des murs
+  const inDepth = ZP + D;                    // profondeur de l'intérieur (z de -D à ZP)
+  const inMidZ  = (ZP - D)/2;                // centre en z de l'intérieur
+  // baies vitrées du sol au plafond : fond + 2 côtés
+  bx(tower, W*2, CH, 0.1, glassWall, 0, wy, -D, false);
+  bx(tower, 0.1, CH, inDepth, glassWall, -W, wy, inMidZ, false);
+  bx(tower, 0.1, CH, inDepth, glassWall,  W, wy, inMidZ, false);
+  // cloison avant (z=ZP) avec une PORTE centrale ouverte vers la terrasse
+  const segW = W - DH;
+  bx(tower, segW, CH, 0.1, glassWall, -(W+DH)/2, wy, ZP, false);
+  bx(tower, segW, CH, 0.1, glassWall,  (W+DH)/2, wy, ZP, false);
+  bx(tower, DH*2+0.2, 0.34, 0.16, white, 0, H+CH-0.17, ZP, false);              // linteau de la porte
+  for(const dx of [-DH, DH]) bx(tower, 0.12, CH, 0.16, alu, dx, wy, ZP, false); // montants de la porte
+  // fins cadres alu en haut/bas des baies (lecture « loft vitré »)
+  for(const [sx,sz,horiz,len] of [[0,-D,true,W*2],[-W,inMidZ,false,inDepth],[W,inMidZ,false,inDepth]]){
+    bx(tower, horiz?len:0.12, 0.1, horiz?0.1:len, alu, sx, H+0.1, sz, false);
+    bx(tower, horiz?len:0.12, 0.1, horiz?0.1:len, alu, sx, H+CH-0.05, sz, false);
+  }
+  // PLAFOND (le « toit » du loft) — masqué automatiquement quand on est à l'intérieur (sinon la caméra ne verrait rien)
+  const ceilMat = new THREE.MeshStandardMaterial({ map:TEX.plaster, normalMap:NTEX.plaster, color:0xeceae2, roughness:0.95 });
+  loftCeiling = bx(tower, W*2+0.2, 0.22, inDepth+0.1, ceilMat, 0, H+CH, inMidZ, false);
+  for(const sx of [-3.5, 0, 3.5]) for(const sz of [-6, -2]){      // spots encastrés (enfants du plafond)
+    const sp = addMesh(loftCeiling, new THREE.CircleGeometry(0.16, 12), new THREE.MeshStandardMaterial({ color:0xfff3d6, emissive:0xffe6a8, emissiveIntensity:1.1 }), sx, -0.12, sz - inMidZ, false);
+    sp.rotation.x = Math.PI/2;
+  }
 
   tower.position.set(BX, 0, BZ);     // tout est construit en LOCAL, le groupe est posé à (BX, BZ)
   scene.add(tower);
@@ -2667,6 +2696,7 @@ function takeCoffee(){
 }
 // animation + indices d'interaction de l'immeuble Perceval (entrée, loft, pizzas, café, chaises)
 function updateBuilding(dt, t){
+  if(loftCeiling) loftCeiling.visible = !playerOnRoof;   // toit visible de l'extérieur, masqué quand on est dans le loft (caméra)
   if(towerCallBtn) towerCallBtn.material.emissiveIntensity = 1.0 + Math.sin(t*3)*0.6;   // bouton d'appel qui pulse
   if(towerSignSprite) towerSignSprite.position.y = 3.4 + Math.sin(t*1.6)*0.12;          // enseigne qui flotte
   // pizzas mangées : réapparition après 25 s (le four maison tourne)
@@ -4874,9 +4904,11 @@ function goUpTower(){
   if(player.sitting) player.sitting = false;
   roofLights.forEach(l=>{ l.visible = true; });          // on allume les lumières du toit
   if(SFX.ding) SFX.ding();                                // ding ! l'ascenseur arrive à l'étage
-  player.group.position.set(roofExit.x, TOWER.y, roofExit.z - 2.8);   // sur le toit, devant la cage d'escalier
+  player.group.position.set(TOWER.x, TOWER.y, TOWER.z - 1);   // À L'INTÉRIEUR du loft (centre de la pièce)
+  player.group.rotation.y = Math.PI;                          // face à la pièce (bureau / salon / café)
   player.vy = 0; player.onGround = true;
-  showToast('🏢 Loft Perceval — le QG des devs (et la piscine) !');
+  camYaw = 0; camPitch = 0.5; camDist = 9;                    // vue intérieure rapprochée
+  showToast('🏢 Loft Perceval — bienvenue à l\'intérieur ! (porte au fond ➜ terrasse & piscine)');
 }
 function goDownTower(){
   playerOnRoof = false;
@@ -4885,6 +4917,7 @@ function goDownTower(){
   if(SFX.ding) SFX.ding();                                // ding ! retour au rez-de-chaussée
   player.group.position.set(towerDoor.x - 4.0, 0, towerDoor.z);       // au sol, à bonne distance de l'entrée (pas de remontée immédiate)
   player.vy = 0; player.onGround = true;
+  camPitch = 0.42; camDist = 11;                                       // caméra extérieure d'origine
 }
 // --- interactions du loft : s'asseoir, manger une pizza, prendre un café ---
 function nearestChair(maxD){
@@ -5522,9 +5555,14 @@ function updatePlayer(dt, t){
   } else {
     pos.y = gy;   // suit les rampes du pont et les plateformes du parcours
   }
-  if(playerOnRoof){            // sur le toit : on reste dans l'enceinte (garde-corps), pas de collision sol
+  if(playerOnRoof){            // sur le toit : on reste dans l'enceinte (murs), pas de collision sol
     pos.x = clamp(pos.x, TOWER.x - TOWER.w + 0.6, TOWER.x + TOWER.w - 0.6);
     pos.z = clamp(pos.z, TOWER.z - TOWER.d + 0.6, TOWER.z + TOWER.d - 0.6);
+    // cloison intérieur/terrasse : mur infranchissable sauf par la porte centrale
+    const lxp = pos.x - TOWER.x, lzp = pos.z - TOWER.z;
+    if(Math.abs(lxp) > LOFT.door && Math.abs(lzp - LOFT.zp) < 0.5){
+      pos.z = TOWER.z + LOFT.zp + (lzp >= LOFT.zp ? 0.5 : -0.5);
+    }
   } else {
     resolveCollision(pos, 0.55);
   }
