@@ -3626,9 +3626,6 @@ function enterCar(){
   delorean.net.ownerId = MY_ID;               // je la réserve pour tout le monde
   delorean.heading = delorean.group.rotation.y;
   delorean.speed = 0;
-  // caméra-poursuite : on se cale DERRIÈRE la voiture (l'avant pointe vers le haut de l'écran)
-  camYaw = delorean.heading + Math.PI;
-  camPitch = 0.34; camDist = 13;
   // l'avatar RESTE visible : on me voit au volant, chez moi comme chez les autres
   SFX.shield();
   showToast('🚗⚡ DeLorean — 88 mph, et en avant !');
@@ -3674,11 +3671,11 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*10;                                  // vitesse bien réduite, paisible
-    delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.7);
-    if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.6));
+    const target = throttle*26;                                  // CONDUITE D'ORIGINE (la version que tu aimais)
+    delorean.speed += (target - delorean.speed) * Math.min(1, dt*2.2);
+    if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*1.4));
     const dir = delorean.speed < 0 ? -1 : 1;
-    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/3, 0, 1) * 2.8 * dir * dt;   // braquage franc
+    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/6, 0, 1) * 1.7 * dir * dt;
     car.rotation.y = delorean.heading;
     car.position.x = clamp(car.position.x + Math.sin(delorean.heading)*delorean.speed*dt, -104, 104);
     car.position.z = clamp(car.position.z + Math.cos(delorean.heading)*delorean.speed*dt, -104, 104);
@@ -3692,10 +3689,8 @@ function updateDelorean(dt, t){
     }
     player.group.position.set(car.position.x, car.position.y, car.position.z);
     player.group.rotation.y = delorean.heading;
-    // la caméra reste DERRIÈRE la voiture : pousser W va toujours vers le haut de l'écran, A/D = gauche/droite
-    camYaw = lerpAngle(camYaw, delorean.heading + Math.PI, Math.min(1, dt*3.2));
     if(camDist < 12) camDist = 12;
-    if(Math.abs(delorean.speed) > 4.5 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
+    if(Math.abs(delorean.speed) > 15 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
     setHint('Descendre de la DeLorean');
     // je diffuse en continu que je tiens le volant : les autres me voient rouler et ne peuvent pas entrer
     const now = performance.now();
@@ -3709,7 +3704,7 @@ function updateDelorean(dt, t){
     delorean.heading = r.group.rotation.y; car.rotation.y = delorean.heading;
     delorean.speed = rspeed;
     for(let i=0;i<delorean.wheels.length;i++) delorean.wheels[i].tire.rotation.x += rspeed*dt*2.2;
-    if(rspeed > 4.5 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
+    if(rspeed > 15 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
   } else {
     delorean.speed = 0;
     if(started && hint && hint.style.display !== 'block'){
