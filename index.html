@@ -3786,8 +3786,10 @@ let crystalBall;
    ENNEMIS — gobelins, spectres, golem, dragon
    ============================================================ */
 const enemies = [];
+let nextEnemyId = 1;   // ID unique par ennemi (coop : synchro hôte→clients)
 
 function registerEnemy(e){
+  e.id = e.id || (MY_ID + '#' + (nextEnemyId++));
   const bar = makeHPBar(e.type==='dragon' ? 3.4 : (e.type==='golem' ? 2.4 : 1.6));
   bar.sprite.position.y = e.barHeight;
   e.group.add(bar.sprite);
@@ -4156,6 +4158,7 @@ let spawnTimer = 4, spectreTimer = 9;
 const SPAWN_GATE = { x:-40, z:47 };  // sortie nord du pont des Oubliettes
 function updateSpawner(dt){
   if(!started || qi < 1 || gameOver) return;
+  if(!coopHost()) return;   // coop : seul l'hôte fait apparaître les ennemis (les autres les reçoivent)
   spawnTimer -= dt; spectreTimer -= dt;
   const gobs = enemies.filter(e=>e.alive && e.type==='gobelin').length;
   const specs = enemies.filter(e=>e.alive && e.type==='spectre').length;
@@ -4182,7 +4185,22 @@ function updateEnemy(e, dt, t){
     return;
   }
   const pos = e.group.position;
-  const ppos = player.group.position;
+  // COOP — non-hôte : ennemi MIROIR, pas d'IA, on suit la position diffusée par l'hôte
+  if(e.remote && !coopHost()){
+    if(e.flashT > 0){ e.flashT -= dt; for(const m of e.bodyMeshes) m.material.emissive && m.material.emissive.setHex(0x883333); }
+    else { for(const m of e.bodyMeshes) m.material.emissive && m.material.emissive.setHex(e.type==='spectre' ? 0x39406e : 0x000000); }
+    let moving = false;
+    if(e.netTarget){ moving = Math.hypot(e.netTarget.x - pos.x, e.netTarget.z - pos.z) > 0.06; const k = Math.min(1, dt*10); pos.x += (e.netTarget.x - pos.x)*k; pos.z += (e.netTarget.z - pos.z)*k; }
+    pos.y = e.floating ? 0.35 + Math.sin(t*2.2 + (e.floatPhase||0))*0.25 : getGroundY(pos.x, pos.z);
+    if(e.ry != null) e.group.rotation.y = lerpAngle(e.group.rotation.y, e.ry, dt*8);
+    if(e.glb && e.type !== 'dragon') enemyAnim(e.glb, moving ? 'walk' : 'idle');
+    e.group.scale.y += (1 - e.group.scale.y)*dt*8;
+    return;
+  }
+  // hôte : l'ennemi cible le JOUEUR LE PLUS PROCHE (héros local ou copain en ligne)
+  const tgt = nearestPlayer(pos);
+  e._targetId = tgt.id;
+  const ppos = tgt.pos;
   const d = Math.hypot(pos.x-ppos.x, pos.z-ppos.z);
 
   // flash de dégâts
@@ -4204,13 +4222,13 @@ function updateEnemy(e, dt, t){
 
   if(e.type === 'dragon'){
     updateDragon(e, dt, t, d);
-  } else if(d < e.aggro && !player.dead){
-    // poursuite / attaque
+  } else if(d < e.aggro){
+    // poursuite / attaque (du joueur le plus proche)
     if(d > e.range){
       moveDir = V3(ppos.x-pos.x, 0, ppos.z-pos.z).normalize();
     } else if(e.attackCd <= 0){
       e.attackCd = e.type==='golem' ? 2.6 : 1.5;
-      hurtPlayer(e.dmg, pos);
+      dealDamageToTarget(e._targetId, e.dmg, pos);
       if(e.glb) enemyAnim(e.glb, 'attack', true);
       else e.group.scale.y = 0.85; // petit écrasement d'attaque
       if(e.type==='golem') shake(0.35, 0.25);
@@ -4341,15 +4359,17 @@ function updateDragon(e, dt, t, d){
 // --- dégâts infligés aux ennemis ---
 function damageEnemy(e, amount){
   if(!e.alive) return;
-  e.hp -= amount;
   e.flashT = 0.15;
-  e.bar.update(Math.max(0, e.hp/e.maxhp));
   addFloatText(e.group.position.clone().setY(e.barHeight*0.7), '-'+amount, '#ffd44d');
   // recul
   const away = V3().subVectors(e.group.position, player.group.position).setY(0).normalize();
   e.kb.copy(away.multiplyScalar(e.type==='golem'||e.type==='dragon' ? 1.5 : 6));
   SFX.hit();
   burst(e.group.position.clone().setY(1.2), 0x4C53BD, 10, 4, 0.14, 0.4, -4);
+  // coop : un non-hôte n'applique PAS les PV — il envoie le coup à l'hôte (autoritaire)
+  if(!coopHost()){ mpSend('hit', { id:e.id, dmg:amount }); return; }
+  e.hp -= amount;
+  e.bar.update(Math.max(0, e.hp/e.maxhp));
   if(e.hp <= 0) killEnemy(e);
 }
 function killEnemy(e){
@@ -4412,10 +4432,10 @@ function updateCrystals(dt, t){
       c.mesh.visible = false; c.halo.visible = false;
       SFX.pickup();
       burst(c.mesh.position, 0xbfe8ff, 24, 5, 0.18, 0.8, 2);
-      qProgress++;
       addFloatText(c.mesh.position, 'Cristal récupéré !', '#bfe8ff', true);
-      if(qProgress >= quests[2].goal) completeQuest();
-      else updateQuestUI();
+      // coop : progression partagée (autorité hôte)
+      if(coopHost()){ qProgress++; if(qProgress >= quests[2].goal) completeQuest(); else updateQuestUI(); }
+      else mpSend('questAct', { act:'crystal' });
     }
   }
 }
@@ -4443,6 +4463,7 @@ function completeQuest(){
   updateQuestUI(true);
 }
 function onEnemyKilled(type){
+  if(!coopHost()) return;   // coop : seul l'hôte compte la progression (diffusée ensuite à tous)
   const q = quests[qi];
   if(q.type==='kill' && q.target===type && qProgress < q.goal){
     qProgress++;
@@ -4812,8 +4833,8 @@ function interact(){
   tone(440, 0.08, 'sine', 0.08);
   // effets de quête / soins
   if(n.def.short === 'Merlin' && qi === 0){
-    qProgress = 1;
-    completeQuest();
+    if(coopHost()){ qProgress = 1; completeQuest(); }
+    else mpSend('questAct', { act:'merlin' });   // coop : l'hôte avance la quête pour tout le groupe
   }
   if(n.def.heal && player.hp < player.maxhp){
     player.hp = player.maxhp;
@@ -5651,6 +5672,118 @@ function broadcastWorld(){
   mpSend('world', { dayTime:+dayTime.toFixed(4), ws:weather.state, wt:+weather.target.toFixed(2), wtimer:+weather.timer.toFixed(1) });
 }
 
+// ====================== COOP GUILDE : ennemis & quêtes partagés (autorité hôte) ======================
+let mpEnemySend = 0, mpQuestSend = 0, lastEnemySnap = 0;
+const netEnemies = {};   // id -> ennemi miroir (côté non-hôte)
+// autorité coop = je suis l'hôte OU aucun hôte ne diffuse depuis 4 s (hôte planté → je reprends la main, jamais de quête bloquée)
+function coopHost(){ return iAmHost() || (performance.now() - lastEnemySnap > 4000); }
+// joueur le plus proche d'une position (héros local OU copain en ligne) — pour l'IA des ennemis (hôte)
+function nearestPlayer(pos){
+  let bestId = MY_ID, bestPos = player.group.position;
+  let bd = player.dead ? Infinity : Math.hypot(pos.x-bestPos.x, pos.z-bestPos.z);
+  for(const id in remotePlayers){
+    const rp = remotePlayers[id].group.position;
+    const dd = Math.hypot(pos.x-rp.x, pos.z-rp.z);
+    if(dd < bd){ bd = dd; bestId = id; bestPos = rp; }
+  }
+  return { id:bestId, pos:bestPos };
+}
+function dealDamageToTarget(targetId, dmg, fromPos){
+  if(!targetId || targetId === MY_ID) hurtPlayer(dmg, fromPos);
+  else mpSend('hurt', { id:targetId, dmg });
+}
+function onHurt(d){ if(d && d.id === MY_ID) hurtPlayer(d.dmg, player.group.position); }
+function spawnEnemyByType(type, x, z){
+  if(type==='gobelin') return buildGobelin(x, z);
+  if(type==='spectre') return buildSpectre(x, z);
+  if(type==='golem')   return buildGolem(x, z);
+  if(type==='dragon')  return buildDragon(x, z);
+  return null;
+}
+// l'hôte diffuse l'état des ennemis (~9/s)
+function broadcastEnemies(){
+  if(!coopHost() || !mpChannel) return;
+  const now = performance.now();
+  if(now - mpEnemySend < 110) return;
+  mpEnemySend = now;
+  const s = [];
+  for(const e of enemies){
+    if(!e.alive) continue;
+    s.push({ id:e.id, ty:e.type, x:+e.group.position.x.toFixed(2), z:+e.group.position.z.toFixed(2), ry:+e.group.rotation.y.toFixed(2), hp:Math.max(0, Math.round(e.hp)) });
+  }
+  mpSend('enemies', { s });
+}
+// non-hôte : crée / met à jour / supprime les ennemis miroirs d'après le snapshot de l'hôte
+function onEnemiesSnapshot(payload){
+  if(!payload || !Array.isArray(payload.s)) return;
+  lastEnemySnap = performance.now();        // un hôte est vivant et diffuse
+  if(coopHost() || !started) return;        // si JE suis l'autorité, j'ignore (et je ne me mire pas moi-même)
+  const seen = {};
+  for(const d of payload.s){
+    seen[d.id] = 1;
+    let e = netEnemies[d.id];
+    if(!e){
+      e = spawnEnemyByType(d.ty, d.x, d.z);
+      if(!e) continue;
+      e.id = d.id; e.remote = true; e.netTarget = V3(d.x, 0, d.z);
+      netEnemies[d.id] = e;
+    }
+    if(!e.netTarget) e.netTarget = V3();
+    e.netTarget.set(d.x, 0, d.z);
+    e.ry = d.ry;
+    if(d.hp < e.hp) e.flashT = 0.15;
+    e.hp = d.hp;
+    if(e.bar) e.bar.update(Math.max(0, e.hp/e.maxhp));
+  }
+  for(const id in netEnemies){
+    if(!seen[id]){
+      const e = netEnemies[id];
+      if(e && e.alive) killEnemy(e);   // explosion + XP local (onEnemyKilled est garde-hôte → no-op côté client)
+      delete netEnemies[id];
+    }
+  }
+}
+// l'hôte reçoit les coups portés par les clients
+function onHit(d){
+  if(!coopHost() || !d) return;
+  const e = enemies.find(x => x.id === d.id);
+  if(e && e.alive){
+    e.hp -= d.dmg; e.flashT = 0.15;
+    if(e.bar) e.bar.update(Math.max(0, e.hp/e.maxhp));
+    if(e.hp <= 0) killEnemy(e);
+  }
+}
+// quête partagée : l'hôte diffuse l'état (~1/s), les clients adoptent
+function broadcastQuest(){
+  if(!coopHost() || !mpChannel) return;
+  const now = performance.now();
+  if(now - mpQuestSend < 1000) return;
+  mpQuestSend = now;
+  mpSend('quest', { qi, qP:qProgress, ch:contractInHand, go:gameOver });
+}
+function onQuestState(w){
+  if(coopHost() || !w) return;
+  if(typeof w.qi === 'number' && w.qi !== qi){
+    qi = w.qi; qProgress = w.qP || 0; contractInHand = !!w.ch;
+    if(quests[qi] && quests[qi].type === 'collect' && crystals.length === 0) spawnCrystals();
+    updateQuestUI(); updateMarkers();
+  } else {
+    if(typeof w.qP === 'number') qProgress = w.qP;
+    contractInHand = !!w.ch;
+    updateQuestUI();
+  }
+  if(w.go) gameOver = true;
+}
+// actions de quête envoyées par un client à l'hôte (parler à Merlin, ramasser un cristal)
+function onQuestAct(d){
+  if(!coopHost() || !d) return;
+  if(d.act === 'merlin' && qi === 0){ qProgress = 1; completeQuest(); }
+  else if(d.act === 'crystal' && qi === 2 && qProgress < quests[2].goal){
+    qProgress++;
+    if(qProgress >= quests[2].goal) completeQuest(); else updateQuestUI();
+  }
+}
+
 /* ---- chat entre copains : bulle au-dessus de l'avatar + petit fil de discussion ---- */
 let chatting = false;
 function showChatBubble(group, text){
@@ -5737,6 +5870,11 @@ function connectMultiplayer(){
     mpChannel.on('broadcast', { event:'car' },   ({ payload })=> onCarData(payload));
     mpChannel.on('broadcast', { event:'chat' },  ({ payload })=> onChat(payload));
     mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!iAmHost() && payload) lightningStrike(payload.i || 0.7); });
+    mpChannel.on('broadcast', { event:'enemies' }, ({ payload })=> onEnemiesSnapshot(payload));   // coop : snapshot ennemis (hôte→clients)
+    mpChannel.on('broadcast', { event:'hit' },      ({ payload })=> onHit(payload));               // coop : coup d'un client → hôte
+    mpChannel.on('broadcast', { event:'hurt' },     ({ payload })=> onHurt(payload));              // coop : un ennemi me frappe (hôte→cible)
+    mpChannel.on('broadcast', { event:'quest' },    ({ payload })=> onQuestState(payload));        // coop : état de quête (hôte→clients)
+    mpChannel.on('broadcast', { event:'questAct' }, ({ payload })=> onQuestAct(payload));          // coop : action de quête (client→hôte)
     mpChannel.on('presence', { event:'sync' },  ()=> refreshPresence());
     mpChannel.on('presence', { event:'join' },  ()=> refreshPresence());
     mpChannel.on('presence', { event:'leave' }, ({ leftPresences })=>{
@@ -5935,6 +6073,8 @@ function animate(){
     updateSlashes(dt);
     broadcastSelf();            // envoie ma position aux autres joueurs
     broadcastWorld();           // si je suis l'hôte : je diffuse l'heure + la météo
+    broadcastEnemies();         // coop : l'hôte diffuse l'état des ennemis (positions, PV, morts)
+    broadcastQuest();           // coop : l'hôte diffuse l'état de la quête (tous au même point)
     updateRemotePlayers(dt);    // déplace/anime les autres joueurs
     updateDialogue();
     updateCooldownUI();
