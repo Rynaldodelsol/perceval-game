@@ -1239,15 +1239,18 @@ function playerGroundY(x, z, fromY){
   }
   return g;
 }
-// l'immeuble Perceval est PLEIN : on empêche d'entrer dans son emprise au sol (entrée seulement via E → ascenseur)
+// bâtiments PLEINS : on empêche d'entrer dans leur emprise au sol (immeuble Perceval, taverne…)
+const SOLID_BUILDINGS = [{ x:TOWER.x, z:TOWER.z, hw:TOWER.w, hd:TOWER.d }];
 function blockTowerRect(pos, pad){
-  const x0 = TOWER.x - TOWER.w - pad, x1 = TOWER.x + TOWER.w + pad;
-  const z0 = TOWER.z - TOWER.d - pad, z1 = TOWER.z + TOWER.d + pad;
-  if(pos.x > x0 && pos.x < x1 && pos.z > z0 && pos.z < z1){
-    const dL = pos.x - x0, dR = x1 - pos.x, dB = pos.z - z0, dF = z1 - pos.z;
-    const mn = Math.min(dL, dR, dB, dF);
-    if(mn === dL) pos.x = x0; else if(mn === dR) pos.x = x1;
-    else if(mn === dB) pos.z = z0; else pos.z = z1;
+  for(const b of SOLID_BUILDINGS){
+    const x0 = b.x - b.hw - pad, x1 = b.x + b.hw + pad;
+    const z0 = b.z - b.hd - pad, z1 = b.z + b.hd + pad;
+    if(pos.x > x0 && pos.x < x1 && pos.z > z0 && pos.z < z1){
+      const dL = pos.x - x0, dR = x1 - pos.x, dB = pos.z - z0, dF = z1 - pos.z;
+      const mn = Math.min(dL, dR, dB, dF);
+      if(mn === dL) pos.x = x0; else if(mn === dR) pos.x = x1;
+      else if(mn === dB) pos.z = z0; else pos.z = z1;
+    }
   }
 }
 
@@ -2619,6 +2622,56 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   towerSignSprite = up;   // pulsé légèrement pour attirer l'œil
 }
 
+// ==================== TAVERNE DE LA GUILDE (hub social + foyer de repos) ====================
+let guildFire = null;
+const GUILD = { x:-26, z:23, r:10 };   // foyer : zone de repos (régén PV/mana accélérée)
+{
+  const TX = -26, TZ = 30;
+  const wood    = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a5a34, roughness:0.85 });
+  const woodD   = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x5e3c22, roughness:0.85 });
+  const plaster = new THREE.MeshStandardMaterial({ map:TEX.plaster, normalMap:NTEX.plaster, color:0xe8dcc0, roughness:0.95 });
+  const roofMat = new THREE.MeshStandardMaterial({ color:0x7a2f2a, roughness:0.8 });
+  const g = new THREE.Group();
+  bx(g, 8, 4, 6, plaster, 0, 2, 0);                                  // corps
+  for(const sx of [-3.6, 3.6]) bx(g, 0.3, 4, 6.05, woodD, sx, 2, 0); // poutres d'angle (colombages)
+  bx(g, 8.05, 0.3, 6.05, woodD, 0, 0.3, 0);                          // sablière basse
+  bx(g, 8.05, 0.3, 6.05, woodD, 0, 3.7, 0);                          // sablière haute
+  for(const s of [-1, 1]){ const r = bx(g, 8.6, 0.3, 4.4, roofMat, 0, 4.6, s*1.6); r.rotation.x = s*0.62; }  // toit 2 pans
+  bx(g, 8.7, 0.34, 0.4, woodD, 0, 5.5, 0);                           // faîtage
+  bx(g, 1.6, 2.6, 0.2, woodD, 0, 1.3, -3.0);                         // porte (face village)
+  const win = new THREE.MeshStandardMaterial({ color:0xffd98a, emissive:0xffb84a, emissiveIntensity:0.9 });
+  for(const wx2 of [-2.6, 2.6]) bx(g, 1.2, 1.2, 0.12, win, wx2, 2.2, -3.02);   // fenêtres lumineuses
+  bx(g, 0.9, 2.4, 0.9, woodD, 2.6, 5.0, 1.4);                        // cheminée
+  const sign = makeSignSprite([{ t:'⚜️ Taverne de la Guilde', big:true }, { t:'Foyer de repos', c:'#ffe9b0' }], '#ffe0a0', 3.4);
+  sign.position.set(0, 5.0, -3.5); g.add(sign);
+  g.position.set(TX, 0, TZ); scene.add(g);
+  SOLID_BUILDINGS.push({ x:TX, z:TZ, hw:4, hd:3 });
+
+  // FEU DE CAMP devant la taverne (le foyer de la guilde)
+  const fx = GUILD.x, fz = GUILD.z;
+  for(let i=0;i<8;i++){ const a = i/8*6.283; cy(scene, 0.28, 0.34, 0.3, 6, mat(0x6a6a72), fx+Math.cos(a)*1.2, 0.15, fz+Math.sin(a)*1.2); }  // cercle de pierres
+  for(let i=0;i<4;i++){ const a = i/4*6.283; const lg = cy(scene, 0.13, 0.13, 1.5, 6, woodD, fx, 0.3, fz); lg.rotation.z = Math.PI/2; lg.rotation.y = a; }  // bûches
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.6, 10), new THREE.MeshBasicMaterial({ color:0xff7a1e, transparent:true, opacity:0.9, depthWrite:false }));
+  flame.position.set(fx, 1.0, fz); scene.add(flame);
+  const fl2 = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.05, 10), new THREE.MeshBasicMaterial({ color:0xffe24a, transparent:true, opacity:0.95, depthWrite:false }));
+  fl2.position.set(fx, 0.9, fz); scene.add(fl2);
+  const fireLight = new THREE.PointLight(0xff9a3a, 1.4, 16, 2); fireLight.position.set(fx, 1.5, fz); scene.add(fireLight);
+  guildFire = { flame, fl2, light:fireLight };
+  // tables + bancs autour du feu
+  for(const [bxp, bzp, ry] of [[-3.6, 0, 0], [3.6, 0, 0], [0, 3.4, Math.PI/2]]){
+    const tg = new THREE.Group(); tg.position.set(fx+bxp, 0, fz+bzp); tg.rotation.y = ry; scene.add(tg);
+    bx(tg, 1.9, 0.16, 0.95, wood, 0, 0.9, 0);
+    for(const lxp of [-0.75, 0.75]) bx(tg, 0.16, 0.9, 0.16, woodD, lxp, 0.45, 0);
+    bx(tg, 2.1, 0.14, 0.42, wood, 0, 0.5, 0.95);
+    for(const lxp of [-0.8, 0.8]) bx(tg, 0.12, 0.5, 0.12, woodD, lxp, 0.25, 0.95);
+  }
+  // bannière de guilde
+  cy(scene, 0.08, 0.08, 4.0, 6, woodD, fx-4.8, 2.0, fz-1.2);
+  bx(scene, 0.1, 1.8, 1.3, new THREE.MeshStandardMaterial({ color:0x4C53BD, roughness:0.6 }), fx-4.8, 3.1, fz-1.2);
+  const gMark = makeSignSprite([{ t:'⚜️ Foyer de la Guilde', big:true }, { t:'Zone de repos', c:'#ffe9b0' }], '#ffe0a0', 3.0);
+  gMark.position.set(fx, 3.0, fz); scene.add(gMark);
+}
+
 // place du village pavée + fontaine à jets + mobilier
 let fountainWater, fountainJet, coffeeStand = null;
 {
@@ -2791,6 +2844,11 @@ function takeCoffee(){
 // animation + indices d'interaction de l'immeuble Perceval (entrée, loft, pizzas, café, chaises)
 function updateBuilding(dt, t){
   if(loftCeiling) loftCeiling.visible = !playerOnRoof;   // toit visible de l'extérieur, masqué quand on est dans le loft (caméra)
+  if(guildFire){                                          // feu de camp de la taverne qui crépite
+    const fl = 1 + Math.sin(t*9)*0.16 + Math.random()*0.05;
+    guildFire.flame.scale.set(1, fl, 1); guildFire.fl2.scale.set(1, fl*1.12, 1);
+    guildFire.light.intensity = 1.2 + Math.sin(t*11)*0.4;
+  }
   if(towerCallBtn) towerCallBtn.material.emissiveIntensity = 1.0 + Math.sin(t*3)*0.6;   // bouton d'appel qui pulse
   if(towerSignSprite) towerSignSprite.position.y = 3.4 + Math.sin(t*1.6)*0.12;          // enseigne qui flotte
   // pizzas mangées : réapparition après 25 s (le four maison tourne)
@@ -5937,12 +5995,17 @@ function updatePlayer(dt, t){
     player.shieldBubble.scale.setScalar(1 + Math.sin(t*6)*0.03);
     if(player.shieldTime <= 0) player.shieldBubble.visible = false;
   }
-  const manaRegen = player.buffRegenT > 0 ? 18 : 6;
+  // foyer de la guilde : zone de repos (régén accélérée, façon auberge WoW)
+  const rested = GUILD && Math.hypot(pos.x - GUILD.x, pos.z - GUILD.z) < GUILD.r;
+  if(rested && !player._rested){ player._rested = true; showToast('💤 Foyer de la guilde — repos : PV & mana régénèrent vite.'); }
+  else if(!rested && player._rested){ player._rested = false; }
+  const boostRegen = player.buffRegenT > 0 || rested;
+  const manaRegen = boostRegen ? 18 : 6;
   player.mana = Math.min(player.maxmana, player.mana + manaRegen*dt);
-  // régénération hors combat (accélérée par le Chant d'auberge)
+  // régénération hors combat (accélérée par le Chant d'auberge ou le foyer de la guilde)
   const inDanger = enemies.some(e=>e.alive && e.group.position.distanceTo(pos) < 14);
-  const hpRegen = (player.buffRegenT > 0 ? 14 : 3);
-  if((!inDanger || player.buffRegenT > 0) && player.hp < player.maxhp) player.hp = Math.min(player.maxhp, player.hp + hpRegen*dt);
+  const hpRegen = boostRegen ? 14 : 3;
+  if((!inDanger || boostRegen) && player.hp < player.maxhp) player.hp = Math.min(player.maxhp, player.hp + hpRegen*dt);
 
   // --- animations : squelette KayKit si chargé, sinon procédural ---
   if(player.glb){
