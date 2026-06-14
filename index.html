@@ -2516,17 +2516,17 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   roofCoffee = { x:BX+cfx, z:BZ+cfz };
   const cofMark = makeSignSprite([{ t:'☕ Café', big:true }, { t:'Appuyez sur E', c:'#cfe0ff' }], '#ffe0b0', 2.6); cofMark.position.set(cfx, H+2.0, cfz); tower.add(cofMark);
 
-  // ============ TABLE À PIZZAS (à l'intérieur, côté ouest) — 4 pizzas maison distinctes, à manger (E) ============
-  const ptx = -5.6, ptz = -1.0;
-  bx(tower, 2.3, 0.08, 2.1, wood, ptx, H+0.74, ptz, false);
-  for(const [ox,oz] of [[-0.95,-0.85],[0.95,-0.85],[-0.95,0.85],[0.95,0.85]]) cy(tower, 0.06, 0.06, 0.74, 6, woodDark, ptx+ox, H+0.37, ptz+oz, false);
+  // ============ TABLE À PIZZAS (DEHORS, à côté de la piscine) — rectangulaire, 4 pizzas maison à manger (E) ============
+  const ptx = 2.4, ptz = 6.9;
+  bx(tower, 2.8, 0.08, 1.1, wood, ptx, H+0.74, ptz, false);
+  for(const [ox,oz] of [[-1.25,-0.42],[1.25,-0.42],[-1.25,0.42],[1.25,0.42]]) cy(tower, 0.06, 0.06, 0.74, 6, woodDark, ptx+ox, H+0.37, ptz+oz, false);
   const pizzaDefs = [
     { name:'Margherita',  sauce:0xc0392b, top:0xeae6d0, tn:7 },
     { name:'Pepperoni',   sauce:0xb83227, top:0xc0392b, tn:8 },
     { name:'Champignons', sauce:0xcf6b3a, top:0xb9a07a, tn:8 },
     { name:'Végétarienne',sauce:0xc0392b, top:0x4f9a44, tn:9 },
   ];
-  const pizSlots = [[-0.62,-0.55],[0.62,-0.55],[-0.62,0.55],[0.62,0.55]];
+  const pizSlots = [[-1.0,0],[-0.34,0],[0.34,0],[1.0,0]];   // en rang sur la table rectangulaire
   for(let pi=0; pi<4; pi++){
     const [ox,oz] = pizSlots[pi], def = pizzaDefs[pi];
     const grp = new THREE.Group(); grp.position.set(ptx+ox, H+0.82, ptz+oz); tower.add(grp);
