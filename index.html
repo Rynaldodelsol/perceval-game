@@ -245,9 +245,9 @@
     <input id="pseudo" maxlength="16" placeholder="Ton pseudo (optionnel)" autocomplete="off">
   </div>
   <div class="controls">
-    <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut<br>
+    <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut (parcours de rochers ➜ cristal d'XP)<br>
     <b>Clic droit maintenu</b> : caméra &nbsp;·&nbsp; <b>Molette</b> : zoom<br>
-    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier de Perceval &nbsp;·&nbsp; <b>E</b> : parler
+    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier &nbsp;·&nbsp; <b>E</b> : parler / pêcher 🎣
   </div>
   <button id="playBtn">Jouer</button>
   <div id="loadWrap">
@@ -1206,6 +1206,19 @@ function getGroundY(x, z){
   return terrainH(x, z);
 }
 
+// --- parcours d'agilité : plateformes de pierre à franchir en sautant ---
+// chaque plateforme : {x, z, w, d, h} — sommet à la hauteur h, empreinte 2w × 2d.
+// « à sens unique » : on traverse par en dessous mais on se pose dessus dès que les pieds
+// arrivent au niveau du sommet (tolérance de 0,6 m pour enjamber une petite marche).
+const PLATFORMS = [];
+function playerGroundY(x, z, fromY){
+  let g = getGroundY(x, z);
+  for(const p of PLATFORMS){
+    if(Math.abs(x - p.x) <= p.w && Math.abs(z - p.z) <= p.d && p.h > g && p.h <= fromY + 0.6) g = p.h;
+  }
+  return g;
+}
+
 // --- particules (jets éphémères) ---
 const particleBursts = [];
 function burst(pos, color, count=14, speed=4, size=0.18, life=0.7, gravity=-6, spread=1){
@@ -1482,6 +1495,44 @@ let riverWater;
   }
   bridge.position.set(-40, 0, 55);
   scene.add(bridge);
+}
+
+// --- PARCOURS D'AGILITÉ : rochers à escalader en sautant jusqu'au cristal d'XP perché ---
+let xpCrystal = null;          // { group, base, ready, cd } — récompense au sommet
+{
+  const rockMat  = new THREE.MeshStandardMaterial({ map:TEX.stone, normalMap:NTEX.stone, color:0xb9b3a4, roughness:0.95 });
+  const rockTop  = new THREE.MeshStandardMaterial({ color:0x8fae6a, roughness:0.9 });   // herbe sur le dessus
+  // définition du parcours (empreinte 2w × 2d, sommet à h) — marches d'environ 1 m, sautables
+  const course = [
+    { x:-52, z:14, w:1.7, d:1.7, h:1.3 },
+    { x:-56, z:18, w:1.5, d:1.5, h:2.4 },
+    { x:-61, z:16, w:1.4, d:1.4, h:3.5 },
+    { x:-64, z:21, w:1.4, d:1.4, h:4.6 },
+    { x:-61, z:25, w:1.5, d:1.5, h:5.6 },
+    { x:-67, z:27, w:3.0, d:3.0, h:6.5 },   // grand plateau d'arrivée
+  ];
+  for(const p of course){
+    PLATFORMS.push(p);
+    const g0 = terrainH(p.x, p.z);                 // base posée sur le sol réel
+    const pillarH = p.h - g0;
+    const pillar = bx(scene, p.w*2, pillarH, p.d*2, rockMat, p.x, g0 + pillarH/2, p.z);
+    pillar.receiveShadow = true;
+    bx(scene, p.w*2 + 0.12, 0.18, p.d*2 + 0.12, rockTop, p.x, p.h - 0.04, p.z);   // coiffe herbeuse
+  }
+  // cristal d'XP flottant au-dessus du plateau d'arrivée
+  const top = course[course.length-1];
+  const cg = new THREE.Group();
+  const crystalMat = new THREE.MeshStandardMaterial({
+    color:0x8fd0ff, emissive:0x4aa6ff, emissiveIntensity:1.4,
+    roughness:0.2, metalness:0.1, transparent:true, opacity:0.92 });
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.55), crystalMat);
+  gem.scale.y = 1.7;
+  cg.add(gem);
+  const glow = new THREE.PointLight(0x6ab8ff, 1.2, 9);
+  cg.add(glow);
+  cg.position.set(top.x, top.h + 1.5, top.z);
+  scene.add(cg);
+  xpCrystal = { group:cg, gem, glow, baseY: top.h + 1.5, x:top.x, z:top.z, top:top.h, ready:true, cd:0 };
 }
 
 // --- chemins (décals clairs) ---
@@ -2917,6 +2968,7 @@ const player = {
   shieldCd: 0, shieldTime: 0,
   dead: false, moving: false,
   walkT: 0,
+  fishing: false, fishT: 0, fishCount: 0,
 };
 player.group.position.set(0, 0, 22);
 let chosenChar = 'Perceval';      // personnage choisi à l'écran-titre (multijoueur : chacun le sien)
@@ -4515,6 +4567,94 @@ function addXP(n){
   updateHUD();
 }
 
+/* ==================== PARCOURS D'AGILITÉ — cristal d'XP perché ==================== */
+const CRYSTAL_XP = 45, CRYSTAL_CD = 35;   // récompense + temps de réapparition (s)
+function updateAgility(dt, t){
+  if(!xpCrystal) return;
+  const c = xpCrystal;
+  c.gem.rotation.y += dt*1.4;
+  c.group.position.y = c.baseY + Math.sin(t*1.8)*0.18;
+  if(!c.ready){
+    c.cd -= dt;
+    if(c.cd <= 0){ c.ready = true; c.gem.visible = true; c.glow.intensity = 1.2; }
+    return;
+  }
+  if(!started || player.dead || gameOver) return;
+  const p = player.group.position;
+  // récolte automatique quand on atteint le plateau et qu'on est assez haut
+  if(Math.hypot(p.x - c.x, p.z - c.z) < 2.4 && p.y > c.top - 0.8){
+    c.ready = false; c.cd = CRYSTAL_CD;
+    c.gem.visible = false; c.glow.intensity = 0;
+    addXP(CRYSTAL_XP);
+    SFX.pickup();
+    burst(V3(c.x, c.top + 1.2, c.z), 0x6ab8ff, 30, 5, 0.2, 1.0, 2);
+    addFloatText(V3(c.x, c.top + 2.0, c.z), '💎 +' + CRYSTAL_XP + ' XP', '#8fd0ff', true);
+    showToast('💎 Cristal d\'XP récupéré ! Reviens sauter dans ' + CRYSTAL_CD + ' s.');
+  }
+}
+
+/* ==================== PÊCHE — au bord de la rivière ==================== */
+let fishBobber = null, fishLine = null;
+const FISH_TIME = 2.6, FISH_XP = 18;
+const FISH_KINDS = ['une truite 🐟', 'un brochet 🐟', 'une carpe 🐠', 'une vieille botte 🥾', 'un poisson-chat 🐡'];
+// peut-on pêcher ici ? au sol, au bord de l'eau, hors du pont
+function nearRiver(){
+  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger))) return false;
+  const p = player.group.position;
+  const dz = Math.abs(p.z - 55);
+  return dz > 3.0 && dz < 7.0 && Math.abs(p.x + 40) > 4 && player.onGround;
+}
+function startFishing(){
+  if(player.fishing) return;
+  player.fishing = true; player.fishT = FISH_TIME;
+  const p = player.group.position;
+  player.group.rotation.y = (p.z < 55) ? 0 : Math.PI;     // se tourne vers l'eau
+  for(const k in keys) keys[k] = false;
+  touchMove.active = false; touchMove.x = 0; touchMove.y = 0;
+  // bouchon posé sur l'eau, devant le joueur
+  const bz = p.z < 55 ? 53 : 57;
+  if(!fishBobber){
+    fishBobber = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8),
+      new THREE.MeshStandardMaterial({ color:0xe8434f, emissive:0x661014, roughness:0.5 }));
+    scene.add(fishBobber);
+  }
+  fishBobber.position.set(p.x, 0.3, bz);
+  fishBobber.visible = true;
+  if(!fishLine){
+    fishLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(), V3()]),
+      new THREE.LineBasicMaterial({ color:0xf2f2f2, transparent:true, opacity:0.7 }));
+    scene.add(fishLine);
+  }
+  fishLine.visible = true;
+  SFX.shield && SFX.shield();
+  showToast('🎣 Tu lances ta ligne… patiente (bouge pour annuler).');
+}
+function stopFishing(){
+  player.fishing = false;
+  if(fishBobber) fishBobber.visible = false;
+  if(fishLine) fishLine.visible = false;
+}
+function finishFishing(){
+  const kind = FISH_KINDS[Math.floor(Math.random()*FISH_KINDS.length)];
+  player.fishCount = (player.fishCount||0) + 1;
+  stopFishing();
+  addXP(FISH_XP);
+  SFX.pickup();
+  const p = player.group.position;
+  burst(V3(p.x, 0.4, p.z < 55 ? 53 : 57), 0x9fd6ef, 16, 3, 0.14, 0.7, 2);
+  addFloatText(player.group.position.clone().setY(2.3), '🎣 +' + FISH_XP + ' XP', '#9fd6ef');
+  showToast('🎣 Ça mord ! Tu attrapes ' + kind + '  (+' + FISH_XP + ' XP)');
+}
+function updateFishingVisual(t){
+  if(!player.fishing || !fishBobber) return;
+  const p = player.group.position;
+  fishBobber.position.y = 0.28 + Math.sin(t*4)*0.05;     // flotte sur les vagues
+  // la ligne va de la main au bouchon
+  const hand = V3(p.x, 1.4, p.z + (p.z < 55 ? 0.4 : -0.4));
+  fishLine.geometry.setFromPoints([hand, fishBobber.position]);
+  fishLine.geometry.attributes.position.needsUpdate = true;
+}
+
 /* ============================================================
    ENTRÉES — clavier & souris (style WoW)
    ============================================================ */
@@ -4770,6 +4910,7 @@ function takeRoofCoffee(){
   updateHUD();
 }
 function interact(){
+  if(player.fishing){ stopFishing(); showToast('🎣 Tu remontes ta ligne.'); return; }
   if(player.sitting){ standUp(); return; }
   if(delorean.driving || delorean.passenger){ exitCar(); return; }
   // immeuble Perceval : monter au loft / en redescendre / interactions du toit (la plus proche gagne)
@@ -4791,6 +4932,8 @@ function interact(){
   } else if(Math.hypot(player.group.position.x - towerDoor.x, player.group.position.z - towerDoor.z) < 3.4){
     goUpTower(); return;
   }
+  // pêcher au bord de la rivière (loin du pont et des PNJ)
+  if(!nearestNpc() && nearRiver()){ startFishing(); return; }
   // discuter avec un copain en ligne tout proche
   if(!nearestNpc() && nearestRemote(3.0)){ openChat(); return; }
   if(!nearestNpc()){
@@ -4832,8 +4975,14 @@ function updateDialogue(){
   if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger))) return;
   const n = nearestNpc();
   const hint = document.getElementById('interactHint');
-  if(n && !dlgNpc){
+  if(player.fishing){
+    document.getElementById('interactTxt').textContent = 'Remonter la ligne 🎣';
+    hint.style.display = 'block';
+  } else if(n && !dlgNpc){
     document.getElementById('interactTxt').textContent = 'Parler à ' + n.def.short;
+    hint.style.display = 'block';
+  } else if(!dlgNpc && !chatting && nearRiver()){
+    document.getElementById('interactTxt').textContent = 'Pêcher 🎣';
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting){
     const friend = nearestRemote(3.0);
@@ -5313,6 +5462,18 @@ function updatePlayer(dt, t){
     const m = moveInput();
     if(m.has){ standUp(); } else { player.moving = false; return; }
   }
+  if(player.fishing){          // en train de pêcher : gelé jusqu'à ce que ça morde (bouger = annuler)
+    const m = moveInput();
+    if(m.has){ stopFishing(); showToast('🎣 Tu remontes ta ligne.'); }
+    else {
+      player.moving = false;
+      player.fishT -= dt;
+      player.group.position.y = getGroundY(player.group.position.x, player.group.position.z);
+      if(player.glb && player.attackAnim <= 0) setPlayerAnim('idle');
+      if(player.fishT <= 0) finishFishing();
+      return;
+    }
+  }
   const { mx, mz, has } = moveInput();
   player.moving = has;
   const pos = player.group.position;
@@ -5332,13 +5493,13 @@ function updatePlayer(dt, t){
     player.vy = 9.5;
     player.onGround = false;
   }
-  const gy = getGroundY(pos.x, pos.z);
+  const gy = playerGroundY(pos.x, pos.z, pos.y);
   if(!player.onGround || pos.y > gy){
     player.vy -= 26*dt;
     pos.y += player.vy*dt;
     if(pos.y <= gy){ pos.y = gy; player.vy = 0; player.onGround = true; }
   } else {
-    pos.y = gy;   // suit les rampes du pont
+    pos.y = gy;   // suit les rampes du pont et les plateformes du parcours
   }
   if(playerOnRoof){            // sur le toit : on reste dans l'enceinte (garde-corps), pas de collision sol
     pos.x = clamp(pos.x, TOWER.x - TOWER.w + 0.6, TOWER.x + TOWER.w - 0.6);
@@ -5937,6 +6098,8 @@ function animate(){
     broadcastWorld();           // si je suis l'hôte : je diffuse l'heure + la météo
     updateRemotePlayers(dt);    // déplace/anime les autres joueurs
     updateDialogue();
+    updateAgility(dt, t);
+    updateFishingVisual(t);
     updateCooldownUI();
     checkCastleReturn();
     drawMinimap();
