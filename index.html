@@ -1157,6 +1157,7 @@ const colliders = [];
 function addCollider(x, z, r){ colliders.push({x, z, r}); }
 function resolveCollision(pos, r, isFloating=false){
   for(const c of colliders){
+    if(c.r <= 0) continue;   // collider désactivé (ex. la DeLorean qu'on conduit) — sinon elle se télescope sur son propre collider chaque frame
     const dx = pos.x-c.x, dz = pos.z-c.z, rr = c.r+r;
     const d2 = dx*dx+dz*dz;
     if(d2 < rr*rr && d2 > 1e-6){
@@ -3647,6 +3648,7 @@ function enterCar(){
   delorean.net.ownerId = MY_ID;               // je la réserve pour tout le monde
   delorean.heading = delorean.group.rotation.y;
   delorean.speed = 0;
+  delorean.carCol.r = 0;                       // désactive son collider dès maintenant (sinon elle se télescope au 1er frame)
   // on place la caméra DERRIÈRE la voiture au démarrage (une seule fois) puis elle reste libre/fixe
   camYaw = delorean.heading + Math.PI; camDist = 13;
   // l'avatar RESTE visible : on me voit au volant, chez moi comme chez les autres
@@ -5749,8 +5751,48 @@ function initMultiplayer(){
   if(!window.supabase){ setTimeout(initMultiplayer, 400); return; }   // le script Supabase peut charger après
   connectMultiplayer();
 }
+
+// ---- déconnexion automatique après 10 min d'inactivité (clavier / souris / tactile) ----
+let lastActivity = performance.now();
+let mpAway = false;
+const AWAY_MS = 10 * 60 * 1000;   // 10 minutes
+const awayOverlay = (()=>{
+  const o = document.createElement('div');
+  o.id = 'awayOverlay';
+  o.style.cssText = 'display:none;position:fixed;inset:0;z-index:90;background:rgba(20,25,60,0.86);color:#fff;'
+    + 'flex-direction:column;align-items:center;justify-content:center;text-align:center;'
+    + "font-family:'Segoe UI',system-ui,sans-serif;backdrop-filter:blur(4px);cursor:pointer";
+  o.innerHTML = '<div style="font-size:60px">💤</div>'
+    + '<div style="font-size:27px;font-weight:700;margin-top:12px">Déconnecté pour inactivité</div>'
+    + '<div style="font-size:16px;color:#cfe0ff;margin-top:10px;line-height:1.6">Tu étais inactif depuis 10 minutes,'
+    + '<br>ton personnage a quitté la partie pour libérer la place.<br><b>Bouge (une touche, la souris, un clic) pour revenir.</b></div>';
+  document.body.appendChild(o);
+  return o;
+})();
+function goAway(){
+  if(mpAway) return;
+  mpAway = true;
+  try{ if(delorean && delorean.driving) exitCar(); }catch(e){}   // libère la DeLorean
+  try{ if(mpChannel) mpChannel.untrack(); }catch(e){}            // je disparais de la présence (les autres me voient partir)
+  awayOverlay.style.display = 'flex';
+}
+function comeBackFromAway(){
+  if(!mpAway) return;
+  mpAway = false;
+  try{ trackMe(); }catch(e){}        // je réapparais dans la partie
+  awayOverlay.style.display = 'none';
+}
+function bumpActivity(){
+  lastActivity = performance.now();
+  if(mpAway) comeBackFromAway();
+}
+['keydown','mousedown','mousemove','wheel','touchstart','touchmove'].forEach(ev=>
+  addEventListener(ev, bumpActivity, { passive:true }));
+setInterval(()=>{
+  if(started && mpChannel && !mpAway && performance.now() - lastActivity > AWAY_MS) goAway();
+}, 5000);
 function broadcastSelf(){
-  if(!mpChannel) return;
+  if(!mpChannel || mpAway) return;
   const now = performance.now();
   if(now - mpLastSend < 80) return;          // ~12 envois / seconde
   mpLastSend = now;
