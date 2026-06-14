@@ -2377,7 +2377,7 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   // ============ PISCINE (sud-ouest) : liseré lumineux + margelle rouge + transats ============
   const poolMat = new THREE.MeshStandardMaterial({ color:0x37b6e8, emissive:0x1f8fc8, emissiveIntensity:0.7, metalness:0.2, roughness:0.15, transparent:true, opacity:0.92 });
   const edge = new THREE.MeshStandardMaterial({ color:0xeaf6ff, emissive:0x9fe0ff, emissiveIntensity:1.6 });
-  const PL = -2.6, PZ = 4.2, pw = 3.4, pd = 1.7;
+  const PL = -2.6, PZ = 6.9, pw = 3.4, pd = 1.7;   // piscine poussée au bord (contre la clôture extérieure)
   bx(tower, pw+1.5, 0.1, pd*2+1.5, tileMat, PL, H+0.06, PZ, false);                  // margelle carrelée rouge
   bx(tower, pw, 0.34, pd*2, poolMat, PL, H+0.1, PZ, false);
   cy(tower, pd, pd, 0.34, 16, poolMat, PL-pw/2, H+0.08, PZ, false);                  // bouts arrondis (légèrement sous la nappe)
