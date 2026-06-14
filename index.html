@@ -260,7 +260,7 @@
   <div class="controls">
     <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut (parcours de rochers ➜ cristal d'XP)<br>
     <b>Clic droit maintenu</b> : caméra &nbsp;·&nbsp; <b>Molette</b> : zoom<br>
-    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier &nbsp;·&nbsp; <b>E</b> : parler / pêcher 🎣 / monter sur la licorne 🦄
+    <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier &nbsp;·&nbsp; <b>3</b> : Pouvoir de classe ✦ &nbsp;·&nbsp; <b>E</b> : parler / pêcher 🎣 / monter 🦄
   </div>
   <button id="playBtn">Jouer</button>
   <div id="loadWrap">
@@ -283,6 +283,7 @@
   <div id="actionbar" class="panel">
     <div class="slot" id="slot1"><span class="key">1</span>⚔️<div class="cd"></div><div class="cdTxt"></div></div>
     <div class="slot" id="slot2"><span class="key">2</span>🛡️<div class="cd"></div><div class="cdTxt"></div></div>
+    <div class="slot" id="slot3"><span class="key">3</span><span id="slot3Icon">✦</span><div class="cd"></div><div class="cdTxt"></div></div>
   </div>
 
   <div id="questPanel" class="panel">
@@ -318,6 +319,7 @@
     <div id="touchBtns">
       <button id="tbA">⚔️</button>
       <button id="tbB">🛡️</button>
+      <button id="tbP">✦</button>
       <button id="tbJ">⤒</button>
       <button id="tbE">E</button>
     </div>
@@ -3092,12 +3094,13 @@ const player = {
   walkT: 0,
   fishing: false, fishT: 0, fishCount: 0,
   mount: null,
+  powerCd: 0, buffDmgT: 0, buffSpdT: 0, buffGuardT: 0, buffRegenT: 0, revealT: 0,   // pouvoir de classe + buffs de guilde
 };
 player.group.position.set(0, 0, 22);
 let chosenChar = 'Perceval';      // personnage choisi à l'écran-titre (multijoueur : chacun le sien)
 let chosenPseudo = '';
 scene.add(player.group);
-function playerDamage(){ return 14 + (player.level-1)*3; }
+function playerDamage(){ return Math.round((14 + (player.level-1)*3) * (player.buffDmgT > 0 ? 1.3 : 1)); }
 function xpNeeded(){ return 50 + player.level*60; }
 
 /* ==================== PERCEVAL VERSION CHEVALIER SCULPTÉ (KayKit) ==================== */
@@ -4949,6 +4952,7 @@ addEventListener('keydown', (e)=>{
   if(!started || player.dead || gameOver) return;
   if(e.code === 'Digit1') tryAttack();
   if(e.code === 'Digit2') tryShield();
+  if(e.code === 'Digit3') tryPower();
   if(e.code === 'KeyE') interact();
 });
 addEventListener('keyup', (e)=>{ keys[e.code] = false; });
@@ -5017,6 +5021,7 @@ if(('ontouchstart' in window) || navigator.maxTouchPoints > 0){
   };
   bindBtn('tbA', ()=>{ if(started && !player.dead && !gameOver) tryAttack(); });
   bindBtn('tbB', ()=>{ if(started && !player.dead && !gameOver) tryShield(); });
+  bindBtn('tbP', ()=>{ if(started && !player.dead && !gameOver) tryPower(); });
   bindBtn('tbE', ()=>{ if(started && !player.dead && !gameOver) interact(); });
   bindBtn('tbJ', ()=>{ keys['Space'] = true; setTimeout(()=>{ keys['Space'] = false; }, 140); });
   // caméra au glisser sur la zone de jeu
@@ -5094,12 +5099,64 @@ function tryShield(){
   SFX.shield();
   burst(player.group.position.clone().setY(1.2), BLEU_CLAIR, 20, 4, 0.16, 0.7, 1);
 }
+
+/* ==================== POUVOIRS DE CLASSE (touche 3) — chacun aide la guilde ==================== */
+// effets : 'shield' (bouclier absorbant), 'heal' (PV instantanés), 'dmg' (+dégâts), 'spd' (+vitesse),
+//          'guard' (-dégâts subis), 'regen' (régén PV/mana accélérée), 'reveal' (ennemis sur mini-carte)
+const POWERS = {
+  Perceval:  { name:'Bouclier Sacré',          icon:'🛡️', effects:['shield'],      dur:5,  mana:35, cd:14, color:0x8fd0ff, radius:12 },
+  Guillaume: { name:'Ordre de mission',        icon:'📣', effects:['dmg','spd'],   dur:18, mana:30, cd:22, color:0xffd44d, radius:14 },
+  Agathe:    { name:'Vague de soin',           icon:'💚', effects:['heal'],        dur:0,  mana:35, cd:14, color:0x8fe89a, radius:12 },
+  Jojo:      { name:'Affûtage',                icon:'🔨', effects:['dmg'],         dur:20, mana:30, cd:18, color:0xff8a3a, radius:12 },
+  Roro:      { name:'Bannière du Capitaine',   icon:'🚩', effects:['guard'],       dur:18, mana:30, cd:22, color:0x6ab8ff, radius:13 },
+  Mathias:   { name:'Galop du Messager',       icon:'🐎', effects:['spd'],         dur:14, mana:25, cd:16, color:0xa0ffd0, radius:13 },
+  Antoine:   { name:"Chant d'auberge",         icon:'🎵', effects:['regen'],       dur:18, mana:25, cd:18, color:0xffd9a0, radius:13 },
+  Bobby:     { name:"Œil de l'Éclaireur",      icon:'👁️', effects:['reveal','spd'],dur:15, mana:25, cd:18, color:0xbfe3f5, radius:14 },
+  Ray:       { name:'Conte héroïque',          icon:'📖', effects:['dmg','shield'], dur:12, mana:30, cd:22, color:0xffb0e6, radius:13 },
+};
+function myPower(){ return POWERS[chosenChar] || POWERS.Perceval; }
+function applyEffects(effects, dur, color){
+  for(const e of effects){
+    if(e === 'shield'){ player.shieldTime = Math.max(player.shieldTime, dur || 4); player.shieldBubble.visible = true; }
+    else if(e === 'heal'){ player.hp = Math.min(player.maxhp, player.hp + 45); }
+    else if(e === 'dmg'){ player.buffDmgT = Math.max(player.buffDmgT, dur); }
+    else if(e === 'spd'){ player.buffSpdT = Math.max(player.buffSpdT, dur); }
+    else if(e === 'guard'){ player.buffGuardT = Math.max(player.buffGuardT, dur); }
+    else if(e === 'regen'){ player.buffRegenT = Math.max(player.buffRegenT, dur); }
+    else if(e === 'reveal'){ player.revealT = Math.max(player.revealT, dur); }
+  }
+  burst(player.group.position.clone().setY(1.0), color || 0xffffff, 22, 4, 0.18, 0.85, 2);
+  updateHUD();
+}
+function tryPower(){
+  if(player.dead || gameOver || (delorean && delorean.driving) || player.mount) return;
+  const pw = myPower();
+  if(player.powerCd > 0){ showToast('⏳ ' + pw.name + ' — encore ' + Math.ceil(player.powerCd) + ' s'); return; }
+  if(player.mana < pw.mana){ addFloatText(player.group.position.clone().setY(2), 'Mana insuffisant', '#8fa0ff'); return; }
+  player.mana -= pw.mana;
+  player.powerCd = pw.cd;
+  applyEffects(pw.effects, pw.dur, pw.color);
+  SFX.shield && SFX.shield();
+  addFloatText(player.group.position.clone().setY(2.4), pw.icon + ' ' + pw.name, '#' + pw.color.toString(16).padStart(6,'0'), true);
+  showToast(pw.icon + ' ' + pw.name + ' !');
+  // propage le buff aux alliés de la guilde autour de moi
+  const p = player.group.position;
+  mpSend('buff', { id:MY_ID, eff:pw.effects, dur:pw.dur, x:+p.x.toFixed(1), z:+p.z.toFixed(1), r:pw.radius, name:pw.name, icon:pw.icon, color:pw.color });
+}
+function onBuff(d){
+  if(!d || d.id === MY_ID || !started) return;
+  const dx = player.group.position.x - d.x, dz = player.group.position.z - d.z;
+  if(Math.hypot(dx, dz) > (d.r || 12)) return;          // hors de portée du lanceur
+  applyEffects(d.eff || [], d.dur || 0, d.color);
+  showToast((d.icon || '✦') + ' ' + (d.name || 'Pouvoir') + ' (allié)');
+}
 function hurtPlayer(amount, fromPos){
   if(player.dead || gameOver) return;
   if(player.shieldTime > 0){
     addFloatText(player.group.position.clone().setY(2.2), 'Absorbé !', '#8fa0ff');
     return;
   }
+  if(player.buffGuardT > 0) amount = Math.max(1, Math.round(amount * 0.6));   // Bannière du Capitaine : -40 % dégâts
   player.hp -= amount;
   SFX.hurt();
   addFloatText(player.group.position.clone().setY(2.2), '-'+amount, '#ff7a7a');
@@ -5300,6 +5357,7 @@ function updateHUD(){
 function updateCooldownUI(){
   const s1 = document.getElementById('slot1');
   const s2 = document.getElementById('slot2');
+  const s3 = document.getElementById('slot3');
   const f1 = clamp(player.attackCd/0.5, 0, 1);
   const f2 = clamp(player.shieldCd/8, 0, 1);
   s1.querySelector('.cd').style.height = (f1*100)+'%';
@@ -5307,6 +5365,16 @@ function updateCooldownUI(){
   const t2 = s2.querySelector('.cdTxt');
   t2.style.visibility = f2 > 0.02 ? 'visible' : 'hidden';
   t2.textContent = Math.ceil(player.shieldCd);
+  if(s3){
+    const pw = myPower();
+    const f3 = clamp(player.powerCd/(pw.cd||1), 0, 1);
+    s3.querySelector('.cd').style.height = (f3*100)+'%';
+    const t3 = s3.querySelector('.cdTxt');
+    t3.style.visibility = f3 > 0.02 ? 'visible' : 'hidden';
+    t3.textContent = Math.ceil(player.powerCd);
+    const ic = document.getElementById('slot3Icon');
+    if(ic && ic.textContent !== pw.icon) ic.textContent = pw.icon;
+  }
 }
 let toastTimer = null;
 function showToast(msg, dur=3200){
@@ -5377,13 +5445,18 @@ function drawMinimap(){
     mmCtx.fillStyle = '#39d6ff'; mmCtx.fill();
     mmCtx.lineWidth = 1.4; mmCtx.strokeStyle = '#ffffff'; mmCtx.stroke();
   }
-  // ennemis
-  mmCtx.fillStyle = '#e85a5a';
+  // ennemis (l'Œil de l'Éclaireur les fait clignoter en gros pour toute la guilde)
+  const reveal = player.revealT > 0;
+  const pulse = 1 + Math.sin(performance.now()*0.008)*0.5;
   for(const e of enemies){
     if(!e.alive) continue;
-    mmCtx.beginPath();
-    mmCtx.arc(wx(e.group.position.x), wz(e.group.position.z), e.type==='dragon'?4:2.5, 0, 7);
-    mmCtx.fill();
+    const ex = wx(e.group.position.x), ez = wz(e.group.position.z);
+    if(reveal){
+      mmCtx.beginPath(); mmCtx.arc(ex, ez, (e.type==='dragon'?6:4)*pulse, 0, 7);
+      mmCtx.strokeStyle = '#ffd44d'; mmCtx.lineWidth = 1.6; mmCtx.stroke();
+    }
+    mmCtx.fillStyle = '#e85a5a';
+    mmCtx.beginPath(); mmCtx.arc(ex, ez, e.type==='dragon'?4:2.5, 0, 7); mmCtx.fill();
   }
   // cristaux de quête
   if(qi===2){
@@ -5767,7 +5840,7 @@ function updatePlayer(dt, t){
   player.moving = has;
   const pos = player.group.position;
   if(player.coffeeBoost > 0) player.coffeeBoost -= dt;     // ☕ regain de motivation
-  const spd = player.speed * (player.coffeeBoost > 0 ? 1.5 : 1);
+  const spd = player.speed * (player.coffeeBoost > 0 ? 1.5 : 1) * (player.buffSpdT > 0 ? 1.4 : 1);
   if(has){
     pos.x += mx*spd*dt;
     pos.z += mz*spd*dt;
@@ -5806,6 +5879,13 @@ function updatePlayer(dt, t){
   // cooldowns & ressources
   player.attackCd = Math.max(0, player.attackCd - dt);
   player.shieldCd = Math.max(0, player.shieldCd - dt);
+  player.powerCd  = Math.max(0, player.powerCd  - dt);
+  // buffs de pouvoir de classe (décompte)
+  player.buffDmgT   = Math.max(0, player.buffDmgT   - dt);
+  player.buffSpdT   = Math.max(0, player.buffSpdT   - dt);
+  player.buffGuardT = Math.max(0, player.buffGuardT - dt);
+  player.buffRegenT = Math.max(0, player.buffRegenT - dt);
+  player.revealT    = Math.max(0, player.revealT    - dt);
   if(player.shieldTime > 0){
     player.shieldTime -= dt;
     player.shieldBubble.visible = true;
@@ -5813,10 +5893,12 @@ function updatePlayer(dt, t){
     player.shieldBubble.scale.setScalar(1 + Math.sin(t*6)*0.03);
     if(player.shieldTime <= 0) player.shieldBubble.visible = false;
   }
-  player.mana = Math.min(player.maxmana, player.mana + 6*dt);
-  // régénération douce hors combat
+  const manaRegen = player.buffRegenT > 0 ? 18 : 6;
+  player.mana = Math.min(player.maxmana, player.mana + manaRegen*dt);
+  // régénération hors combat (accélérée par le Chant d'auberge)
   const inDanger = enemies.some(e=>e.alive && e.group.position.distanceTo(pos) < 14);
-  if(!inDanger && player.hp < player.maxhp) player.hp = Math.min(player.maxhp, player.hp + 3*dt);
+  const hpRegen = (player.buffRegenT > 0 ? 14 : 3);
+  if((!inDanger || player.buffRegenT > 0) && player.hp < player.maxhp) player.hp = Math.min(player.maxhp, player.hp + hpRegen*dt);
 
   // --- animations : squelette KayKit si chargé, sinon procédural ---
   if(player.glb){
@@ -6304,6 +6386,7 @@ function connectMultiplayer(){
     mpChannel.on('broadcast', { event:'world' }, ({ payload })=> onWorldState(payload));
     mpChannel.on('broadcast', { event:'car' },   ({ payload })=> onCarData(payload));
     mpChannel.on('broadcast', { event:'mount' }, ({ payload })=> onMountData(payload));
+    mpChannel.on('broadcast', { event:'buff' },  ({ payload })=> onBuff(payload));
     mpChannel.on('broadcast', { event:'chat' },  ({ payload })=> onChat(payload));
     mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!iAmHost() && payload) lightningStrike(payload.i || 0.7); });
     mpChannel.on('broadcast', { event:'enemies' }, ({ payload })=> onEnemiesSnapshot(payload));   // coop : snapshot ennemis (hôte→clients)
