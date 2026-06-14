@@ -2352,10 +2352,10 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
     for(const fx of [-0.6,0.55]) for(const fz of [-0.22,0.22]) cy(tower, 0.03, 0.03, 0.3, 6, railMeta, lxx+fx, H+0.18, lzz+fz, false);
   }
 
-  // ============ SALON + PERGOLA ARRONDIE (nord-est, le « toit arrondi ») ============
+  // ============ SALON LOUNGE — DEHORS, sur la terrasse à côté de la piscine ============
   const sofaWood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a6a48, roughness:0.7 });
   const cushion  = new THREE.MeshStandardMaterial({ color:0x3a3d44, roughness:0.85 });
-  const lx = 3.6, lz = -4.8;
+  const lx = 3.8, lz = 5.2;
   bx(tower, 2.6, 0.4, 0.9, sofaWood, lx, H+0.45, lz, false);                         // canapé teck
   bx(tower, 2.4, 0.3, 0.7, cushion, lx, H+0.68, lz, false);
   bx(tower, 2.4, 0.55, 0.18, cushion, lx, H+0.86, lz-0.36, false);                   // dossier
