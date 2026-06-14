@@ -14,13 +14,13 @@
 <meta property="og:title" content="Perceval : la quête du Contrat Sacré">
 <meta property="og:description" content="Embarque dans l'aventure 3D du royaume de Perceval : explore le village, galope sur la licorne, conduis la DeLorean, pêche, grimpe le parcours… et récupère le Contrat Sacré !">
 <meta property="og:url" content="https://rynaldodelsol.github.io/perceval-game/">
-<meta property="og:image" content="https://rynaldodelsol.github.io/perceval-game/assets/preview.png">
-<meta property="og:image:width" content="1731">
-<meta property="og:image:height" content="909">
+<meta property="og:image" content="https://rynaldodelsol.github.io/perceval-game/assets/preview.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Perceval : la quête du Contrat Sacré">
 <meta name="twitter:description" content="Aventure 3D : licorne, DeLorean, pêche, parcours d'agilité… récupère le Contrat Sacré !">
-<meta name="twitter:image" content="https://rynaldodelsol.github.io/perceval-game/assets/preview.png">
+<meta name="twitter:image" content="https://rynaldodelsol.github.io/perceval-game/assets/preview.jpg">
 <style>
   /* ==================== STYLES GÉNÉRAUX ==================== */
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -511,7 +511,9 @@ document.addEventListener('visibilitychange', ()=>{
 /* ==================== ASSETS 3D (KayKit & Quaternius, licence CC0) ==================== */
 const ASSETS = {};
 const mixers = [];
+const mounts = [];    // montures montables (licorne, cheval de Mathias) — verrou réseau partagé
 let unicorn = null;   // la licorne montable près du pont (modèle Horse.glb + corne + crinière)
+let galopin = null;   // le cheval de Mathias, montable lui aussi
 let assetsReady = false;
 // barre de chargement : indique l'avancement réel du téléchargement des modèles 3D
 function setLoadProgress(loaded, total){
@@ -1855,14 +1857,21 @@ function swapNature(){
   if(natureSwapped || !ASSETS.tree1) return;
   natureSwapped = true;
   for(const o of procNature) scene.remove(o);
-  // Galopin, le cheval de Mathias, version sculptée et animée
+  // Galopin, le cheval de Mathias — montable (mêmes règles que la licorne)
   if(ASSETS.horse && horseProc){
     const hm = spawnModel('horse', 2.1);
     if(hm){
       hm.wrap.position.set(9, 0, -39);
       hm.wrap.rotation.y = -0.6;
       scene.add(hm.wrap);
-      makeEnemyAnim(hm);   // Idle en boucle
+      const ganim = makeEnemyAnim(hm);   // idle / walk(galop)
+      galopin = makeMount({ key:'galopin', wrap:hm.wrap, obj:hm.obj, anim:ganim, heading:-0.6, gallop:13,
+        rideMsg:'🐎 En selle sur Galopin ! ZQSD/WASD pour galoper — E pour descendre.',
+        takenMsg:'🐎 Galopin est déjà monté par un autre joueur.',
+        hint:'Monter sur Galopin 🐎' });
+      const gk = makeSignSprite([{ t:'🐎 Galopin', big:true }, { t:'Appuyez sur E pour monter', c:'#d9ecff' }], '#cfe0ff', 2.8);
+      gk.position.set(9, 2.9, -39); scene.add(gk);
+      galopin.mark = gk;
       scene.remove(horseProc);
     }
   }
@@ -1898,9 +1907,11 @@ function swapNature(){
       um.wrap.rotation.y = 1.2;
       scene.add(um.wrap);
       const uanim = makeEnemyAnim(um);       // {mixer, actions, map, current} : idle / walk(galop)
-      unicorn = { wrap:um.wrap, obj:um.obj, anim:uanim, heading:1.2, speed:0, riding:false,
-                  horn, mane, tail, headBone, neckBone, tailBone, scale:um.scale };
-      // panneau « monter »
+      unicorn = makeMount({ key:'unicorn', wrap:um.wrap, obj:um.obj, anim:uanim, heading:1.2, gallop:13, sparkle:0xffb0e6,
+        horn, mane, tail, headBone, neckBone, tailBone, scale:um.scale, cosmetics:updateUnicornCosmetics,
+        rideMsg:'🦄 En selle ! ZQSD/WASD pour galoper — E pour descendre.',
+        takenMsg:'🦄 La licorne est déjà prise par un autre joueur.',
+        hint:'Monter sur la licorne 🦄' });
       const mk = makeSignSprite([{ t:'🦄 Licorne', big:true }, { t:'Appuyez sur E pour monter', c:'#ffd9f2' }], '#ffd0ee', 2.8);
       mk.position.set(-47, 3.0, 47); scene.add(mk);
       unicorn.mark = mk;
@@ -3080,6 +3091,7 @@ const player = {
   dead: false, moving: false,
   walkT: 0,
   fishing: false, fishT: 0, fishCount: 0,
+  mount: null,
 };
 player.group.position.set(0, 0, 22);
 let chosenChar = 'Perceval';      // personnage choisi à l'écran-titre (multijoueur : chacun le sien)
@@ -4787,91 +4799,140 @@ function updateFishingVisual(t){
   fishLine.geometry.attributes.position.needsUpdate = true;
 }
 
-/* ==================== LICORNE — monter & galoper ==================== */
-const GALLOP_SPEED = 13;
-function mountUnicorn(){
-  if(!unicorn || unicorn.riding) return;
+/* ==================== MONTURES — licorne & cheval, montables (verrou réseau comme la DeLorean) ==================== */
+function makeMount(opts){
+  const m = Object.assign({ riding:false, speed:0, net:{ ownerId:null, last:0 }, cosmetics:null, gallop:13, _send:0 }, opts);
+  mounts.push(m); return m;
+}
+function mountHasRemoteRider(m){ return m.net.ownerId !== null && m.net.ownerId !== MY_ID; }
+function nearestFreeMount(maxD){
+  let best = null, bd = maxD;
+  for(const m of mounts){
+    if(m.riding || mountHasRemoteRider(m)) continue;
+    const d = Math.hypot(player.group.position.x - m.wrap.position.x, player.group.position.z - m.wrap.position.z);
+    if(d < bd){ bd = d; best = m; }
+  }
+  return best;
+}
+function mountRide(m){
+  if(!m || m.riding) return;
+  if(mountHasRemoteRider(m)){ showToast(m.takenMsg || '🐎 Déjà pris par un autre joueur.'); return; }
   if(player.fishing) stopFishing();
   if(player.sitting) player.sitting = false;
-  unicorn.riding = true; unicorn.speed = 0;
+  m.riding = true; m.speed = 0; m.net.ownerId = MY_ID; m.net.last = performance.now();
+  player.mount = m;
   for(const k in keys) keys[k] = false;
   touchMove.active = false; touchMove.x = 0; touchMove.y = 0;
-  if(unicorn.mark) unicorn.mark.visible = false;
-  camYaw = unicorn.heading + Math.PI; camDist = 12;
+  if(m.mark) m.mark.visible = false;
+  camYaw = m.heading + Math.PI; camDist = 12;
   SFX.pickup && SFX.pickup();
-  showToast('🦄 En selle ! ZQSD/WASD pour galoper — E pour descendre.');
+  showToast(m.rideMsg || '🐎 En selle ! ZQSD/WASD pour galoper — E pour descendre.');
+  mpSend('mount', { id:MY_ID, key:m.key, state:'claim' });
 }
-function dismountUnicorn(){
-  if(!unicorn || !unicorn.riding) return;
-  unicorn.riding = false; unicorn.speed = 0;
-  enemyAnim(unicorn.anim, 'idle');
-  if(unicorn.mark) unicorn.mark.visible = true;
-  const h = unicorn.heading;
-  const px = clamp(unicorn.wrap.position.x + Math.cos(h)*1.9, -104, 104);   // posé à côté
-  const pz = clamp(unicorn.wrap.position.z - Math.sin(h)*1.9, -104, 104);
+function dismountRide(m){
+  if(!m || !m.riding) return;
+  m.riding = false; m.speed = 0; m.net.ownerId = null;
+  if(player.mount === m) player.mount = null;
+  enemyAnim(m.anim, 'idle');
+  if(m.mark) m.mark.visible = true;
+  const h = m.heading;
+  const px = clamp(m.wrap.position.x + Math.cos(h)*1.9, -104, 104);
+  const pz = clamp(m.wrap.position.z - Math.sin(h)*1.9, -104, 104);
   player.group.position.set(px, getGroundY(px, pz), pz);
   player.vy = 0; player.onGround = true;
-  showToast('🦄 Vous descendez de la licorne.');
+  showToast('Vous descendez.');
+  mpSend('mount', { id:MY_ID, key:m.key, state:'release' });
+}
+function onMountData(d){
+  if(!d || d.id === MY_ID) return;
+  const m = mounts.find(x=>x.key === d.key); if(!m) return;
+  if(d.state === 'claim'){
+    if(m.riding){                                  // double-montée simultanée : le plus petit id garde la monture
+      if(d.id < MY_ID){
+        m.riding = false; if(player.mount === m) player.mount = null;
+        m.net.ownerId = d.id; m.net.last = performance.now();
+        const px = clamp(m.wrap.position.x + Math.cos(m.heading)*1.9, -104, 104);
+        const pz = clamp(m.wrap.position.z - Math.sin(m.heading)*1.9, -104, 104);
+        player.group.position.set(px, getGroundY(px, pz), pz);
+        showToast('Un autre joueur la montait déjà — vous descendez.');
+      }
+      return;
+    }
+    m.net.ownerId = d.id; m.net.last = performance.now();
+  } else if(d.state === 'release'){ if(m.net.ownerId === d.id) m.net.ownerId = null; }
 }
 const _bv = new THREE.Vector3();
 function boneLocalPos(bone, wrap){ bone.getWorldPosition(_bv); wrap.worldToLocal(_bv); return _bv.clone(); }
-// place corne/crinière/queue d'après les os (repère wrap : +Z = avant du modèle)
+// place corne/crinière/queue de la licorne d'après les os (repère wrap : +Z = avant du modèle)
 function updateUnicornCosmetics(t){
   if(!unicorn) return;
   const u = unicorn, wrap = u.wrap;
   const head = u.headBone ? boneLocalPos(u.headBone, wrap) : V3(0, 1.95, 0.9);
   const neck = u.neckBone ? boneLocalPos(u.neckBone, wrap) : V3(0, 1.7, 0.45);
   const tp   = u.tailBone ? boneLocalPos(u.tailBone, wrap) : V3(0, 1.3, -1.0);
-  // CORNE : au-dessus/avant du front, dressée vers le haut-avant
   u.horn.position.set(head.x, head.y + 0.22, head.z + 0.24);
   u.horn.rotation.set(0.5, 0, 0);
-  // CRINIÈRE : du sommet du crâne vers le garrot, ondule
   for(let i=0;i<u.mane.length;i++){
     const f = i/(u.mane.length-1);
     u.mane[i].position.set(head.x + (neck.x-head.x)*f, head.y + (neck.y-head.y)*f + 0.14, head.z + (neck.z-head.z)*f);
     u.mane[i].rotation.set(-0.7, 0, Math.sin(t*3 + i)*0.14);
   }
-  // QUEUE : retombe vers le bas-arrière depuis l'os de la queue, ondule
   for(let i=0;i<u.tail.length;i++){
     const f = i/(u.tail.length-1);
     u.tail[i].position.set(tp.x + Math.sin(t*2 + i)*0.04, tp.y - f*0.5, tp.z - 0.1 - f*0.4);
     u.tail[i].rotation.set(2.6, 0, Math.sin(t*2.5 + i)*0.18);
   }
 }
-function updateUnicorn(dt, t){
-  if(!unicorn) return;
-  if(!unicorn.riding){ updateUnicornCosmetics(t); return; }
-  const u = unicorn, wrap = u.wrap;
-  const up = (keys['KeyW']||keys['ArrowUp'])?1:0, dn = (keys['KeyS']||keys['ArrowDown'])?1:0;
-  let throttle = up - dn;
-  let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
-  if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
-  throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-  const target = throttle * GALLOP_SPEED;
-  u.speed += (target - u.speed) * Math.min(1, dt*2.2);
-  if(Math.abs(throttle) < 0.05) u.speed *= (1 - Math.min(1, dt*2.6));
-  const dir = u.speed < 0 ? -1 : 1;
-  u.heading -= steer * clamp(Math.abs(u.speed)/3, 0, 1) * 1.9 * dir * dt;
-  wrap.rotation.y = u.heading;
-  wrap.position.x = clamp(wrap.position.x + Math.sin(u.heading)*u.speed*dt, -106, 106);
-  wrap.position.z = clamp(wrap.position.z + Math.cos(u.heading)*u.speed*dt, -106, 106);
-  resolveCollision(wrap.position, 0.9);                 // bute sur les bâtiments / la rivière (passe par le pont)
-  blockTowerRect(wrap.position, 0.9);                    // la licorne ne traverse pas l'immeuble non plus
-  wrap.position.y = getGroundY(wrap.position.x, wrap.position.z);
-  // animation : galop proportionnel à la vitesse, sinon idle
-  if(Math.abs(u.speed) > 0.6){
-    enemyAnim(u.anim, 'walk');
-    const wk = u.anim.map.walk;
-    if(wk && u.anim.actions[wk]) u.anim.actions[wk].timeScale = 0.8 + Math.abs(u.speed)*0.12;
-  } else enemyAnim(u.anim, 'idle');
-  // le cavalier sur la selle, avec le rebond du galop
-  const bob = Math.abs(u.speed) > 1 ? Math.sin(t*Math.abs(u.speed)*1.5)*0.06 : 0;
-  player.group.position.set(wrap.position.x - Math.sin(u.heading)*0.05, wrap.position.y + 1.35 + bob, wrap.position.z - Math.cos(u.heading)*0.05);
-  player.group.rotation.y = u.heading;
-  if(player.glb) setPlayerAnim('idle');
-  if(Math.abs(u.speed) > 4 && Math.random() < 0.25) burst(V3(wrap.position.x, 0.3, wrap.position.z), 0xffb0e6, 8, 2.5, 0.12, 0.6, 1);
-  updateUnicornCosmetics(t);
+function updateMount(m, dt, t){
+  // libère la monture si l'occupant distant ne donne plus de nouvelles (parti / planté)
+  if(m.net.ownerId && m.net.ownerId !== MY_ID){
+    if(!remotePlayers[m.net.ownerId] || performance.now() - m.net.last > 2500) m.net.ownerId = null;
+  }
+  const wrap = m.wrap;
+  if(m.riding){
+    const up = (keys['KeyW']||keys['ArrowUp'])?1:0, dn = (keys['KeyS']||keys['ArrowDown'])?1:0;
+    let throttle = up - dn;
+    let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
+    if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
+    throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
+    const target = throttle * m.gallop;
+    m.speed += (target - m.speed) * Math.min(1, dt*2.2);
+    if(Math.abs(throttle) < 0.05) m.speed *= (1 - Math.min(1, dt*2.6));
+    const dir = m.speed < 0 ? -1 : 1;
+    m.heading -= steer * clamp(Math.abs(m.speed)/3, 0, 1) * 1.9 * dir * dt;
+    wrap.rotation.y = m.heading;
+    wrap.position.x = clamp(wrap.position.x + Math.sin(m.heading)*m.speed*dt, -106, 106);
+    wrap.position.z = clamp(wrap.position.z + Math.cos(m.heading)*m.speed*dt, -106, 106);
+    resolveCollision(wrap.position, 0.9);                 // bute sur les bâtiments / la rivière (passe par le pont)
+    blockTowerRect(wrap.position, 0.9);                   // ne traverse pas l'immeuble Perceval
+    wrap.position.y = getGroundY(wrap.position.x, wrap.position.z);
+    if(Math.abs(m.speed) > 0.6){
+      enemyAnim(m.anim, 'walk');
+      const wk = m.anim.map.walk; if(wk && m.anim.actions[wk]) m.anim.actions[wk].timeScale = 0.8 + Math.abs(m.speed)*0.12;
+    } else enemyAnim(m.anim, 'idle');
+    const bob = Math.abs(m.speed) > 1 ? Math.sin(t*Math.abs(m.speed)*1.5)*0.06 : 0;
+    player.group.position.set(wrap.position.x - Math.sin(m.heading)*0.05, wrap.position.y + 1.35 + bob, wrap.position.z - Math.cos(m.heading)*0.05);
+    player.group.rotation.y = m.heading;
+    if(player.glb) setPlayerAnim('idle');
+    if(m.sparkle && Math.abs(m.speed) > 4 && Math.random() < 0.25) burst(V3(wrap.position.x, 0.3, wrap.position.z), m.sparkle, 8, 2.5, 0.12, 0.6, 1);
+    if(performance.now() - m._send > 120){ m._send = performance.now(); mpSend('mount', { id:MY_ID, key:m.key, state:'claim' }); }
+  } else if(m.net.ownerId && m.net.ownerId !== MY_ID && remotePlayers[m.net.ownerId]){
+    // un autre joueur la monte : la monture suit son avatar
+    const r = remotePlayers[m.net.ownerId];
+    const nx = r.group.position.x, nz = r.group.position.z;
+    const sp = dt > 0 ? Math.min(40, Math.hypot(nx - wrap.position.x, nz - wrap.position.z)/dt) : 0;
+    wrap.position.x = nx; wrap.position.z = nz; wrap.position.y = getGroundY(nx, nz);
+    m.heading = r.group.rotation.y; wrap.rotation.y = m.heading;
+    if(sp > 0.6){ enemyAnim(m.anim, 'walk'); const wk = m.anim.map.walk; if(wk && m.anim.actions[wk]) m.anim.actions[wk].timeScale = 0.8 + sp*0.12; }
+    else enemyAnim(m.anim, 'idle');
+    if(m.mark) m.mark.visible = false;
+  } else {
+    if(m.mark) m.mark.visible = true;
+    enemyAnim(m.anim, 'idle');
+  }
+  if(m.cosmetics) m.cosmetics(t);
 }
+function updateMounts(dt, t){ for(const m of mounts) updateMount(m, dt, t); }
 
 /* ============================================================
    ENTRÉES — clavier & souris (style WoW)
@@ -5132,7 +5193,7 @@ function takeRoofCoffee(){
 }
 function interact(){
   if(player.fishing){ stopFishing(); showToast('🎣 Tu remontes ta ligne.'); return; }
-  if(unicorn && unicorn.riding){ dismountUnicorn(); return; }
+  if(player.mount){ dismountRide(player.mount); return; }
   if(player.sitting){ standUp(); return; }
   if(delorean.driving || delorean.passenger){ exitCar(); return; }
   // immeuble Perceval : monter au loft / en redescendre / interactions du toit (la plus proche gagne)
@@ -5156,9 +5217,8 @@ function interact(){
   }
   // pêcher au bord de la rivière (loin du pont et des PNJ)
   if(!nearestNpc() && nearRiver()){ startFishing(); return; }
-  // monter sur la licorne près du pont
-  if(!nearestNpc() && unicorn && !unicorn.riding &&
-     Math.hypot(player.group.position.x - unicorn.wrap.position.x, player.group.position.z - unicorn.wrap.position.z) < 3.2){ mountUnicorn(); return; }
+  // monter sur une monture proche (licorne / cheval), si elle est libre
+  if(!nearestNpc()){ const fm = nearestFreeMount(3.2); if(fm){ mountRide(fm); return; } }
   // discuter avec un copain en ligne tout proche
   if(!nearestNpc() && nearestRemote(3.0)){ openChat(); return; }
   if(!nearestNpc()){
@@ -5197,18 +5257,18 @@ function updateDialogue(){
     document.getElementById('dialogue').style.display = 'none';
   }
   // sur le toit / assis / en voiture : on laisse les indices aux gestionnaires dédiés (updateBuilding, etc.)
-  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger)) || (unicorn && unicorn.riding)) return;
+  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger)) || player.mount) return;
   const n = nearestNpc();
   const hint = document.getElementById('interactHint');
-  const nearUnicorn = unicorn && !unicorn.riding && Math.hypot(player.group.position.x - unicorn.wrap.position.x, player.group.position.z - unicorn.wrap.position.z) < 3.2;
+  const fm = nearestFreeMount(3.2);
   if(player.fishing){
     document.getElementById('interactTxt').textContent = 'Remonter la ligne 🎣';
     hint.style.display = 'block';
   } else if(n && !dlgNpc){
     document.getElementById('interactTxt').textContent = 'Parler à ' + n.def.short;
     hint.style.display = 'block';
-  } else if(!dlgNpc && !chatting && nearUnicorn){
-    document.getElementById('interactTxt').textContent = 'Monter sur la licorne 🦄';
+  } else if(!dlgNpc && !chatting && fm){
+    document.getElementById('interactTxt').textContent = fm.hint || 'Monter 🐎';
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting && nearRiver()){
     document.getElementById('interactTxt').textContent = 'Pêcher 🎣';
@@ -5683,7 +5743,7 @@ function updateAtmosphere(dt){
    MISE À JOUR DU JOUEUR (déplacement, saut, animations)
    ============================================================ */
 function updatePlayer(dt, t){
-  if(player.dead || gameOver || (delorean && delorean.driving) || (unicorn && unicorn.riding)){
+  if(player.dead || gameOver || (delorean && delorean.driving) || player.mount){
     player.moving = false;
     return;
   }
@@ -5954,7 +6014,7 @@ function onRemoteData(data){
   }
   r.target.set(data.x, 0, data.z); r.ty = (data.y != null) ? data.y : null; r.ry = data.ry || 0; r.moving = !!data.mv; r.last = performance.now();
 }
-function removeRemote(id){ const r = remotePlayers[id]; if(r){ scene.remove(r.group); delete remotePlayers[id]; } if(delorean && delorean.net.ownerId === id) delorean.net.ownerId = null; }
+function removeRemote(id){ const r = remotePlayers[id]; if(r){ scene.remove(r.group); delete remotePlayers[id]; } if(delorean && delorean.net.ownerId === id) delorean.net.ownerId = null; for(const m of mounts){ if(m.net.ownerId === id) m.net.ownerId = null; } }
 function updateRemotePlayers(dt){
   const now = performance.now();
   for(const id in remotePlayers){
@@ -6243,6 +6303,7 @@ function connectMultiplayer(){
     mpChannel.on('broadcast', { event:'p' },     ({ payload })=> onRemoteData(payload));
     mpChannel.on('broadcast', { event:'world' }, ({ payload })=> onWorldState(payload));
     mpChannel.on('broadcast', { event:'car' },   ({ payload })=> onCarData(payload));
+    mpChannel.on('broadcast', { event:'mount' }, ({ payload })=> onMountData(payload));
     mpChannel.on('broadcast', { event:'chat' },  ({ payload })=> onChat(payload));
     mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!iAmHost() && payload) lightningStrike(payload.i || 0.7); });
     mpChannel.on('broadcast', { event:'enemies' }, ({ payload })=> onEnemiesSnapshot(payload));   // coop : snapshot ennemis (hôte→clients)
@@ -6437,7 +6498,7 @@ function animate(){
   if(started){
     for(const m2 of mixers) m2.update(dt);
     updatePlayer(dt, t);
-    updateUnicorn(dt, t);
+    updateMounts(dt, t);
     updateNpcs(dt, t);
     updateSpawner(dt);
     for(let i=enemies.length-1;i>=0;i--){
