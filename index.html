@@ -1222,6 +1222,17 @@ function playerGroundY(x, z, fromY){
   }
   return g;
 }
+// l'immeuble Perceval est PLEIN : on empêche d'entrer dans son emprise au sol (entrée seulement via E → ascenseur)
+function blockTowerRect(pos, pad){
+  const x0 = TOWER.x - TOWER.w - pad, x1 = TOWER.x + TOWER.w + pad;
+  const z0 = TOWER.z - TOWER.d - pad, z1 = TOWER.z + TOWER.d + pad;
+  if(pos.x > x0 && pos.x < x1 && pos.z > z0 && pos.z < z1){
+    const dL = pos.x - x0, dR = x1 - pos.x, dB = pos.z - z0, dF = z1 - pos.z;
+    const mn = Math.min(dL, dR, dB, dF);
+    if(mn === dL) pos.x = x0; else if(mn === dR) pos.x = x1;
+    else if(mn === dB) pos.z = z0; else pos.z = z1;
+  }
+}
 
 // --- particules (jets éphémères) ---
 const particleBursts = [];
@@ -4832,6 +4843,7 @@ function updateUnicorn(dt, t){
   wrap.position.x = clamp(wrap.position.x + Math.sin(u.heading)*u.speed*dt, -106, 106);
   wrap.position.z = clamp(wrap.position.z + Math.cos(u.heading)*u.speed*dt, -106, 106);
   resolveCollision(wrap.position, 0.9);                 // bute sur les bâtiments / la rivière (passe par le pont)
+  blockTowerRect(wrap.position, 0.9);                    // la licorne ne traverse pas l'immeuble non plus
   wrap.position.y = getGroundY(wrap.position.x, wrap.position.z);
   // animation : galop proportionnel à la vitesse, sinon idle
   if(Math.abs(u.speed) > 0.6){
@@ -5715,6 +5727,7 @@ function updatePlayer(dt, t){
     }
   } else {
     resolveCollision(pos, 0.55);
+    blockTowerRect(pos, 0.55);                 // impossible de traverser l'immeuble Perceval
   }
 
   // cooldowns & ressources
