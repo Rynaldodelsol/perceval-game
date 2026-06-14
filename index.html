@@ -3696,7 +3696,7 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*6;                                   // TRÈS lente et maniable — fini le bolide
+    const target = throttle*6.9;                                 // +15% (réglage demandé) — maniable
     delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.6);   // accélération douce, pas de fusée
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*2.2));   // ralentit vite quand on lâche
     const dir = delorean.speed < 0 ? -1 : 1;
