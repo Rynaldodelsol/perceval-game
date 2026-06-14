@@ -6281,6 +6281,15 @@ function broadcastQuest(){
 function onQuestState(w){
   if(coopHost() || !w) return;
   if(typeof w.qi === 'number' && w.qi !== qi){
+    // la quête vient d'être terminée par la guilde : CHAQUE joueur reçoit l'XP + l'animation de victoire
+    if(w.qi === qi + 1 && quests[qi]){
+      const q = quests[qi];
+      showToast('✅ Quête terminée : ' + q.titre + '  (+' + q.xp + ' XP)');
+      SFX.quest && SFX.quest();
+      addXP(q.xp);
+      const flash = document.getElementById('lvlFlash'); if(flash){ flash.style.opacity='1'; setTimeout(()=>flash.style.opacity='0', 600); }
+      burst(player.group.position.clone().setY(1.0), 0xffd700, 30, 5, 0.2, 1.0, 2);
+    }
     qi = w.qi; qProgress = w.qP || 0; contractInHand = !!w.ch;
     if(quests[qi] && quests[qi].type === 'collect' && crystals.length === 0) spawnCrystals();
     updateQuestUI(); updateMarkers();
