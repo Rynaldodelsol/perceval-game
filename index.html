@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- empêche le navigateur de servir une vieille version en cache (sinon les mises à jour n'apparaissent pas) -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Perceval : la quête du Contrat Sacré</title>
 <style>
   /* ==================== STYLES GÉNÉRAUX ==================== */
@@ -3690,11 +3694,11 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*8;                                   // lente et MANIABLE (petite carte) — fini le bolide
+    const target = throttle*6;                                   // TRÈS lente et maniable — fini le bolide
     delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.6);   // accélération douce, pas de fusée
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*2.2));   // ralentit vite quand on lâche
     const dir = delorean.speed < 0 ? -1 : 1;
-    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/2.5, 0, 1) * 2.4 * dir * dt;   // braque COURT (rayon ~3 m) à toute vitesse
+    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/2, 0, 1) * 2.8 * dir * dt;   // braque TRÈS court (rayon ~2 m) à toute vitesse
     car.rotation.y = delorean.heading;
     car.position.x = clamp(car.position.x + Math.sin(delorean.heading)*delorean.speed*dt, -104, 104);
     car.position.z = clamp(car.position.z + Math.cos(delorean.heading)*delorean.speed*dt, -104, 104);
@@ -3709,7 +3713,7 @@ function updateDelorean(dt, t){
     player.group.position.set(car.position.x, car.position.y, car.position.z);
     player.group.rotation.y = delorean.heading;
     if(camDist < 12) camDist = 12;
-    if(Math.abs(delorean.speed) > 5 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
+    if(Math.abs(delorean.speed) > 1.2 && Math.random() < 0.9) emitCarTrail(car, delorean.heading);   // feu quasi-constant dès qu'on roule
     setHint('Descendre de la DeLorean');
     // je diffuse en continu que je tiens le volant : les autres me voient rouler et ne peuvent pas entrer
     const now = performance.now();
@@ -3723,7 +3727,7 @@ function updateDelorean(dt, t){
     delorean.heading = r.group.rotation.y; car.rotation.y = delorean.heading;
     delorean.speed = rspeed;
     for(let i=0;i<delorean.wheels.length;i++) delorean.wheels[i].tire.rotation.x += rspeed*dt*2.2;
-    if(rspeed > 5 && Math.random() < 0.7) emitCarTrail(car, delorean.heading);
+    if(rspeed > 1.2 && Math.random() < 0.9) emitCarTrail(car, delorean.heading);
   } else {
     delorean.speed = 0;
     if(started && hint && hint.style.display !== 'block'){
