@@ -2396,7 +2396,7 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   // ============ SALON LOUNGE — DEHORS, sur la terrasse à côté de la piscine ============
   const sofaWood = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a6a48, roughness:0.7 });
   const cushion  = new THREE.MeshStandardMaterial({ color:0x3a3d44, roughness:0.85 });
-  const lx = 3.8, lz = 5.2;
+  const lx = 3.8, lz = 2.4;   // salon reculé contre la paroi (cloison), loin de la clôture extérieure
   bx(tower, 2.6, 0.4, 0.9, sofaWood, lx, H+0.45, lz, false);                         // canapé teck
   bx(tower, 2.4, 0.3, 0.7, cushion, lx, H+0.68, lz, false);
   bx(tower, 2.4, 0.55, 0.18, cushion, lx, H+0.86, lz-0.36, false);                   // dossier
@@ -2418,50 +2418,54 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   const red    = new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.7 });
   const black  = new THREE.MeshStandardMaterial({ color:0x18181c, roughness:0.6 });
   const tlx = -3.5, tlz = -4.7;
+  // tout le poste de travail (tapis + table + ordinateurs + chaises) dans un groupe, TOURNÉ DE 90°
+  const desk = new THREE.Group(); desk.position.set(tlx, 0, tlz); desk.rotation.y = Math.PI/2; tower.add(desk);
+  const ROT = Math.PI/2, cosR = Math.cos(ROT), sinR = Math.sin(ROT);
   // tapis persan sous la table
-  addFloorPlane(tower, 4.9, 3.1, new THREE.MeshStandardMaterial({ map:BTEX.rug, roughness:0.94 }), tlx, H+0.03, tlz);
+  addFloorPlane(desk, 4.9, 3.1, new THREE.MeshStandardMaterial({ map:BTEX.rug, roughness:0.94 }), 0, H+0.03, 0);
   // grande table en bois à pieds tournés
-  bx(tower, 3.6, 0.16, 1.8, wood, tlx, H+0.78, tlz, false);
-  bx(tower, 3.5, 0.08, 1.7, woodDark, tlx, H+0.69, tlz, false);                      // ceinture
+  bx(desk, 3.6, 0.16, 1.8, wood, 0, H+0.78, 0, false);
+  bx(desk, 3.5, 0.08, 1.7, woodDark, 0, H+0.69, 0, false);                      // ceinture
   for(const [ox,oz] of [[-1.55,-0.72],[1.55,-0.72],[-1.55,0.72],[1.55,0.72]]){
-    cy(tower, 0.08, 0.06, 0.7, 8, wood, tlx+ox, H+0.35, tlz+oz, false);
-    cy(tower, 0.12, 0.12, 0.1, 8, woodDark, tlx+ox, H+0.62, tlz+oz, false);          // bagues du pied tourné
-    cy(tower, 0.1, 0.1, 0.08, 8, woodDark, tlx+ox, H+0.46, tlz+oz, false);
+    cy(desk, 0.08, 0.06, 0.7, 8, wood, ox, H+0.35, oz, false);
+    cy(desk, 0.12, 0.12, 0.1, 8, woodDark, ox, H+0.62, oz, false);              // bagues du pied tourné
+    cy(desk, 0.1, 0.1, 0.08, 8, woodDark, ox, H+0.46, oz, false);
   }
-  // un laptop devant CHAQUE chaise (côtés où l'on s'assoit), écran tourné vers la personne
+  // un laptop devant CHAQUE chaise, écran tourné vers la personne
   for(const [ox,oz,ry] of [[-1.0,0.58,0],[0.4,0.58,0],[1.5,0.58,0],[-1.0,-0.58,Math.PI],[0.6,-0.58,Math.PI]]){
-    const g = new THREE.Group(); g.position.set(tlx+ox, H+0.87, tlz+oz); g.rotation.y = ry; tower.add(g);
+    const g = new THREE.Group(); g.position.set(ox, H+0.87, oz); g.rotation.y = ry; desk.add(g);
     bx(g, 0.5, 0.03, 0.34, silver, 0, 0, 0, false);
     bx(g, 0.46, 0.015, 0.3, black, 0, 0.022, 0.02, false);
     const lid = bx(g, 0.5, 0.32, 0.025, silver, 0, 0.17, -0.16, false); lid.rotation.x = -0.35;
     const sc  = bx(g, 0.44, 0.27, 0.012, screenMat, 0, 0.18, -0.145, false); sc.rotation.x = -0.35;
   }
-  // écran externe (bout est) + clavier + souris
-  cy(tower, 0.05, 0.05, 0.35, 6, black, tlx+1.75, H+1.05, tlz, false);
-  bx(tower, 0.5, 0.06, 0.22, black, tlx+1.75, H+0.9, tlz, false);
-  bx(tower, 0.08, 0.62, 1.04, black, tlx+1.84, H+1.4, tlz, false);                   // dos écran
-  bx(tower, 0.04, 0.56, 0.98, screenMat, tlx+1.78, H+1.4, tlz, false);               // dalle
+  // écran externe (bout de table) + clavier + souris
+  cy(desk, 0.05, 0.05, 0.35, 6, black, 1.75, H+1.05, 0, false);
+  bx(desk, 0.5, 0.06, 0.22, black, 1.75, H+0.9, 0, false);
+  bx(desk, 0.08, 0.62, 1.04, black, 1.84, H+1.4, 0, false);                   // dos écran
+  bx(desk, 0.04, 0.56, 0.98, screenMat, 1.78, H+1.4, 0, false);              // dalle
   // photo affichée sur le grand écran (visible des deux côtés)
   const loftPhotoTex = new THREE.TextureLoader().load('assets/loft_photo.jpg');
   loftPhotoTex.encoding = THREE.sRGBEncoding;
   for(const [dx, ry] of [[-0.031, -Math.PI/2], [0.031, Math.PI/2]]){
-    const ph = addMesh(tower, new THREE.PlaneGeometry(0.54, 0.54), new THREE.MeshBasicMaterial({ map:loftPhotoTex }), tlx+1.78+dx, H+1.4, tlz, false);
+    const ph = addMesh(desk, new THREE.PlaneGeometry(0.54, 0.54), new THREE.MeshBasicMaterial({ map:loftPhotoTex }), 1.78+dx, H+1.4, 0, false);
     ph.rotation.y = ry;
   }
-  bx(tower, 0.42, 0.03, 0.16, black, tlx+1.18, H+0.88, tlz, false);                  // clavier
-  bx(tower, 0.08, 0.03, 0.12, black, tlx+0.92, H+0.88, tlz+0.28, false);             // souris
+  bx(desk, 0.42, 0.03, 0.16, black, 1.18, H+0.88, 0, false);                  // clavier
+  bx(desk, 0.08, 0.03, 0.12, black, 0.92, H+0.88, 0.28, false);             // souris
   // 3 mugs blancs
-  for(const [mx,mz] of [[-0.6,0.35],[0.75,-0.25],[0.05,0.55]]) cy(tower, 0.06, 0.05, 0.1, 8, mat(0xf2efe8), tlx+mx, H+0.91, tlz+mz, false);
+  for(const [mx,mz] of [[-0.6,0.35],[0.75,-0.25],[0.05,0.55]]) cy(desk, 0.06, 0.05, 0.1, 8, mat(0xf2efe8), mx, H+0.91, mz, false);
   // chaises de bureau (mesh) — assise rouge, dossier noir, pied étoile — + ancres « s'asseoir »
   function officeChair(px, pz, ry){
-    const g = new THREE.Group(); g.position.set(tlx+px, H, tlz+pz); g.rotation.y = ry; tower.add(g);
+    const g = new THREE.Group(); g.position.set(px, H, pz); g.rotation.y = ry; desk.add(g);
     cy(g, 0.3, 0.34, 0.04, 5, black, 0, 0.04, 0, false);                             // base étoile
     cy(g, 0.045, 0.045, 0.42, 8, new THREE.MeshStandardMaterial({ color:0x2a2a30, metalness:0.6, roughness:0.4 }), 0, 0.27, 0, false);
     bx(g, 0.5, 0.09, 0.5, red, 0, 0.5, 0, false);                                    // assise
     const back  = bx(g, 0.5, 0.56, 0.05, new THREE.MeshStandardMaterial({ color:0x202024, roughness:0.6 }), 0, 0.83, -0.25, false); back.rotation.x = 0.13;   // dossier incliné
     const backR = bx(g, 0.42, 0.46, 0.03, new THREE.MeshStandardMaterial({ color:0x8a241c, roughness:0.7 }), 0, 0.81, -0.21, false); backR.rotation.x = 0.13; // garniture résille rouge
     for(const ax2 of [-0.28, 0.28]){ bx(g, 0.06, 0.04, 0.34, black, ax2, 0.58, 0.02, false); cy(g, 0.025, 0.025, 0.14, 6, black, ax2, 0.5, 0.18, false); }  // accoudoirs
-    loftChairs.push({ x:BX+tlx+px, z:BZ+tlz+pz, ry:ry });
+    const wx = px*cosR + pz*sinR, wz = -px*sinR + pz*cosR;     // position monde après rotation du groupe
+    loftChairs.push({ x:BX+tlx+wx, z:BZ+tlz+wz, ry:ry+ROT });
   }
   officeChair(-1.0, 1.7, Math.PI); officeChair(0.4, 1.8, Math.PI); officeChair(1.55, 1.7, Math.PI);
   officeChair(-1.0, -1.85, 0);     officeChair(0.6, -1.9, 0);
