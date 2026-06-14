@@ -2441,6 +2441,13 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   bx(tower, 0.5, 0.06, 0.22, black, tlx+1.75, H+0.9, tlz, false);
   bx(tower, 0.08, 0.62, 1.04, black, tlx+1.84, H+1.4, tlz, false);                   // dos écran
   bx(tower, 0.04, 0.56, 0.98, screenMat, tlx+1.78, H+1.4, tlz, false);               // dalle
+  // photo affichée sur le grand écran (visible des deux côtés)
+  const loftPhotoTex = new THREE.TextureLoader().load('assets/loft_photo.jpg');
+  loftPhotoTex.encoding = THREE.sRGBEncoding;
+  for(const [dx, ry] of [[-0.031, -Math.PI/2], [0.031, Math.PI/2]]){
+    const ph = addMesh(tower, new THREE.PlaneGeometry(0.54, 0.54), new THREE.MeshBasicMaterial({ map:loftPhotoTex }), tlx+1.78+dx, H+1.4, tlz, false);
+    ph.rotation.y = ry;
+  }
   bx(tower, 0.42, 0.03, 0.16, black, tlx+1.18, H+0.88, tlz, false);                  // clavier
   bx(tower, 0.08, 0.03, 0.12, black, tlx+0.92, H+0.88, tlz+0.28, false);             // souris
   // 3 mugs blancs
