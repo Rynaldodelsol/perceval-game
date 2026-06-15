@@ -1590,7 +1590,9 @@ function addPath(x1,z1,x2,z2,w=3.4){
   scene.add(p);
 }
 addPath(0, 14, 0, -64);      // village -> château
-addPath(0, 16, -38, 50);     // village -> pont
+addPath(0, 16, -26, 21);     // village -> taverne (foyer)
+addPath(-26, 21, -36, 26);   // contourne la taverne par le sud-ouest (ne traverse plus la maison)
+addPath(-36, 26, -42, 52);   // -> pont, en passant à l'ouest de la taverne
 addPath(-40, 60, -70, 72);   // pont -> Oubliettes
 addPath(2, 16, 48, 4);       // village -> forêt
 
@@ -2224,22 +2226,18 @@ BTEX.plaque = canvasTex(128, (ctx,s)=>{
   ctx.font = 'bold ' + Math.floor(s*0.13) + 'px Arial'; ctx.fillText('RÉSIDENCE', s/2, s*0.42);
   ctx.font = 'italic bold ' + Math.floor(s*0.2) + 'px Georgia, serif'; ctx.fillText('Athénée', s/2, s*0.66);
 });
-// tapis persan vif (rouge éclatant + bleu roi + or) — sous la table du bureau
+// tapis moderne (gris/taupe chaleureux à motif géométrique discret) — sous la table du bureau
 BTEX.rug = canvasTex(256, (ctx,s)=>{
-  ctx.fillStyle = '#a81818'; ctx.fillRect(0,0,s,s);                          // rouge vif
-  let off = 0;
-  for(const [col,w] of [['#0e2a6e',0.085],['#f0c64a',0.025],['#c81e1e',0.05],['#f0c64a',0.025],['#0e2a6e',0.03]]){
-    const p = w*s; ctx.strokeStyle = col; ctx.lineWidth = p; ctx.strokeRect(off+p/2, off+p/2, s-off*2-p, s-off*2-p); off += p;
-  }
-  ctx.fillStyle = '#f0c64a'; for(let i=0;i<34;i++){ ctx.beginPath(); ctx.arc(rand(s*0.18,s*0.82), rand(s*0.18,s*0.82), 2.4, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#cac6be'; ctx.fillRect(0,0,s,s);                          // gris clair
+  ctx.strokeStyle = '#8c8780'; ctx.lineWidth = s*0.055; ctx.strokeRect(s*0.07, s*0.07, s*0.86, s*0.86);   // bordure
+  ctx.strokeStyle = '#b3aea4'; ctx.lineWidth = s*0.012; ctx.strokeRect(s*0.12, s*0.12, s*0.76, s*0.76);
   const cx = s/2, cy = s/2;
-  // médaillon central en losange (bleu roi / or / rouge)
-  const diamond = (rx,ry,col)=>{ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(cx,cy-ry); ctx.lineTo(cx+rx,cy); ctx.lineTo(cx,cy+ry); ctx.lineTo(cx-rx,cy); ctx.closePath(); ctx.fill(); };
-  diamond(s*0.2, s*0.31, '#0e2a6e'); diamond(s*0.13, s*0.2, '#f0c64a'); diamond(s*0.07, s*0.11, '#c81e1e');
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, s*0.018, 0, 7); ctx.fill();
-  // écoinçons dorés dans les coins
-  ctx.fillStyle = '#0e2a6e';
-  for(const [qx,qy] of [[0.26,0.26],[0.74,0.26],[0.26,0.74],[0.74,0.74]]){ ctx.beginPath(); ctx.arc(s*qx, s*qy, s*0.045, 0, 7); ctx.fill(); }
+  ctx.strokeStyle = '#7e7a72'; ctx.lineWidth = s*0.02;                       // losanges concentriques sobres
+  for(const r of [0.26, 0.15]){
+    ctx.beginPath(); ctx.moveTo(cx, cy-s*r); ctx.lineTo(cx+s*r, cy); ctx.lineTo(cx, cy+s*r); ctx.lineTo(cx-s*r, cy); ctx.closePath(); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(126,122,114,0.6)';
+  for(const [qx,qy] of [[0.22,0.22],[0.78,0.22],[0.22,0.78],[0.78,0.78]]){ ctx.beginPath(); ctx.arc(s*qx, s*qy, s*0.02, 0, 7); ctx.fill(); }
 });
 // carrelage terracotta rouge (terrasse + margelle)
 BTEX.tile = canvasTex(256, (ctx,s)=>{
