@@ -538,7 +538,7 @@ function setLoadProgress(loaded, total){
 (function(){
   const t = document.getElementById('title'); if(!t) return;
   const tryImg = (url, next)=>{ const im = new Image(); im.onload = ()=>{ t.style.backgroundImage = "url('" + url + "')"; }; im.onerror = next || null; im.src = url; };
-  tryImg('assets/accueil.jpg?v=1', ()=> tryImg('assets/accueil.png?v=1'));
+  tryImg('assets/accueil.jpg?v=2', ()=> tryImg('assets/accueil.jpeg?v=2', ()=> tryImg('assets/accueil.png?v=2')));
 })();
 const assetsPromise = (async()=>{
   const loader = new THREE.GLTFLoader();
@@ -3203,42 +3203,60 @@ function updateBuilding(dt, t){
   if(txt){ hint.style.display = 'block'; document.getElementById('interactTxt').textContent = txt; }
 }
 
-// --- les Oubliettes (grotte sombre au sud-ouest) ---
-let torchFlames = [], wispPoints, wispBase;
+// --- les Oubliettes : grotte sombre et mystique (sud-ouest) ---
+let torchFlames = [], wispPoints, wispBase, oubCrystals = [];
 {
-  // amas de rocs déchiquetés
-  const cragMat = fmat(0x4a4c5a);
-  const cragMat2 = fmat(0x585a6a);
+  const CX = -73, CZ = 81;
+  const rockDark = fmat(0x34363f), rockMid = fmat(0x474a57), rockLite = fmat(0x595d70), moss = fmat(0x47683b);
+  // MASSIF rocheux en strates : plusieurs blobs de tailles et tons variés
   const cragDefs = [
-    [-78, 84, 13, 9, 1],   [-67, 92, 7.5, 6, 2],  [-86, 76, 6, 7, 3],
-    [-71, 86, 5, 8, 4],    [-62, 84, 4, 4.5, 5],  [-82, 90, 5.5, 5, 6],
+    [-78,84,13,9,1,rockMid], [-67,92,8,6.5,2,rockDark], [-86,77,7,7.5,3,rockLite],
+    [-71,87,6,8.5,4,rockMid], [-62,85,4.5,5,5,rockDark], [-83,90,6,5.5,6,rockMid],
+    [-91,85,5,6,7,rockDark],  [-73,96,5.5,5,8,rockLite],
   ];
-  for(const [cx, cz, cr, ch, seed] of cragDefs){
-    const crag = new THREE.Mesh(blobGeo(1, 1, 0.32, seed*2.7), seed%2 ? cragMat : cragMat2);
-    crag.scale.set(cr, ch, cr*0.9);
-    crag.position.set(cx, ch*0.35, cz);
-    crag.rotation.y = seed;
-    crag.castShadow = true;
-    scene.add(crag);
-    addAO(cx, cz, cr*1.2, 0.5);
+  for(const [cx,cz,cr,ch,seed,m] of cragDefs){
+    const crag = new THREE.Mesh(blobGeo(1, 1, 0.42, seed*2.7), m);
+    crag.scale.set(cr, ch, cr*0.95); crag.position.set(cx, ch*0.32, cz); crag.rotation.y = seed; crag.castShadow = true;
+    scene.add(crag); addAO(cx, cz, cr*1.2, 0.5);
   }
-  // pics rocheux autour de l'entrée
-  for(let i=0;i<7;i++){
-    const a = -0.6 + i*0.35;
-    const px = -71.5 + Math.sin(a)*6.5, pz = 76.5 + Math.cos(a)*4 - 4;
-    const spike = cn(scene, rand(0.5,0.9), rand(1.8,3.6), 5, cragMat, px, 0.9, pz);
-    spike.rotation.z = rand(-0.15, 0.15);
+  // gros rochers anguleux (cristallins) au pied du massif
+  for(let i=0;i<11;i++){
+    const a = rand(0,6.283), rd = rand(8,16);
+    const b = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.7,1.9), 0), i%2 ? rockDark : rockMid);
+    b.position.set(CX+Math.cos(a)*rd, rand(0.2,0.9), CZ+Math.sin(a)*rd*0.7);
+    b.rotation.set(rand(0,3), rand(0,3), rand(0,3)); b.castShadow = true; scene.add(b);
   }
-  // bouche de la grotte : anneau de pierre + fond noir
-  const mouthRing = new THREE.Mesh(new THREE.TorusGeometry(3.4, 1.0, 8, 14), cragMat2);
-  mouthRing.position.set(-71.5, 2.4, 76.5);
-  mouthRing.rotation.x = 0.12;
-  scene.add(mouthRing);
-  const mouth = new THREE.Mesh(new THREE.CircleGeometry(3.4, 16),
-    new THREE.MeshBasicMaterial({ color:0x06070f }));
-  mouth.position.set(-71.5, 2.4, 76.6);
-  mouth.rotation.x = 0.12;
-  scene.add(mouth);
+  // touffes de mousse sur le massif
+  for(let i=0;i<9;i++){ const a = rand(0,6.283), rd = rand(3,10);
+    const mb = new THREE.Mesh(blobGeo(1,1,0.5,i*3.1), moss); mb.scale.set(rand(1,2.3), 0.5, rand(1,2.3));
+    mb.position.set(CX+Math.cos(a)*rd, rand(2,6.5), CZ+Math.sin(a)*rd-4); scene.add(mb);
+  }
+  // ENTRÉE : arche rocheuse + tunnel sombre qui s'enfonce
+  const MX = -71.5, MY = 2.7, MZ = 76.4;
+  const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 6, 18, 1, true), new THREE.MeshBasicMaterial({ color:0x05060d, side:THREE.BackSide }));
+  tunnel.rotation.x = Math.PI/2 + 0.08; tunnel.position.set(MX, MY, MZ+4); scene.add(tunnel);
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(3.25, 22), new THREE.MeshBasicMaterial({ color:0x06070f }));
+  mouth.position.set(MX, MY, MZ+0.12); mouth.rotation.x = 0.08; scene.add(mouth);
+  for(let i=0;i<=10;i++){ const a = Math.PI*(i/10); const rb = new THREE.Mesh(blobGeo(1,1,0.45,i*1.7), i%2 ? rockDark : rockMid);
+    rb.scale.setScalar(rand(0.85,1.5)); rb.position.set(MX+Math.cos(a)*3.9, MY+Math.sin(a)*4.3-0.6, MZ-0.4); rb.castShadow = true; scene.add(rb);
+  }
+  // stalactites (haut) + stalagmites (sol)
+  for(let i=0;i<5;i++){ const st = cn(scene, rand(0.18,0.32), rand(0.8,1.9), 6, rockDark, MX-2.2+i*1.1, MY+3.2, MZ+0.3); st.rotation.x = Math.PI; }
+  for(let i=0;i<7;i++){ cn(scene, rand(0.22,0.5), rand(0.7,1.7), 6, i%2?rockDark:rockMid, MX-3+rand(-0.5,6.5), 0.5, MZ-2.6+rand(-1.2,1.2)); }
+  // CRISTAUX violets lumineux autour de l'entrée + lueur
+  const crystalMat = new THREE.MeshStandardMaterial({ color:0x9a6fe0, emissive:0x7a3fd0, emissiveIntensity:1.2, roughness:0.2, metalness:0.1, transparent:true, opacity:0.92 });
+  for(const [cx,cyv,cz,s] of [[-68,0.7,75,1],[-75.5,0.8,74.4,1.3],[-69.3,1.3,77.3,0.8],[-74.2,1.8,77.6,0.9],[-71.5,4.7,77.2,1.1],[-65.6,1.0,79,0.7],[-77,0.6,78,1.0]]){
+    const cr = new THREE.Mesh(new THREE.OctahedronGeometry(0.5*s, 0), crystalMat);
+    cr.scale.y = 1.9; cr.position.set(cx, cyv, cz); cr.rotation.y = rand(0,3); scene.add(cr); oubCrystals.push(cr);
+  }
+  const glow = new THREE.PointLight(0x8a4fe0, 1.4, 18, 2); glow.position.set(MX, MY, MZ+0.6); scene.add(glow);
+  // crânes & ossements (thème oubliettes)
+  const bone = fmat(0xcfc7b2);
+  for(const [sx,sz] of [[-66,74],[-78,73.5],[-69,73]]){
+    const sk = new THREE.Mesh(new THREE.SphereGeometry(0.22,10,8), bone); sk.scale.set(1,0.92,1.05); sk.position.set(sx,0.22,sz); scene.add(sk);
+    for(const ex of [-0.08,0.08]) addMesh(scene, new THREE.SphereGeometry(0.05,6,5), mat(0x14141a), sx+ex, 0.24, sz+0.18);
+    bx(scene, 0.26, 0.05, 0.05, bone, sx, 0.06, sz+0.25); bx(scene, 0.26, 0.05, 0.05, bone, sx+0.1, 0.06, sz+0.32);  // os
+  }
   // torches de part et d'autre
   for(const tx of [-76.2, -66.8]){
     const tg = new THREE.Group();
@@ -3288,6 +3306,8 @@ let torchFlames = [], wispPoints, wispBase;
   addCollider(-78, 84, 12);
   addCollider(-67, 92, 7);
   addCollider(-86, 76, 6);
+  addCollider(-91, 85, 5);
+  addCollider(-73, 96, 5);
   addCollider(-65, 70, 0.4);
 }
 function updateOubliettes(dt, t){
@@ -3298,6 +3318,7 @@ function updateOubliettes(dt, t){
     if(Math.random() < dt*3) spawnPuff(f.pos, { color:0x55585f, scale:0.25, growth:0.4, rise:0.8, life:1.4, opacity:0.3, drift:0.1 });
   }
   if(torchFlames.light) torchFlames.light.intensity = 1.0 + Math.sin(t*13)*0.2 + Math.sin(t*29)*0.12;
+  if(oubCrystals.length){ const ei = 1.0 + Math.sin(t*2)*0.45; for(const c of oubCrystals){ c.rotation.y += dt*0.5; c.material.emissiveIntensity = ei; } }   // cristaux qui pulsent
   if(wispPoints){
     const arr = wispPoints.geometry.attributes.position.array;
     for(let i=0;i<wispBase.length;i++){
