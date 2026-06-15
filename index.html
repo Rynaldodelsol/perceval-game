@@ -534,6 +534,12 @@ function setLoadProgress(loaded, total){
     const lw = document.getElementById('loadWrap'); if(lw) lw.style.display = 'none';
   }
 }
+// écran d'accueil/loader HD : si assets/accueil.jpg (ou .png) existe, on l'utilise en fond plein écran (sinon on garde preview.jpg)
+(function(){
+  const t = document.getElementById('title'); if(!t) return;
+  const tryImg = (url, next)=>{ const im = new Image(); im.onload = ()=>{ t.style.backgroundImage = "url('" + url + "')"; }; im.onerror = next || null; im.src = url; };
+  tryImg('assets/accueil.jpg?v=1', ()=> tryImg('assets/accueil.png?v=1'));
+})();
 const assetsPromise = (async()=>{
   const loader = new THREE.GLTFLoader();
   const defs = {
