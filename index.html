@@ -7462,6 +7462,7 @@ animate();
 if(location.search.indexOf('dev=1') >= 0){
   window.__dev = {
     tp(x, z, yaw){ if(player && player.group){ player.group.position.set(x, player.group.position.y, z); } if(yaw != null){ camYaw = yaw; } },
+    cam(dist, pitch){ if(dist != null) camDist = dist; if(pitch != null) camPitch = pitch; },
     forceStart(){ if(!started){ const cb = document.querySelector('.charBtn'); if(cb) cb.click(); const pb = document.getElementById('playBtn'); if(pb) pb.click(); } },
     get started(){ return started; }, get camYaw(){ return camYaw; },
     player, camera, scene, enemies,
