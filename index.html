@@ -2785,7 +2785,16 @@ const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le jou
     pc.beginPath(); pc.ellipse(X,Y+55,44,62,0,0,7); pc.fill();          // étiquette
     pc.fillStyle = '#fff'; pc.font = '800 26px Arial'; pc.fillText('DODO',X,Y+50);
     pc.fillStyle = '#f4c81f'; pc.font = '13px Arial'; pc.fillText('LA RÉUNION',X,Y+80);
+    // condensation sur la bouteille
+    pc.fillStyle = 'rgba(255,255,255,0.5)';
+    for(let i=0;i<22;i++){ pc.beginPath(); pc.arc(X-30+Math.random()*60, Y-60+Math.random()*200, 1+Math.random()*2.5, 0,7); pc.fill(); }
   })();
+  // éclaboussures d'eau + gouttelettes autour de la bouteille (façon photo)
+  pc.strokeStyle = 'rgba(205,235,255,0.7)'; pc.lineWidth = 6; pc.lineCap = 'round';
+  for(let i=0;i<7;i++){ const a = Math.random()*6.28; pc.beginPath(); pc.arc(410,540, 95+i*14, a, a+0.9); pc.stroke(); }
+  pc.lineCap = 'butt';
+  pc.fillStyle = 'rgba(225,243,255,0.9)';
+  for(let i=0;i<55;i++){ const a = Math.random()*6.28, r = 70+Math.random()*120; pc.beginPath(); pc.arc(410+Math.cos(a)*r, 540+Math.sin(a)*r*0.95, 1.5+Math.random()*5, 0,7); pc.fill(); }
   (function hibiscus(){                                                  // hibiscus bas-gauche
     const HX = 66, HY = 706;
     pc.fillStyle = '#fff';
