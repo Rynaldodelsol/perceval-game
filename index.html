@@ -225,8 +225,20 @@
     transform:translate(-50%,-50%); }
   #touchBtns { position:absolute; right:16px; bottom:92px; display:flex; flex-direction:column;
     gap:12px; pointer-events:auto; }
-  #touchBtns button { width:62px; height:62px; border-radius:50%; border:2px solid #4C53BD;
-    background:rgba(15,20,55,0.8); font-size:25px; color:#fff; font-weight:700; touch-action:manipulation; }
+  #touchBtns button { width:64px; height:64px; border-radius:50%; position:relative; overflow:hidden;
+    border:1.5px solid rgba(150,160,235,0.5); color:#fff; font-size:26px; font-weight:700; touch-action:manipulation;
+    background:radial-gradient(circle at 50% 32%, rgba(96,108,200,0.85), rgba(17,21,52,0.95) 72%);
+    box-shadow:0 5px 16px rgba(0,0,0,0.45), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 16px rgba(0,0,0,0.4);
+    text-shadow:0 2px 6px rgba(0,0,0,0.6); transition:transform .1s ease, box-shadow .15s ease; }
+  /* reflet brillant en haut (effet bouton 3D) */
+  #touchBtns button::before { content:''; position:absolute; left:14%; right:14%; top:7%; height:34%; border-radius:50%;
+    background:linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0)); pointer-events:none; }
+  #touchBtns button:active { transform:scale(0.92); box-shadow:0 2px 8px rgba(0,0,0,0.5), inset 0 2px 6px rgba(0,0,0,0.5); }
+  /* halos colorés par compétence (cohérent avec la barre desktop) */
+  #touchBtns #tbA { border-color:rgba(255,124,112,0.7); box-shadow:0 5px 16px rgba(0,0,0,0.45), 0 0 14px rgba(255,90,80,0.5), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 16px rgba(0,0,0,0.4); }
+  #touchBtns #tbB { border-color:rgba(96,176,255,0.7); box-shadow:0 5px 16px rgba(0,0,0,0.45), 0 0 14px rgba(70,150,255,0.5), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 16px rgba(0,0,0,0.4); }
+  #touchBtns #tbP { border-color:rgba(255,208,96,0.8); box-shadow:0 5px 16px rgba(0,0,0,0.45), 0 0 16px rgba(255,196,70,0.6), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 16px rgba(0,0,0,0.4); }
+  #touchBtns #tbJ { border-color:rgba(140,230,170,0.7); box-shadow:0 5px 16px rgba(0,0,0,0.45), 0 0 14px rgba(90,210,130,0.45), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 16px rgba(0,0,0,0.4); }
 
   /* ==================== ÉCRANS MORT / VICTOIRE ==================== */
   .overlayScreen { position:fixed; inset:0; z-index:40; display:none; flex-direction:column;
