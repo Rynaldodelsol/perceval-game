@@ -514,6 +514,7 @@ const mixers = [];
 const mounts = [];    // montures montables (licorne, cheval de Mathias) — verrou réseau partagé
 let unicorn = null;   // la licorne montable près du pont (modèle Horse.glb + corne + crinière)
 let galopin = null;   // le cheval de Mathias, montable lui aussi
+let boat = null;      // la barque avec pêcheur qui navigue sur la rivière
 let assetsReady = false;
 // barre de chargement : indique l'avancement réel du téléchargement des modèles 3D
 function setLoadProgress(loaded, total){
@@ -1951,6 +1952,30 @@ function swapNature(){
       mug.position.set(0.28, 1.2, 0.32); dm.wrap.add(mug);
       guildDrinkers.push({ wrap:dm.wrap, mug, mugY:1.2, phase:i*3.3, legBones });
     });
+  }
+  // 🚣 BARQUE avec un pêcheur (vrai modèle) qui navigue sur la rivière
+  {
+    const bg = new THREE.Group();
+    const wD = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x6b4a2c, roughness:0.85 });
+    const wL = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a5a34, roughness:0.85 });
+    bx(bg, 3.4, 0.14, 1.3, wD, 0, 0, 0);                                          // fond
+    bx(bg, 3.1, 0.06, 1.06, new THREE.MeshStandardMaterial({ color:0x4a3622, roughness:0.9 }), 0, 0.09, 0);  // plancher
+    for(const sz of [-0.62, 0.62]) bx(bg, 3.4, 0.4, 0.12, wL, 0, 0.2, sz);        // flancs
+    for(const [sx,rot] of [[1.78,-0.5],[-1.78,0.5]]){ const e = bx(bg, 0.5, 0.42, 1.3, wL, sx, 0.26, 0); e.rotation.z = rot; }  // bouts relevés (proue/poupe)
+    bx(bg, 0.5, 0.1, 1.15, wL, -0.5, 0.3, 0);                                     // banc arrière (pêcheur)
+    bx(bg, 0.5, 0.1, 1.15, wL, 0.8, 0.3, 0);                                      // banc avant
+    bg.position.set(40, 0.33, 55); scene.add(bg);
+    let fisher = null;
+    const fm = spawnModel('rogueHooded', 1.55);
+    if(fm){
+      fm.wrap.position.set(-0.5, 0.26, 0); fm.wrap.rotation.y = Math.PI/2;        // assis sur le banc arrière, face à l'avant
+      bg.add(fm.wrap); makeEnemyAnim(fm);
+      fm._legs = findSitLegBones(fm.wrap);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.01, 1.7, 6), new THREE.MeshStandardMaterial({ color:0x3a2a18, roughness:0.7 }));
+      rod.position.set(0.35, 0.95, 0.35); rod.rotation.z = -0.85; rod.rotation.x = 0.3; fm.wrap.add(rod);
+      fisher = fm;
+    }
+    boat = { group:bg, fisher, dir:1, x:40 };
   }
   // trois essences d'arbres réparties sur les emplacements existants
   const lots = [[],[],[]];
@@ -5202,6 +5227,20 @@ function updateMount(m, dt, t){
   if(m.cosmetics) m.cosmetics(t);
 }
 function updateMounts(dt, t){ for(const m of mounts) updateMount(m, dt, t); }
+// la barque va et vient sur la rivière (fait demi-tour avant le pont) + tangage doux + pose assise du pêcheur
+function updateBoat(dt, t){
+  if(!boat) return;
+  const b = boat;
+  b.x += b.dir * 3.0 * dt;
+  if(b.x > 95){ b.x = 95; b.dir = -1; }
+  else if(b.x < -32){ b.x = -32; b.dir = 1; }     // demi-tour à l'est du pont (x=-40)
+  b.group.position.x = b.x;
+  b.group.position.y = 0.33 + Math.sin(t*1.4)*0.05;
+  b.group.rotation.y = b.dir > 0 ? 0 : Math.PI;
+  b.group.rotation.z = Math.sin(t*1.1)*0.03;
+  if(b.fisher && b.fisher._legs) for(const lb of b.fisher._legs) lb.b.rotation.x = lb.x;   // maintient l'assise
+  if(Math.random() < 0.18) burst(V3(b.x - b.dir*1.9, 0.25, 55), 0xcfeaff, 4, 1.2, 0.1, 0.5, 1);  // sillage
+}
 
 /* ============================================================
    ENTRÉES — clavier & souris (style WoW)
@@ -6984,6 +7023,7 @@ function animate(){
     for(const m2 of mixers) m2.update(dt);
     updatePlayer(dt, t);
     updateMounts(dt, t);
+    updateBoat(dt, t);
     updateNpcs(dt, t);
     updateSpawner(dt);
     for(let i=enemies.length-1;i>=0;i--){
