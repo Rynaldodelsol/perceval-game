@@ -6016,7 +6016,7 @@ function thunder(delay){
   if(!audioCtx) return;
   const t0 = audioCtx.currentTime + Math.max(0, delay);
   const sr = audioCtx.sampleRate;
-  const close = Math.random() < 0.4;                  // coup proche (sec) ou lointain (sourd et roulant)
+  const close = false;                                // toujours un grondement lointain, sourd et roulant (réglage demandé)
   // bus -> passe-bas adoucissant -> compresseur -> sortie, avec envoi vers la réverb
   const out = audioCtx.createGain(); out.gain.value = close ? 1.0 : 0.78;
   const lpM = audioCtx.createBiquadFilter(); lpM.type = 'lowpass'; lpM.frequency.value = close ? 5500 : 2400;
