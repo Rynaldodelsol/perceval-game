@@ -188,7 +188,8 @@
   #chatClose { flex:none; width:34px; height:34px; border:none; border-radius:9px; cursor:pointer;
     background:rgba(255,255,255,0.16); color:#fff; font-size:18px; font-weight:800; line-height:1; }
   /* Bouton de chat permanent (bord gauche, à l'écart des boutons d'action) */
-  #chatBtn { position:absolute; left:16px; top:50%; transform:translateY(-50%); z-index:8;
+  /* bouton de chat : juste à côté de la barre d'action (desktop : à droite de la barre centrale) */
+  #chatBtn { position:absolute; left:50%; bottom:24px; transform:translateX(140px); z-index:8;
     width:56px; height:56px; border-radius:50%; cursor:pointer; pointer-events:auto; display:none;
     align-items:center; justify-content:center; font-size:27px; border:1.5px solid rgba(150,160,235,0.55);
     background:radial-gradient(circle at 50% 32%, rgba(96,108,200,0.9), rgba(17,21,52,0.96) 72%);
@@ -197,7 +198,7 @@
   #chatBtn::before { content:''; position:absolute; left:16%; right:16%; top:8%; height:32%; border-radius:50%;
     background:linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0)); pointer-events:none; }
   #chatBtn:hover { box-shadow:0 8px 22px rgba(0,0,0,0.5), 0 0 20px rgba(110,150,255,0.7), inset 0 2px 0 rgba(255,255,255,0.26); }
-  #chatBtn:active { transform:translateY(-50%) scale(0.92); }
+  #chatBtn:active { transform:translateX(140px) scale(0.92); }
   #chatBtn.open { background:radial-gradient(circle at 50% 32%, rgba(255,212,77,0.9), rgba(120,80,10,0.96) 72%); border-color:rgba(255,212,77,0.8); }
   #chatBadge { position:absolute; top:-3px; right:-3px; min-width:19px; height:19px; padding:0 4px; display:none;
     align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff;
@@ -287,6 +288,9 @@
     #touchBtns { right:12px; bottom:20px; display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
     #touchBtns button { width:58px; height:58px; font-size:23px; }
     #touchBtns #tbE { grid-column:1 / -1; width:auto; height:46px; border-radius:24px; font-size:18px; }   /* E = barre large dessous */
+    /* chat : juste à gauche du bloc de boutons tactiles (donc à côté des boutons d'action) */
+    #chatBtn { left:auto; right:150px; bottom:22px; top:auto; transform:none; width:52px; height:52px; }
+    #chatBtn:active { transform:scale(0.92); }
     /* Quêtes : sur mobile on le repositionne en haut à gauche (sous l'encart joueur) au lieu de le cacher */
     #navBtns { right:auto !important; left:10px !important; top:78px !important; bottom:auto !important; flex-direction:row !important; }
     #navBtns button { font-size:12px !important; padding:6px 11px !important; }
@@ -2792,6 +2796,11 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   const wood     = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x9a6f44, roughness:0.7 });
   const woodDark = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x6b4a2c, roughness:0.7 });
   const screenMat = new THREE.MeshStandardMaterial({ color:0x0a1830, emissive:0x2aa0e0, emissiveIntensity:0.9 });
+  // écran de code animé PARTAGÉ (mur + tous les laptops) : une seule texture qui défile
+  { const cc = document.createElement('canvas'); cc.width = cc.height = 256;
+    const ctex = new THREE.CanvasTexture(cc); ctex.encoding = THREE.sRGBEncoding;
+    loftScreen = { ctx:cc.getContext('2d'), tex:ctex, scroll:0, last:0 }; drawLoftScreen(); }
+  const codeScreenMat = new THREE.MeshBasicMaterial({ map:loftScreen.tex });   // écran de code (non éclairé = bien lisible)
   const silver = new THREE.MeshStandardMaterial({ color:0xc8ccd2, metalness:0.7, roughness:0.4 });
   const red    = new THREE.MeshStandardMaterial({ color:0xc0392b, roughness:0.7 });
   const black  = new THREE.MeshStandardMaterial({ color:0x18181c, roughness:0.6 });
@@ -2815,7 +2824,7 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
     bx(g, 0.5, 0.03, 0.34, silver, 0, 0, 0, false);
     bx(g, 0.46, 0.015, 0.3, black, 0, 0.022, 0.02, false);
     const lid = bx(g, 0.5, 0.32, 0.025, silver, 0, 0.17, -0.16, false); lid.rotation.x = -0.35;
-    const sc  = bx(g, 0.44, 0.27, 0.012, screenMat, 0, 0.18, -0.145, false); sc.rotation.x = -0.35;
+    const sc  = bx(g, 0.44, 0.27, 0.012, codeScreenMat, 0, 0.18, -0.145, false); sc.rotation.x = -0.35;   // code qui défile, comme l'écran mural
   }
   // écran externe (bout de table) + clavier + souris
   cy(desk, 0.05, 0.05, 0.35, 6, black, 1.75, H+1.05, 0, false);
@@ -2851,10 +2860,7 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
   const wallMat = new THREE.MeshStandardMaterial({ map:TEX.plaster, normalMap:NTEX.plaster, color:0xe9e7df, roughness:0.95 });
   const wz0 = -7.7;
   bx(tower, 6.4, 2.9, 0.16, wallMat, tlx, H+1.5, wz0, false);
-  // TV de code DYNAMIQUE (le texte défile) — canvas réactualisé dans updateBuilding
-  { const c = document.createElement('canvas'); c.width = c.height = 256;
-    const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
-    loftScreen = { ctx:c.getContext('2d'), tex:tex, scroll:0, last:0 }; drawLoftScreen(); }
+  // TV de code DYNAMIQUE (le texte défile) — réutilise la texture de code partagée (créée plus haut)
   bx(tower, 2.16, 1.36, 0.04, black, tlx-1.5, H+1.7, wz0+0.09, false);               // cadre TV
   addMesh(tower, new THREE.PlaneGeometry(2.0, 1.2), new THREE.MeshBasicMaterial({ map:loftScreen.tex }), tlx-1.5, H+1.7, wz0+0.12, false);
   addMesh(tower, new THREE.CircleGeometry(0.4, 24), new THREE.MeshBasicMaterial({ map:BTEX.dart }), tlx+1.1, H+1.85, wz0+0.12, false);  // cible
@@ -7622,6 +7628,7 @@ animate();
 if(location.search.indexOf('dev=1') >= 0){
   window.__dev = {
     tp(x, z, yaw){ if(player && player.group){ player.group.position.set(x, player.group.position.y, z); } if(yaw != null){ camYaw = yaw; } },
+    roof(x, z, yaw){ playerOnRoof = true; if(player && player.group){ player.group.position.set(x, TOWER.y, z); } if(yaw != null){ camYaw = yaw; } },
     cam(dist, pitch){ if(dist != null) camDist = dist; if(pitch != null) camPitch = pitch; },
     forceStart(){ if(!started){ const cb = document.querySelector('.charBtn'); if(cb) cb.click(); const pb = document.getElementById('playBtn'); if(pb) pb.click(); } },
     get started(){ return started; }, get camYaw(){ return camYaw; },
