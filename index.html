@@ -6041,6 +6041,37 @@ function showToast(msg, dur=3200){
   if(toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>t.style.opacity='0', dur);
 }
+// carte encadrée et mise en avant (info importante de début de partie : le pouvoir de classe)
+function showPowerCard(pw, dur=8000){
+  let el = document.getElementById('powerCard');
+  if(!el){
+    const css = document.createElement('style');
+    css.textContent =
+      '#powerCard{position:fixed;left:50%;top:15%;transform:translate(-50%,-14px);z-index:55;width:min(440px,90vw);' +
+        'padding:16px 22px 14px;text-align:center;pointer-events:none;color:#eef1ff;' +
+        'background:linear-gradient(180deg,rgba(28,38,92,.97),rgba(15,21,52,.97));border:2px solid var(--pc,#ffd44d);' +
+        'border-radius:18px;box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 26px var(--pc,#ffd44d);' +
+        'opacity:0;transition:opacity .45s ease,transform .45s ease;}' +
+      '#powerCard.show{opacity:1;transform:translate(-50%,0);}' +
+      '#powerCard .pcHead{font-size:12px;letter-spacing:2.5px;font-weight:800;color:var(--pc,#ffd44d);}' +
+      '#powerCard .pcMain{display:flex;align-items:center;justify-content:center;gap:13px;margin:9px 0 3px;}' +
+      '#powerCard .pcIcon{font-size:42px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));}' +
+      '#powerCard .pcName{font-size:22px;font-weight:800;}' +
+      '#powerCard .pcRole{font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--pc,#ffd44d);}' +
+      '#powerCard .pcDesc{font-size:15px;color:#dfe6ff;margin-top:2px;}' +
+      '#powerCard .pcHint{font-size:12px;color:#aab2e8;margin-top:9px;border-top:1px solid rgba(255,255,255,.12);padding-top:7px;}';
+    document.head.appendChild(css);
+    el = document.createElement('div'); el.id = 'powerCard'; document.body.appendChild(el);
+  }
+  el.style.setProperty('--pc', '#' + pw.color.toString(16).padStart(6,'0'));
+  el.innerHTML = '<div class="pcHead">✦ TON POUVOIR DE CLASSE ✦</div>' +
+    '<div class="pcMain"><span class="pcIcon">' + pw.icon + '</span>' +
+    '<div><div class="pcName">' + pw.name + '</div><div class="pcRole">' + pw.role + '</div></div></div>' +
+    '<div class="pcDesc">' + pw.desc + '</div>' +
+    '<div class="pcHint">Appuie sur <b>3</b> (ou <b>✦</b>) pour l\'activer</div>';
+  el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(()=> el.classList.remove('show'), dur);
+}
 
 /* ==================== TABLEAU DES QUÊTES ==================== */
 let navOpen = null;
@@ -7237,7 +7268,7 @@ function startGame(){
   updateHUD();
   showToast('Bienvenue à Valblanche, ' + shown + ' !');
   const pw = myPower();   // rappelle au joueur son pouvoir de classe (touche 3)
-  setTimeout(()=> showToast('Ton pouvoir (touche 3) : ' + pw.icon + ' ' + pw.name + ' — ' + pw.role + ' : ' + pw.desc, 5200), 3400);
+  setTimeout(()=> showPowerCard(pw, 8500), 2600);   // carte encadrée mise en avant (reste ~8,5 s)
   connectMultiplayer();   // au cas où la connexion lobby n'aurait pas démarré
   trackMe();              // présence à jour : je joue maintenant ce personnage
   applyTakenNpcs();       // masque les PNJ déjà incarnés par d'autres joueurs
