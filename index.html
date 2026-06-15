@@ -1261,6 +1261,15 @@ function blockTowerRect(pos, pad){
     }
   }
 }
+// barrières SAUTABLES : bloquent au sol, mais on passe par-dessus en sautant (y au-dessus du sommet)
+const BARRIERS = [];   // { x, z, r, h }
+function blockBarriers(pos, y){
+  for(const b of BARRIERS){
+    if(y >= b.h - 0.15) continue;                 // assez haut → on franchit
+    const dx = pos.x - b.x, dz = pos.z - b.z, d = Math.hypot(dx, dz);
+    if(d < b.r && d > 0.0001){ pos.x = b.x + dx/d*b.r; pos.z = b.z + dz/d*b.r; }
+  }
+}
 
 // --- particules (jets éphémères) ---
 const particleBursts = [];
@@ -1596,6 +1605,18 @@ addPath(-26, 21, -36, 26);   // contourne la taverne par le sud-ouest (ne traver
 addPath(-36, 26, -42, 52);   // -> pont, en passant à l'ouest de la taverne
 addPath(-40, 60, -70, 72);   // pont -> Oubliettes
 addPath(2, 16, 48, 4);       // village -> forêt
+
+// --- barrières en bois À SAUTER (haies) : un petit parcours de saut dans le champ est ---
+function buildFence(x1, z1, x2, z2){
+  const dx = x2-x1, dz = z2-z1, len = Math.hypot(dx, dz), n = Math.max(2, Math.round(len/1.7));
+  const woodP = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x7a5230, roughness:0.85 });
+  for(let i=0;i<=n;i++){ const x = x1+dx*i/n, z = z1+dz*i/n; cy(scene, 0.08, 0.09, 1.0, 6, woodP, x, 0.5, z); }   // poteaux
+  for(const ry of [0.5, 0.85]){ const rail = bx(scene, len, 0.09, 0.09, woodP, (x1+x2)/2, ry, (z1+z2)/2); rail.rotation.y = -Math.atan2(dz, dx); }  // lisses
+  for(let i=0;i<n;i++){ const x = x1+dx*(i+0.5)/n, z = z1+dz*(i+0.5)/n; BARRIERS.push({ x, z, r:0.95, h:1.0 }); }
+}
+buildFence(20, 2, 30, 2);    // haie 1
+buildFence(20, 8, 30, 8);    // haie 2
+buildFence(20, 14, 30, 14);  // haie 3
 
 // --- herbe instanciée : touffes de brins croisés, vent dans le vertex shader ---
 let grassUniforms = null;
@@ -6284,6 +6305,7 @@ function updatePlayer(dt, t){
   } else {
     resolveCollision(pos, 0.55);
     blockTowerRect(pos, 0.55);                 // impossible de traverser l'immeuble Perceval
+    blockBarriers(pos, pos.y);                 // haies : il faut sauter par-dessus
   }
 
   // cooldowns & ressources
