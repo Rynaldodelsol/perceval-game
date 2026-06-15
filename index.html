@@ -3764,8 +3764,9 @@ function buildPerceval(){
   addMesh(backShield, new THREE.TorusGeometry(0.27, 0.032, 8, 22), goldTrim, 0, 0, -0.03, false);
   sp(backShield, 0.055, goldTrim, 0, 0, -0.07, 8);   // umbo central
   backShield.rotation.y = Math.PI;
+  backShield.rotation.x = -0.42;   // incline le bouclier vers l'arrière → sa face (et le picto) regarde la caméra
   backShield.rotation.z = 0.15;
-  backShield.position.set(0, -0.38, -0.17);
+  backShield.position.set(0, -0.34, -0.2);
   cape.add(backShield);
   cape.position.set(0, 1.78, -0.16);
   g.add(cape);
