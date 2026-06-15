@@ -250,17 +250,17 @@
 <div id="title">
   <h1>⚔️ Perceval</h1>
   <h2>la quête du Contrat Sacré</h2>
-  <div id="charSelect" class="panel">
+  <div id="charSelect" class="panel" style="display:none">
     <div class="csTitle">Choisis ton personnage</div>
     <div id="charRow"></div>
     <input id="pseudo" maxlength="16" placeholder="Ton pseudo (optionnel)" autocomplete="off">
   </div>
-  <div class="controls">
+  <div class="controls" style="display:none">
     <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut (parcours de rochers ➜ cristal d'XP)<br>
     <b>Clic droit maintenu</b> : caméra &nbsp;·&nbsp; <b>Molette</b> : zoom<br>
     <b>Clic gauche / 1</b> : attaque &nbsp;·&nbsp; <b>2</b> : Bouclier &nbsp;·&nbsp; <b>3</b> : Pouvoir de classe ✦ &nbsp;·&nbsp; <b>E</b> : parler / pêcher 🎣 / monter 🦄
   </div>
-  <button id="playBtn">Jouer</button>
+  <button id="playBtn" style="display:none">Jouer</button>
   <div id="loadWrap">
     <div id="loadBar"><div id="loadFill"></div></div>
     <div id="loadTxt">Préparation des montures et des héros…</div>
@@ -528,6 +528,10 @@ function setLoadProgress(loaded, total){
   if(pct >= 100){
     const b = document.getElementById('playBtn');
     if(b){ b.disabled = false; b.classList.remove('loading'); if(b.dataset.waiting === '1') b.textContent = 'Jouer'; }
+    // tout est chargé → on révèle la sélection du personnage, les commandes et le bouton Jouer
+    ['charSelect','playBtn'].forEach(id=>{ const el = document.getElementById(id); if(el) el.style.display = ''; });
+    const ctr = document.querySelector('#title .controls'); if(ctr) ctr.style.display = '';
+    const lw = document.getElementById('loadWrap'); if(lw) lw.style.display = 'none';
   }
 }
 const assetsPromise = (async()=>{
@@ -1600,13 +1604,11 @@ function addPath(x1,z1,x2,z2,w=3.4){
   scene.add(p);
 }
 addPath(0, 14, 0, -64);      // village -> château
-addPath(0, 16, -26, 21);     // village -> taverne (foyer)
-addPath(-26, 21, -36, 26);   // contourne la taverne par le sud-ouest (ne traverse plus la maison)
-addPath(-36, 26, -42, 52);   // -> pont, en passant à l'ouest de la taverne
+addPath(0, 16, -40, 55);     // village -> pont, d'un seul tenant (passe à l'est de la taverne, ne la traverse pas)
 addPath(-40, 60, -70, 72);   // pont -> Oubliettes
 addPath(2, 16, 48, 4);       // village -> forêt
 
-// --- barrières en bois À SAUTER (haies) : un petit parcours de saut dans le champ est ---
+// --- clôtures en bois (sautables) : on saute par-dessus pour entrer ---
 function buildFence(x1, z1, x2, z2){
   const dx = x2-x1, dz = z2-z1, len = Math.hypot(dx, dz), n = Math.max(2, Math.round(len/1.7));
   const woodP = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x7a5230, roughness:0.85 });
@@ -1614,9 +1616,23 @@ function buildFence(x1, z1, x2, z2){
   for(const ry of [0.5, 0.85]){ const rail = bx(scene, len, 0.09, 0.09, woodP, (x1+x2)/2, ry, (z1+z2)/2); rail.rotation.y = -Math.atan2(dz, dx); }  // lisses
   for(let i=0;i<n;i++){ const x = x1+dx*(i+0.5)/n, z = z1+dz*(i+0.5)/n; BARRIERS.push({ x, z, r:0.95, h:1.0 }); }
 }
-buildFence(20, 2, 30, 2);    // haie 1
-buildFence(20, 8, 30, 8);    // haie 2
-buildFence(20, 14, 30, 14);  // haie 3
+// ENCLOS AUX LAPINS (clôturé) : saute par-dessus la clôture pour chasser les lapins (XP)
+buildFence(20, -13, 32, -13);  buildFence(20, -1, 32, -1);
+buildFence(20, -13, 20, -1);   buildFence(32, -13, 32, -1);
+const rabbits = [];
+function buildRabbit(x, z){
+  const g = new THREE.Group();
+  const fur = mat(0xf2efe6);
+  const body = addMesh(g, new THREE.SphereGeometry(0.18, 10, 8), fur, 0, 0.18, 0); body.scale.set(1, 0.9, 1.35);
+  addMesh(g, new THREE.SphereGeometry(0.12, 10, 8), fur, 0, 0.3, 0.18);                      // tête
+  for(const ex of [-0.05, 0.05]){ const ear = bx(g, 0.05, 0.22, 0.03, fur, ex, 0.46, 0.15); ear.rotation.x = -0.2; }   // oreilles
+  addMesh(g, new THREE.SphereGeometry(0.06, 8, 6), fur, 0, 0.2, -0.22);                       // queue
+  for(const ex of [-0.05, 0.05]) addMesh(g, new THREE.SphereGeometry(0.018, 6, 5), mat(0x222222), ex, 0.33, 0.27);  // yeux
+  g.position.set(x, 0, z); scene.add(g);
+  const r = { group:g, x, z, dir:rand(0, 6.283), hopT:rand(0, 1.4), alive:true, respawn:0 };
+  rabbits.push(r); return r;
+}
+for(let i=0;i<6;i++) buildRabbit(rand(22, 30), rand(-11, -3));
 
 // --- herbe instanciée : touffes de brins croisés, vent dans le vertex shader ---
 let grassUniforms = null;
@@ -5262,6 +5278,26 @@ function updateBoat(dt, t){
   if(b.fisher && b.fisher._legs) for(const lb of b.fisher._legs) lb.b.rotation.x = lb.x;   // maintient l'assise
   if(Math.random() < 0.18) burst(V3(b.x - b.dir*1.9, 0.25, 55), 0xcfeaff, 4, 1.2, 0.1, 0.5, 1);  // sillage
 }
+// 🐰 lapins qui sautillent dans l'enclos (chassables : attaque = +8 XP, réapparaissent)
+function updateRabbits(dt, t){
+  for(const r of rabbits){
+    if(!r.alive){ r.respawn -= dt; if(r.respawn <= 0){ r.alive = true; r.group.visible = true; } continue; }
+    r.hopT += dt;
+    const cyc = r.hopT % 1.4;
+    const hop = cyc < 0.5 ? Math.sin(cyc/0.5*Math.PI) : 0;
+    if(cyc < 0.04 && Math.random() < 0.5) r.dir = rand(0, 6.283);
+    if(hop > 0){ r.x += Math.cos(r.dir)*dt*1.7; r.z += Math.sin(r.dir)*dt*1.7; }
+    r.x = clamp(r.x, 21, 31); r.z = clamp(r.z, -12, -2);
+    r.group.position.set(r.x, 0.04 + hop*0.35, r.z);
+    r.group.rotation.y = Math.atan2(Math.cos(r.dir), Math.sin(r.dir));
+  }
+}
+function killRabbit(r){
+  r.alive = false; r.group.visible = false; r.respawn = rand(8, 14);
+  addXP(8); SFX.pickup && SFX.pickup();
+  burst(V3(r.x, 0.3, r.z), 0xffffff, 12, 3, 0.14, 0.5, 1);
+  addFloatText(V3(r.x, 0.8, r.z), '🐰 +8 XP', '#ffe9b0');
+}
 
 /* ============================================================
    ENTRÉES — clavier & souris (style WoW)
@@ -5412,6 +5448,12 @@ function tryAttack(){
       hitSomething = true;
     }
   }
+  // les lapins se font chasser aussi (XP)
+  for(const r of rabbits){
+    if(!r.alive) continue;
+    const to = V3(r.x - player.group.position.x, 0, r.z - player.group.position.z);
+    if(to.length() < 2.6 && to.normalize().angleTo(facing) < 1.3){ killRabbit(r); hitSomething = true; }
+  }
   if(hitSomething) shake(0.12, 0.06);
 }
 function tryShield(){
@@ -5430,15 +5472,15 @@ function tryShield(){
 // effets : 'shield' (bouclier absorbant), 'heal' (PV instantanés), 'dmg' (+dégâts), 'spd' (+vitesse),
 //          'guard' (-dégâts subis), 'regen' (régén PV/mana accélérée), 'reveal' (ennemis sur mini-carte)
 const POWERS = {
-  Perceval:  { name:'Bouclier Sacré',          icon:'🛡️', role:'PROTECTION', desc:'bouclier qui protège la guilde', effects:['shield'],      dur:5,  mana:35, cd:14, color:0x8fd0ff, radius:12 },
-  Guillaume: { name:'Ordre de mission',        icon:'📣', role:'BOOST',      desc:'+30% dégâts & +40% vitesse',     effects:['dmg','spd'],   dur:18, mana:30, cd:22, color:0xffd44d, radius:14 },
-  Agathe:    { name:'Vague de soin',           icon:'💚', role:'SOIN',       desc:'rend des PV aux alliés',          effects:['heal'],        dur:0,  mana:35, cd:14, color:0x8fe89a, radius:12 },
-  Jojo:      { name:'Affûtage',                icon:'🔨', role:'DÉGÂTS',     desc:'+30% dégâts pour la guilde',      effects:['dmg'],         dur:20, mana:30, cd:18, color:0xff8a3a, radius:12 },
-  Roro:      { name:'Bannière du Capitaine',   icon:'🚩', role:'TANK',       desc:'-40% dégâts subis (zone)',        effects:['guard'],       dur:18, mana:30, cd:22, color:0x6ab8ff, radius:13 },
-  Mathias:   { name:'Galop du Messager',       icon:'🐎', role:'VITESSE',    desc:'+40% vitesse pour la guilde',     effects:['spd'],         dur:14, mana:25, cd:16, color:0xa0ffd0, radius:13 },
-  Antoine:   { name:"Chant d'auberge",         icon:'🎵', role:'SOUTIEN',    desc:'régén PV/mana accélérée',         effects:['regen'],       dur:18, mana:25, cd:18, color:0xffd9a0, radius:13 },
-  Bobby:     { name:"Œil de l'Éclaireur",      icon:'👁️', role:'UTILITÉ',    desc:'révèle les ennemis + vitesse',    effects:['reveal','spd'],dur:15, mana:25, cd:18, color:0xbfe3f5, radius:14 },
-  Ray:       { name:'Conte héroïque',          icon:'📖', role:'BARDE',      desc:'+dégâts + bouclier',              effects:['dmg','shield'], dur:12, mana:30, cd:22, color:0xffb0e6, radius:13 },
+  Perceval:  { name:'Bouclier Sacré',          icon:'🛡️', role:'PROTECTION', desc:'bulle qui encaisse les coups (toi + alliés, 5s)', effects:['shield'],      dur:5,  mana:35, cd:14, color:0x8fd0ff, radius:12 },
+  Guillaume: { name:'Ordre de mission',        icon:'📣', role:'BOOST',      desc:'+30% dégâts ET +40% vitesse (équipe, 18s)',       effects:['dmg','spd'],   dur:18, mana:30, cd:22, color:0xffd44d, radius:14 },
+  Agathe:    { name:'Vague de soin',           icon:'💚', role:'SOIN',       desc:'rend ~45 PV à toi + alliés proches',              effects:['heal'],        dur:0,  mana:35, cd:14, color:0x8fe89a, radius:12 },
+  Jojo:      { name:'Affûtage',                icon:'🔨', role:'DÉGÂTS',     desc:"+30% de dégâts d'attaque (équipe, 20s)",          effects:['dmg'],         dur:20, mana:30, cd:18, color:0xff8a3a, radius:12 },
+  Roro:      { name:'Bannière du Capitaine',   icon:'🚩', role:'TANK',       desc:'tu subis 40% de dégâts en moins (zone, 18s)',     effects:['guard'],       dur:18, mana:30, cd:22, color:0x6ab8ff, radius:13 },
+  Mathias:   { name:'Galop du Messager',       icon:'🐎', role:'VITESSE',    desc:'+40% de vitesse de course (équipe, 14s)',         effects:['spd'],         dur:14, mana:25, cd:16, color:0xa0ffd0, radius:13 },
+  Antoine:   { name:"Chant d'auberge",         icon:'🎵', role:'SOUTIEN',    desc:'PV & mana remontent beaucoup plus vite (18s)',    effects:['regen'],       dur:18, mana:25, cd:18, color:0xffd9a0, radius:13 },
+  Bobby:     { name:"Œil de l'Éclaireur",      icon:'👁️', role:'UTILITÉ',    desc:'ennemis qui clignotent sur la mini-carte 15s + vitesse', effects:['reveal','spd'],dur:15, mana:25, cd:18, color:0xbfe3f5, radius:14 },
+  Ray:       { name:'Conte héroïque',          icon:'📖', role:'BARDE',      desc:'+dégâts ET petit bouclier pour l\'équipe',        effects:['dmg','shield'], dur:12, mana:30, cd:22, color:0xffb0e6, radius:13 },
 };
 function myPower(){ return POWERS[chosenChar] || POWERS.Perceval; }
 function applyEffects(effects, dur, color){
@@ -7046,6 +7088,7 @@ function animate(){
     updatePlayer(dt, t);
     updateMounts(dt, t);
     updateBoat(dt, t);
+    updateRabbits(dt, t);
     updateNpcs(dt, t);
     updateSpawner(dt);
     for(let i=enemies.length-1;i>=0;i--){
