@@ -1075,6 +1075,31 @@ TEX.banner = (()=>{
   t.encoding = THREE.sRGBEncoding;
   return t;
 })();
+// face du BOUCLIER : texture CARRÉE (picto centré, pas de cadre rectangulaire) → pas de déformation sur le disque,
+// + filtrage anisotrope/mipmaps pour supprimer le scintillement quand le bouclier bouge.
+function drawShieldFace(ctx, logoImg){
+  const S = 256;
+  ctx.clearRect(0,0,S,S);
+  const g = ctx.createRadialGradient(S*0.5, S*0.42, 12, S*0.5, S*0.5, S*0.58);
+  g.addColorStop(0,'#fbf7ea'); g.addColorStop(0.68,'#ece2c6'); g.addColorStop(1,'#d6c69c');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(S*0.5, S*0.5, S*0.5, 0, 7); ctx.fill();
+  if(logoImg){
+    const ratio = logoImg.width/logoImg.height; let w = S*0.62, h = w/ratio;
+    if(h > S*0.62){ h = S*0.62; w = h*ratio; }
+    ctx.drawImage(logoImg, S*0.5 - w/2, S*0.5 - h/2, w, h);          // vrai logo centré
+  } else {
+    drawPicto(ctx, S*0.5 - 0.45*120, S*0.5 - 0.535*120, 120);        // repli : picto dessiné, centré
+  }
+}
+TEX.shield = (()=>{
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  drawShieldFace(c.getContext('2d'), null);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = (renderer && renderer.capabilities) ? renderer.capabilities.getMaxAnisotropy() : 8;
+  t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
+  return t;
+})();
 // le picto remplace la lettre du portrait et l'emoji du titre
 {
   // logo officiel (assets/logo.png) sur fond clair pour que le picto violet/marine ressorte ;
@@ -1097,6 +1122,8 @@ TEX.banner = (()=>{
     if(h > 148){ h = 148; w = h*ratio; }
     ctx.drawImage(img, 64 - w/2, 128 - h/2, w, h);
     TEX.banner.needsUpdate = true;   // bannières 3D (château) avec le vrai logo
+    drawShieldFace(TEX.shield.image.getContext('2d'), img);   // + le bouclier
+    TEX.shield.needsUpdate = true;
   };
   img.src = 'assets/logo.png';
 }
@@ -3739,8 +3766,8 @@ function buildPerceval(){
   cape.add(capeMesh);
   // le bouclier est sanglé PAR-DESSUS la cape : il suit ses mouvements, plus de chevauchement
   const backShield = new THREE.Group();
-  addMesh(backShield, new THREE.CircleGeometry(0.27, 18),
-    new THREE.MeshLambertMaterial({ map:TEX.banner, side:THREE.DoubleSide }), 0, 0, -0.04, false);
+  addMesh(backShield, new THREE.CircleGeometry(0.27, 36),
+    new THREE.MeshLambertMaterial({ map:TEX.shield, side:THREE.DoubleSide }), 0, 0, -0.04, false);
   addMesh(backShield, new THREE.TorusGeometry(0.27, 0.032, 8, 22), goldTrim, 0, 0, -0.03, false);
   sp(backShield, 0.055, goldTrim, 0, 0, -0.07, 8);   // umbo central
   backShield.rotation.y = Math.PI;
