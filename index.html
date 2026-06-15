@@ -236,7 +236,9 @@
     #touchBtns { right:12px; bottom:20px; display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
     #touchBtns button { width:58px; height:58px; font-size:23px; }
     #touchBtns #tbE { grid-column:1 / -1; width:auto; height:46px; border-radius:24px; font-size:18px; }   /* E = barre large dessous */
-    #navBtns { display:none !important; }
+    /* Quêtes : sur mobile on le repositionne en haut à gauche (sous l'encart joueur) au lieu de le cacher */
+    #navBtns { right:auto !important; left:10px !important; top:78px !important; bottom:auto !important; flex-direction:row !important; }
+    #navBtns button { font-size:12px !important; padding:6px 11px !important; }
     #joy { left:16px; bottom:16px; width:116px; height:116px; }
     #joyKnob { width:50px; height:50px; }
     /* l'encart de dialogue et l'indice E passent AU-DESSUS des commandes (jamais de chevauchement) */
@@ -249,6 +251,19 @@
     #charSelect { margin-top:0; }
     .charBtn { padding:8px 10px; }
     .charBtn .cbName { font-size:14px; }
+  }
+
+  /* ÉCRAN-TITRE EN PAYSAGE (hauteur réduite) : le contenu doit défiler depuis le haut,
+     sinon la sélection de perso est coupée et le bouton Jouer devient inaccessible. */
+  @media (max-height: 560px) and (orientation: landscape) {
+    #title { justify-content:flex-start; padding:14px 12px 20px; gap:8px; overflow-y:auto; }
+    #title h1 { font-size:clamp(22px,5vh,40px); margin:0; }
+    #title h2 { font-size:clamp(13px,3vh,20px); margin:0 0 4px; }
+    #title .controls { display:none !important; }
+    #charSelect { margin-top:0; }
+    #charRow { flex-wrap:wrap; justify-content:center; }
+    .charBtn { padding:6px 9px; }
+    #loadWrap { position:static !important; margin-top:8px; }
   }
 </style>
 </head>
@@ -544,7 +559,10 @@ const LOADING_TIPS = [
   "git pull du royaume de Valblanche 🏰…",
   "Et un petit coup d'œil sur Modul'r 👀…",
 ];
-let _loadPct = 0, _loadTip = LOADING_TIPS[0], _loadTipTimer = null;
+// petit utilitaire : copie mélangée (Fisher-Yates) — pour ne pas revoir la même séquence à chaque ouverture
+function shuffled(arr){ const a = arr.slice(); for(let k=a.length-1;k>0;k--){ const j=(Math.random()*(k+1))|0; [a[k],a[j]]=[a[j],a[k]]; } return a; }
+const _LOAD_TIPS_SHUFFLED = shuffled(LOADING_TIPS);
+let _loadPct = 0, _loadTip = _LOAD_TIPS_SHUFFLED[0], _loadTipTimer = null;
 function renderLoad(){
   const txt = document.getElementById('loadTxt');
   if(!txt) return;
@@ -552,7 +570,7 @@ function renderLoad(){
 }
 (function startLoadTips(){
   let i = 0;
-  _loadTipTimer = setInterval(()=>{ i = (i+1) % LOADING_TIPS.length; _loadTip = LOADING_TIPS[i]; renderLoad(); }, 3200);
+  _loadTipTimer = setInterval(()=>{ i = (i+1) % _LOAD_TIPS_SHUFFLED.length; _loadTip = _LOAD_TIPS_SHUFFLED[i]; renderLoad(); }, 3200);
   renderLoad();
 })();
 // barre de chargement : indique l'avancement réel du téléchargement des modèles 3D
@@ -6111,8 +6129,7 @@ function openQuestBoard(){
   document.head.appendChild(css);
   const nav = document.createElement('div'); nav.id = 'navBtns';
   nav.innerHTML = '<button id="btnQuests">📋 Quêtes</button>';
-  // sur tactile, le bouton chevauchait les commandes : on le masque (le « Journal de quêtes » en haut suffit)
-  if(('ontouchstart' in window) || navigator.maxTouchPoints > 0) nav.style.display = 'none';
+  // sur tactile, le bouton reste visible mais le CSS @media le replace en haut à gauche (hors des commandes)
   document.body.appendChild(nav);
   const o = document.createElement('div'); o.id = 'questBoard'; o.className = 'ovl';
   o.innerHTML = '<div class="ovlBox"><h3>📋 Tableau des quêtes</h3><div id="questBoardList"></div><button class="ovlClose">Fermer</button></div>';
@@ -7274,7 +7291,18 @@ function startGame(){
   player.group.rotation.y = Math.PI;
   startQuest(0);
   updateHUD();
-  showToast('Bienvenue à Valblanche, ' + shown + ' !');
+  // message d'accueil tiré au hasard : pour ne pas revivre la même séquence à chaque ouverture
+  const WELCOMES = [
+    'Bienvenue à Valblanche, ' + shown + ' !',
+    'En selle, ' + shown + ' — la Team 10 Positif compte sur toi ⚔️',
+    'Salut ' + shown + ' ! Le Contrat Sacré n\'attend que toi 📜',
+    'Te voilà, ' + shown + '. Modul\'r tremble déjà 👀',
+    'Prêt(e), ' + shown + ' ? Le royaume vient de finir son build ✅',
+    'Ah, ' + shown + ' ! Café servi ☕, quête chargée — c\'est parti.',
+    'Bon retour à Valblanche, ' + shown + '. L\'UX du jour : aventure fluide 🎨',
+    'Hé ' + shown + ', le galop t\'appelle 🐴 — à toi de jouer !',
+  ];
+  showToast(WELCOMES[(Math.random()*WELCOMES.length)|0]);
   const pw = myPower();   // rappelle au joueur son pouvoir de classe (touche 3)
   setTimeout(()=> showPowerCard(pw, 8500), 2600);   // carte encadrée mise en avant (reste ~8,5 s)
   connectMultiplayer();   // au cas où la connexion lobby n'aurait pas démarré
