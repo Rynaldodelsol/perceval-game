@@ -1634,6 +1634,92 @@ function buildRabbit(x, z){
 }
 for(let i=0;i<6;i++) buildRabbit(rand(22, 30), rand(-11, -3));
 
+// ==================== DÉCOR DE VILLAGE : ponton, moulin, puits, étals, lampadaires ====================
+let windmillHub = null;
+{
+  const wood = mat(0x8a5a34), woodD = mat(0x5e3c22), stone = mat(0x9a948a), dark = mat(0x2a2f38);
+  // --- PONTON / EMBARCADÈRE sur la rivière (berge sud) ---
+  (function dock(){
+    const X = 15;
+    bx(scene, 1.8, 0.12, 5.0, wood, X, 0.4, 51.6);                                   // tablier (z ~49 -> 54)
+    for(const z of [49.4, 51.4, 53.4]) for(const sx of [-0.75, 0.75]) cy(scene, 0.08, 0.08, 1.0, 6, woodD, X+sx, -0.1, z);  // pilotis
+    for(const sx of [-0.85, 0.85]) cy(scene, 0.1, 0.1, 0.9, 8, woodD, X+sx, 0.85, 53.6);   // bittes d'amarrage
+  })();
+  // --- MOULIN À VENT (champ est) ---
+  (function windmill(){
+    const X = 64, Z = -24;
+    cy(scene, 1.5, 2.2, 5.4, 12, mat(0xe8dcc0), X, 2.7, Z);                          // tour conique
+    cy(scene, 1.65, 1.7, 0.4, 12, woodD, X, 5.2, Z);                                 // corniche
+    cn(scene, 1.85, 1.7, 12, mat(0x7a2f2a), X, 6.25, Z);                             // toit conique
+    bx(scene, 0.9, 1.8, 0.2, woodD, X, 1.0, Z+2.15);                                 // porte
+    const hub = new THREE.Group(); hub.position.set(X, 4.5, Z + 2.25); scene.add(hub);
+    const axle = cy(hub, 0.18, 0.18, 0.6, 8, woodD, 0, 0, 0.2); axle.rotation.x = Math.PI/2;
+    for(let i=0;i<4;i++){
+      const bg = new THREE.Group(); bg.rotation.z = i*Math.PI/2; hub.add(bg);
+      bx(bg, 0.16, 3.2, 0.06, woodD, 0, 1.7, 0);                                     // longeron
+      for(let k=1;k<=5;k++) bx(bg, 0.7, 0.12, 0.04, mat(0xe9e3d2), 0.22, 0.45*k, 0.03);  // toile (lattes)
+    }
+    windmillHub = hub;
+  })();
+  // --- PUITS (près de la place) ---
+  (function well(){
+    const X = -12, Z = 9;
+    cy(scene, 1.0, 1.0, 1.0, 16, stone, X, 0.5, Z);                                  // margelle
+    cy(scene, 0.78, 0.78, 0.06, 16, mat(0x14202e), X, 0.98, Z);                      // eau sombre
+    for(const sx of [-0.95, 0.95]) cy(scene, 0.09, 0.09, 1.9, 6, woodD, X+sx, 1.45, Z);   // montants
+    cn(scene, 1.05, 0.9, 4, mat(0x7a2f2a), X, 2.85, Z);                              // toit pyramidal
+    const ax = cy(scene, 0.05, 0.05, 1.0, 6, woodD, X, 2.3, Z); ax.rotation.z = Math.PI/2;  // axe
+    cy(scene, 0.2, 0.17, 0.28, 8, woodD, X, 1.6, Z);                                 // seau
+  })();
+  // --- ÉTALS DE MARCHÉ (sur la place) ---
+  function stall(X, Z, aw){
+    bx(scene, 2.0, 0.1, 1.1, wood, X, 0.92, Z);
+    for(const [sx,sz] of [[-0.9,-0.45],[0.9,-0.45],[-0.9,0.45],[0.9,0.45]]) cy(scene, 0.06, 0.06, 0.92, 6, woodD, X+sx, 0.46, Z+sz);
+    for(const sx of [-0.9, 0.9]) cy(scene, 0.06, 0.06, 2.2, 6, woodD, X+sx, 1.1, Z-0.45);
+    for(const sx of [-0.9, 0.9]) cy(scene, 0.06, 0.06, 1.5, 6, woodD, X+sx, 0.75, Z+0.45);
+    const awn = bx(scene, 2.25, 0.1, 1.55, aw, X, 2.05, Z); awn.rotation.x = -0.34;  // auvent
+    for(const [fx,fc] of [[-0.6,0xe2451c],[0,0xf0c020],[0.6,0x8fbf3a]]){
+      bx(scene, 0.5, 0.18, 0.5, woodD, X+fx, 1.06, Z+0.1);
+      for(let k=0;k<5;k++) addMesh(scene, new THREE.SphereGeometry(0.08, 8, 6), mat(fc), X+fx+rand(-0.17,0.17), 1.22, Z+0.1+rand(-0.17,0.17));
+    }
+  }
+  stall(7, 19, mat(0xc23b2b)); stall(-7, 19, mat(0x2f7a44)); stall(10, 9, mat(0x2a59a8));
+  // --- LAMPADAIRES le long des chemins ---
+  function lamp(X, Z){
+    cy(scene, 0.08, 0.11, 3.0, 8, dark, X, 1.5, Z);
+    cy(scene, 0.16, 0.16, 0.18, 8, dark, X, 3.05, Z);
+    bx(scene, 0.26, 0.32, 0.26, mat(0xfff0c0, { emissive:0xffd980, emissiveIntensity:1.3 }), X, 3.3, Z);
+    cn(scene, 0.22, 0.22, 4, dark, X, 3.62, Z);
+  }
+  for(const [X,Z] of [[3,8],[-3,-8],[-3,-24],[-3,-42],[-13,30],[-29,44],[20,11],[34,7]]) lamp(X, Z);
+}
+
+// ==================== ANIMAUX DE FERME (moutons + poules) ====================
+const farmAnimals = [];
+function buildSheep(x, z){
+  const g = new THREE.Group();
+  const wool = mat(0xf3f1ea), face = mat(0x35302c);
+  const body = addMesh(g, new THREE.SphereGeometry(0.42, 10, 8), wool, 0, 0.72, 0); body.scale.set(1.35, 1, 1.05);
+  addMesh(g, new THREE.SphereGeometry(0.2, 8, 7), face, 0, 0.8, 0.55);
+  for(const ex of [-0.08, 0.08]) bx(g, 0.05, 0.16, 0.04, face, ex, 0.98, 0.6);
+  for(const [lx,lz] of [[-0.26,-0.26],[0.26,-0.26],[-0.26,0.26],[0.26,0.26]]) cy(g, 0.07, 0.07, 0.5, 6, face, lx, 0.25, lz);
+  g.position.set(x, 0, z); scene.add(g);
+  farmAnimals.push({ group:g, type:'sheep', x, z, dir:rand(0,6.283), t:rand(0,4), speed:0.5, bx0:-12, bx1:6, bz0:-30, bz1:-18, head:null });
+}
+function buildChicken(x, z){
+  const g = new THREE.Group();
+  const wt = mat(0xf6f2e8), red = mat(0xd23b2b), beak = mat(0xe8a32a);
+  addMesh(g, new THREE.SphereGeometry(0.16, 9, 7), wt, 0, 0.22, 0).scale.set(1, 1.05, 1.25);
+  const head = addMesh(g, new THREE.SphereGeometry(0.1, 8, 6), wt, 0, 0.42, 0.12);
+  bx(g, 0.05, 0.08, 0.05, red, 0, 0.52, 0.12);
+  cn(g, 0.04, 0.12, 5, beak, 0, 0.42, 0.25);
+  for(const sx of [-0.05, 0.05]) cy(g, 0.02, 0.02, 0.18, 5, beak, sx, 0.07, 0);
+  g.position.set(x, 0, z); scene.add(g);
+  farmAnimals.push({ group:g, type:'chicken', x, z, dir:rand(0,6.283), t:rand(0,2.5), speed:0.7, bx0:4, bx1:14, bz0:5, bz1:12, head });
+}
+for(let i=0;i<4;i++) buildSheep(rand(-9, 3), rand(-28, -20));
+for(let i=0;i<5;i++) buildChicken(rand(6, 12), rand(6, 11));
+
 // --- herbe instanciée : touffes de brins croisés, vent dans le vertex shader ---
 let grassUniforms = null;
 function inKeepOutZone(x, z){
@@ -3070,6 +3156,7 @@ function updateBuilding(dt, t){
     guildFire.light.intensity = 1.2 + Math.sin(t*11)*0.4;
   }
   if(dungeonCd > 0) dungeonCd = Math.max(0, dungeonCd - dt);   // repos du Gardien
+  if(windmillHub) windmillHub.rotation.z += dt*0.5;            // les ailes du moulin tournent
   // buveurs de la taverne : chacun lève le coude pour boire à tour de rôle (~10 s)
   for(const d of guildDrinkers){
     if(d.legBones) for(const lb of d.legBones) lb.b.rotation.x = lb.x;   // maintient la pose assise (l'idle l'écraserait)
@@ -5298,6 +5385,21 @@ function killRabbit(r){
   burst(V3(r.x, 0.3, r.z), 0xffffff, 12, 3, 0.14, 0.5, 1);
   addFloatText(V3(r.x, 0.8, r.z), '🐰 +8 XP', '#ffe9b0');
 }
+// moutons & poules qui se baladent doucement dans leur pré
+function updateFarmAnimals(dt, t){
+  for(const a of farmAnimals){
+    const per = a.type === 'chicken' ? 2.5 : 4.0;
+    const ph = a.t % per;
+    if(ph < dt && Math.random() < 0.7) a.dir = rand(0, 6.283);
+    a.t += dt;
+    const moving = (a.t % per) < per*0.45;
+    if(moving){ a.x += Math.cos(a.dir)*dt*a.speed; a.z += Math.sin(a.dir)*dt*a.speed; }
+    a.x = clamp(a.x, a.bx0, a.bx1); a.z = clamp(a.z, a.bz0, a.bz1);
+    a.group.position.set(a.x, moving ? Math.abs(Math.sin(t*5 + a.t))*0.04 : 0, a.z);
+    a.group.rotation.y = Math.atan2(Math.cos(a.dir), Math.sin(a.dir));
+    if(a.type === 'chicken' && a.head) a.head.position.y = 0.42 + Math.sin(t*7 + a.t)*0.05;   // picore
+  }
+}
 
 /* ============================================================
    ENTRÉES — clavier & souris (style WoW)
@@ -7089,6 +7191,7 @@ function animate(){
     updateMounts(dt, t);
     updateBoat(dt, t);
     updateRabbits(dt, t);
+    updateFarmAnimals(dt, t);
     updateNpcs(dt, t);
     updateSpawner(dt);
     for(let i=enemies.length-1;i>=0;i--){
