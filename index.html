@@ -2726,31 +2726,55 @@ const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le jou
   const fireLight = new THREE.PointLight(0xff9a3a, 1.4, 16, 2); fireLight.position.set(fx, 1.5, fz); scene.add(fireLight);
   guildFire = { flame, fl2, light:fireLight };
   // tables + bancs autour du feu (aucune devant la porte) ; les buveurs (vrais modèles) sont ajoutés dans swapNature
+  const beerMat = mat(0xC8861E), foamMat = mat(0xfff4dd), bottleMat = mat(0xd9a441), capMat = mat(0x1466b8), plateMat = mat(0xece6d8);
+  const setTable = (tg)=>{                       // chopes de bière + de quoi manger sur la table (dessus ≈ y 0.98)
+    for(const [mx,mz] of [[-0.5,-0.12],[0.55,0.12]]){
+      cy(tg, 0.085, 0.072, 0.2, 8, beerMat, mx, 1.08, mz);          // chope de bière
+      cy(tg, 0.09, 0.09, 0.04, 8, foamMat, mx, 1.2, mz);            // mousse
+      bx(tg, 0.04, 0.16, 0.02, beerMat, mx+0.11, 1.08, mz);        // anse
+    }
+    cy(tg, 0.05, 0.05, 0.32, 8, bottleMat, 0.15, 1.14, -0.28);     // bouteille DODO
+    cy(tg, 0.05, 0.05, 0.05, 8, capMat, 0.15, 1.32, -0.28);
+    cy(tg, 0.22, 0.22, 0.025, 14, plateMat, -0.05, 1.0, 0.22);     // assiette
+    addMesh(tg, new THREE.SphereGeometry(0.12, 10, 8), mat(0xb5793a), -0.05, 1.07, 0.22).scale.y = 0.7;   // viande/rôti
+    for(const [px,pz] of [[-0.18,0.28],[0.16,0.16]]) addMesh(tg, new THREE.SphereGeometry(0.07, 8, 6), mat(0xd9b06a), px, 1.05, pz).scale.y = 0.8;  // pains
+  };
   [[-3.6, 0, 0], [3.6, 0, 0], [0, -3.6, Math.PI/2]].forEach(([bxp, bzp, ry])=>{
     const tg = new THREE.Group(); tg.position.set(fx+bxp, 0, fz+bzp); tg.rotation.y = ry; scene.add(tg);
     bx(tg, 1.9, 0.16, 0.95, wood, 0, 0.9, 0);
     for(const lxp of [-0.75, 0.75]) bx(tg, 0.16, 0.9, 0.16, woodD, lxp, 0.45, 0);
     bx(tg, 2.1, 0.14, 0.42, wood, 0, 0.5, 0.95);
     for(const lxp of [-0.8, 0.8]) bx(tg, 0.12, 0.5, 0.12, woodD, lxp, 0.25, 0.95);
+    setTable(tg);
   });
   // bannière de guilde
   cy(scene, 0.08, 0.08, 4.0, 6, woodD, fx-4.8, 2.0, fz-1.2);
-  // bannière « DODO 🍺 2€ » (texte lisible des deux côtés)
-  const bc = document.createElement('canvas'); bc.width = 256; bc.height = 360;
+  // AFFICHE DODO (recréée façon promo « bière de la Réunion ») — lisible des deux côtés
+  const bc = document.createElement('canvas'); bc.width = 512; bc.height = 740;
   const bctx = bc.getContext('2d');
-  bctx.fillStyle = '#4C53BD'; bctx.fillRect(0,0,256,360);
-  bctx.strokeStyle = '#ffe9b0'; bctx.lineWidth = 8; bctx.strokeRect(12,12,232,336);
+  const grd = bctx.createLinearGradient(0,0,0,740); grd.addColorStop(0,'#2095e2'); grd.addColorStop(1,'#1262b4');
+  bctx.fillStyle = grd; bctx.fillRect(0,0,512,740);
+  bctx.fillStyle = 'rgba(255,238,150,0.55)'; bctx.beginPath(); bctx.arc(256,60,95,0,7); bctx.fill();   // soleil
   bctx.textAlign = 'center'; bctx.textBaseline = 'middle';
-  bctx.fillStyle = '#ffe9b0'; bctx.strokeStyle = '#1b2452';
-  bctx.lineWidth = 7; bctx.font = '800 62px "Segoe UI", system-ui, sans-serif';
-  bctx.strokeText('DODO', 128, 92); bctx.fillText('DODO', 128, 92);
-  bctx.font = '92px "Segoe UI", system-ui, sans-serif'; bctx.fillText('🍺', 128, 190);
-  bctx.font = '800 66px "Segoe UI", system-ui, sans-serif';
-  bctx.strokeText('2 €', 128, 288); bctx.fillText('2 €', 128, 288);
+  bctx.lineWidth = 14; bctx.strokeStyle = '#f4c81f'; bctx.fillStyle = '#ffffff';
+  bctx.font = '900 150px "Segoe UI", Arial, sans-serif';
+  bctx.strokeText('DODO', 256, 165); bctx.fillText('DODO', 256, 165);          // DODO
+  bctx.fillStyle = '#e2261c'; bctx.fillRect(54,250,404,72);                     // bandeau rouge
+  bctx.fillStyle = '#fff'; bctx.font = '800 30px "Segoe UI", Arial, sans-serif';
+  bctx.fillText('LA BIÈRE DE LA RÉUNION', 256, 286);
+  bctx.lineWidth = 16; bctx.strokeStyle = '#ffffff'; bctx.fillStyle = '#e2261c';
+  bctx.font = '900 230px "Segoe UI", Arial, sans-serif';
+  bctx.strokeText('2€', 256, 470); bctx.fillText('2€', 256, 470);              // 2€
+  bctx.save(); bctx.translate(256,605); bctx.rotate(-0.05); bctx.fillStyle = '#11244e'; bctx.fillRect(-160,-36,320,72); bctx.restore();
+  bctx.fillStyle = '#fff'; bctx.font = '800 52px "Segoe UI", Arial, sans-serif'; bctx.fillText('PROMO', 256, 605);
+  bctx.fillStyle = '#f4c81f'; bctx.fillRect(0,680,512,60);                      // bande jaune bas
+  bctx.fillStyle = '#11244e'; bctx.font = '800 24px "Segoe UI", Arial, sans-serif';
+  bctx.fillText('FIÈRE · AUTHENTIQUE · RÉUNIONNAISE', 256, 710);
+  bctx.font = '78px "Segoe UI", Arial, sans-serif'; bctx.fillText('🍺', 430, 165);
   const bannerTex = new THREE.CanvasTexture(bc); bannerTex.encoding = THREE.sRGBEncoding;
-  bx(scene, 0.12, 1.8, 1.3, new THREE.MeshStandardMaterial({ color:0x3a4196, roughness:0.6 }), fx-4.8, 3.1, fz-1.2);   // support
+  bx(scene, 0.12, 2.0, 1.4, new THREE.MeshStandardMaterial({ color:0x11244e, roughness:0.6 }), fx-4.8, 3.2, fz-1.2);   // support
   for(const [dx, ry] of [[0.075, -Math.PI/2], [-0.075, Math.PI/2]]){
-    const p = addMesh(scene, new THREE.PlaneGeometry(1.2, 1.7), new THREE.MeshBasicMaterial({ map:bannerTex, transparent:true }), fx-4.8+dx, 3.1, fz-1.2, false);
+    const p = addMesh(scene, new THREE.PlaneGeometry(1.32, 1.92), new THREE.MeshBasicMaterial({ map:bannerTex, transparent:true }), fx-4.8+dx, 3.2, fz-1.2, false);
     p.rotation.y = ry;
   }
   const gMark = makeSignSprite([{ t:'⚜️ Foyer de la Guilde', big:true }, { t:'Asseyez-vous et récupérez de l\'XP', c:'#ffe9b0' }], '#ffe0a0', 3.0);
@@ -4039,11 +4063,11 @@ function updateDelorean(dt, t){
     let steer = ((keys['KeyD']||keys['ArrowRight'])?1:0) - ((keys['KeyA']||keys['ArrowLeft'])?1:0);
     if(touchMove.active){ throttle += -touchMove.y; steer += touchMove.x; }
     throttle = clamp(throttle, -1, 1); steer = clamp(steer, -1, 1);
-    const target = throttle*10.45;                               // +10 % de vitesse (9.5 -> 10.45)
+    const target = throttle*11.5;                                // +10 % de vitesse (10.45 -> 11.5)
     delorean.speed += (target - delorean.speed) * Math.min(1, dt*1.6);   // accélération douce, pas de fusée
     if(Math.abs(throttle) < 0.05) delorean.speed *= (1 - Math.min(1, dt*2.2));   // ralentit vite quand on lâche
     const dir = delorean.speed < 0 ? -1 : 1;
-    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/2, 0, 1) * 2.5 * dir * dt;   // braquage légèrement moins serré (rayon un peu plus large)
+    delorean.heading -= steer * clamp(Math.abs(delorean.speed)/2, 0, 1) * 2.3 * dir * dt;   // braquage un peu moins serré (2.5 -> 2.3)
     car.rotation.y = delorean.heading;
     car.position.x = clamp(car.position.x + Math.sin(delorean.heading)*delorean.speed*dt, -104, 104);
     car.position.z = clamp(car.position.z + Math.cos(delorean.heading)*delorean.speed*dt, -104, 104);
