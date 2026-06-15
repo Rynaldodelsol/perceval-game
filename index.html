@@ -2807,10 +2807,17 @@ const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le jou
   pc.fillStyle = '#11244e'; pc.font = '800 22px Arial'; pc.fillText('FIÈRE · AUTHENTIQUE · RÉUNIONNAISE',256,748);
   const bannerTex = new THREE.CanvasTexture(bc); bannerTex.encoding = THREE.sRGBEncoding;
   bx(scene, 0.12, 2.0, 1.4, new THREE.MeshStandardMaterial({ color:0x11244e, roughness:0.6 }), fx-4.8, 3.2, fz-1.2);   // support
+  const bannerPlanes = [];
   for(const [dx, ry] of [[0.075, -Math.PI/2], [-0.075, Math.PI/2]]){
     const p = addMesh(scene, new THREE.PlaneGeometry(1.32, 1.92), new THREE.MeshBasicMaterial({ map:bannerTex, transparent:true }), fx-4.8+dx, 3.2, fz-1.2, false);
-    p.rotation.y = ry;
+    p.rotation.y = ry; bannerPlanes.push(p);
   }
+  // si l'utilisateur dépose son affiche dans assets/ (dodo.jpg ou dodo.png), on l'utilise telle quelle ; sinon on garde l'affiche dessinée
+  (function loadBannerImage(){
+    const tl = new THREE.TextureLoader();
+    const apply = (tex)=>{ tex.encoding = THREE.sRGBEncoding; for(const p of bannerPlanes){ p.material.map = tex; p.material.needsUpdate = true; } };
+    tl.load('assets/dodo.jpg?v=1', apply, undefined, ()=> tl.load('assets/dodo.png?v=1', apply, undefined, ()=>{ /* aucun fichier : on garde le dessin */ }));
+  })();
   const gMark = makeSignSprite([{ t:'⚜️ Foyer de la Guilde', big:true }, { t:'Asseyez-vous et récupérez de l\'XP', c:'#ffe9b0' }], '#ffe0a0', 3.0);
   gMark.position.set(fx, 3.6, fz); scene.add(gMark);
 }
