@@ -3328,7 +3328,56 @@ let torchFlames = [], wispPoints, wispBase, oubCrystals = [];
   addCollider(-73, 96, 5);
   addCollider(-65, 70, 0.4);
 }
+// ==================== CIMETIÈRE HANTÉ devant les Oubliettes (modèles Kenney Graveyard, CC0) ====================
+const GYP = 'assets/kenney_graveyard/';
+const gyLoader = new THREE.GLTFLoader();
+const gyFires = [];
+function placeProp(file, x, z, h, ry){
+  gyLoader.load(GYP + file, (g)=>{
+    const o = g.scene;
+    o.traverse(m=>{ if(m.isMesh || m.isSkinnedMesh){ m.castShadow = true; m.frustumCulled = false; if(m.material){ m.material.metalness = 0; } } });
+    const box = new THREE.Box3().setFromObject(o);
+    const s = h / Math.max(0.001, box.max.y - box.min.y);
+    o.scale.setScalar(s);
+    o.position.set(x, -box.min.y*s, z);
+    o.rotation.y = ry || 0;
+    scene.add(o);
+  }, undefined, ()=>{ console.warn('prop introuvable', file); });
+}
+function gyBrazier(x, z){
+  placeProp('fire-basket.glb', x, z, 1.2, 0);
+  const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0xff9a40, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
+  flame.position.set(x, 1.35, z); flame.scale.set(0.7, 1.05, 1); scene.add(flame);
+  const light = new THREE.PointLight(0xff8a3a, 1.0, 13, 2); light.position.set(x, 1.7, z); scene.add(light);
+  gyFires.push({ flame, light, phase:rand(0,6) });
+}
+(function buildGraveyard(){
+  // cryptes (avec collision)
+  placeProp('crypt-b.glb', -83, 71, 3.6, 0.7);  addCollider(-83, 71, 1.8);
+  placeProp('crypt-small.glb', -62, 70, 2.6, -0.8); addCollider(-62, 70, 1.3);
+  // portail en fer + clôtures le long de l'allée d'accès
+  placeProp('iron-fence-border-gate.glb', -71, 64.5, 1.7, 0);
+  for(let i=0;i<4;i++){ placeProp('iron-fence.glb', -67.5 - i*2.4, 65, 1.2, 0); placeProp('iron-fence.glb', -74.5 - i*2.4, 65, 1.2, 0); }
+  // pierres tombales dispersées
+  const stones = ['gravestone-cross.glb','gravestone-bevel.glb','gravestone-broken.glb','gravestone-round.glb','cross.glb','gravestone-decorative.glb','gravestone-wide.glb','gravestone-cross-large.glb'];
+  const spots = [[-78,67],[-66,68],[-80,69.5],[-64,71.5],[-77,72.5],[-68.5,73],[-83,67.5],[-61,68],[-75,68.5],[-64,66]];
+  spots.forEach((p,i)=> placeProp(stones[i % stones.length], p[0], p[1], 1.0, rand(0,6.283)));
+  // pins morts / tombants (ambiance lugubre)
+  const pines = ['pine-fall.glb','pine-crooked.glb','pine-fall-crooked.glb'];
+  for(const [x,z] of [[-87,66],[-58,66],[-88,74],[-57,73],[-90,70]]) placeProp(pines[Math.floor(rand(0,3))], x, z, rand(4,5.5), rand(0,6.283));
+  // brasiers allumés (flamme + lumière vacillante) de part et d'autre + sur l'allée
+  gyBrazier(-67, 74); gyBrazier(-76, 74); gyBrazier(-71, 67.5);
+  // détails : cercueil, autel + calice près de la bouche, urnes, débris, pelle, lanterne
+  placeProp('coffin-old.glb', -85, 69, 0.6, 0.5);
+  placeProp('altar-stone.glb', -68, 78, 1.0, 0.3);
+  placeProp('detail-chalice.glb', -68, 78.5, 0.45, 0);
+  placeProp('urn-round.glb', -69.5, 70.5, 0.7, 0);
+  placeProp('debris.glb', -73.5, 69, 0.4, 1.0);
+  placeProp('shovel-dirt.glb', -64.5, 73.5, 0.95, 0.4);
+  placeProp('lantern-candle.glb', -71, 63.5, 1.1, 0);
+})();
 function updateOubliettes(dt, t){
+  for(const f of gyFires){ const fl = 1 + Math.sin(t*12 + f.phase)*0.22; f.flame.scale.set(0.7*fl, 1.05*fl, 1); f.light.intensity = 0.9 + Math.sin(t*15 + f.phase)*0.3; }
   for(const f of torchFlames){
     const fl = 1 + Math.sin(t*11 + f.phase)*0.18 + Math.sin(t*23 + f.phase*2)*0.1;
     f.flame.scale.set(0.9*fl, 1.3*fl, 1);

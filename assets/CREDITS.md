@@ -12,3 +12,6 @@
 - **Horse.glb** — « White Horse », par Quaternius (poly.pizza/m/bEdE4rmZy9)
 - **Female.glb** (PNJ Agathe) — « Adventurer », par Quaternius, licence CC0 1.0
   https://poly.pizza/m/ZwF0K7WBmu · https://quaternius.com
+
+## Décor cimetière (Oubliettes)
+- Kenney — Graveyard Kit (CC0) — https://kenney.nl/assets/graveyard-kit
