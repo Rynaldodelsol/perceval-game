@@ -57,7 +57,7 @@
   }
   @keyframes pvspin { to { transform:rotate(360deg); } }
   /* barre de chargement des modèles 3D */
-  #loadWrap { margin-top:18px; width:300px; max-width:80vw; display:flex; flex-direction:column; align-items:center; gap:7px; }
+  #loadWrap { position:absolute; left:50%; bottom:6vh; transform:translateX(-50%); width:min(440px, 88vw); display:flex; flex-direction:column; align-items:center; gap:8px; z-index:2; }
   #loadBar {
     width:100%; height:11px; border-radius:999px; overflow:hidden;
     background:rgba(255,255,255,0.22); box-shadow:inset 0 1px 3px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.15);
@@ -523,16 +523,43 @@ let unicorn = null;   // la licorne montable près du pont (modèle Horse.glb + 
 let galopin = null;   // le cheval de Mathias, montable lui aussi
 let boat = null;      // la barque avec pêcheur qui navigue sur la rivière
 let assetsReady = false;
+// petites phrases d'ambiance pendant le chargement (Modul'r en ligne de mire… mais pas que)
+const LOADING_TIPS = [
+  "On affûte les épées contre Modul'r…",
+  "Modul'r en ligne de mire 🎯…",
+  "Le Dragon Modul'r fait sa sieste (profites-en)…",
+  "Aux Oubliettes, l'ancien BO Modul'r ⚰️…",
+  "Compilation du Contrat Sacré 📜…",
+  "La Team 10 Positif remet du café ☕…",
+  "On débusque les bugs comme des gobelins 🐛…",
+  "Galopin et la licorne s'échauffent 🦄…",
+  "Merlin recharge ses sortilèges ✨…",
+  "On tire les bières DODO à la taverne 🍺…",
+  "Les Oubliettes s'assombrissent ☠…",
+  "Comptage des moutons, réveil des poules 🐔…",
+  "Plantation des cristaux d'XP 💎…",
+  "Zéro downtime, promis (presque)…",
+  "git pull du royaume de Valblanche 🏰…",
+];
+let _loadPct = 0, _loadTip = LOADING_TIPS[0], _loadTipTimer = null;
+function renderLoad(){
+  const txt = document.getElementById('loadTxt');
+  if(!txt) return;
+  txt.textContent = _loadPct >= 100 ? '✓ Royaume prêt — en selle, l’aventure commence !' : (_loadTip + '  ' + _loadPct + '%');
+}
+(function startLoadTips(){
+  let i = 0;
+  _loadTipTimer = setInterval(()=>{ i = (i+1) % LOADING_TIPS.length; _loadTip = LOADING_TIPS[i]; renderLoad(); }, 1700);
+  renderLoad();
+})();
 // barre de chargement : indique l'avancement réel du téléchargement des modèles 3D
 function setLoadProgress(loaded, total){
-  const pct = total ? Math.round(loaded/total*100) : 100;
+  _loadPct = total ? Math.round(loaded/total*100) : 100;
   const fill = document.getElementById('loadFill');
-  const txt  = document.getElementById('loadTxt');
-  if(fill) fill.style.width = pct + '%';
-  if(txt) txt.textContent = pct >= 100
-    ? '✓ Royaume prêt — en selle, l’aventure commence !'
-    : 'Chargement des montures et des héros… ' + pct + '%';
-  if(pct >= 100){
+  if(fill) fill.style.width = _loadPct + '%';
+  renderLoad();
+  if(_loadPct >= 100){
+    if(_loadTipTimer){ clearInterval(_loadTipTimer); _loadTipTimer = null; }
     const b = document.getElementById('playBtn');
     if(b){ b.disabled = false; b.classList.remove('loading'); if(b.dataset.waiting === '1') b.textContent = 'Jouer'; }
     // tout est chargé → on révèle la sélection du personnage, les commandes et le bouton Jouer
