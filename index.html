@@ -525,21 +525,22 @@ let boat = null;      // la barque avec pêcheur qui navigue sur la rivière
 let assetsReady = false;
 // petites phrases d'ambiance pendant le chargement (Modul'r en ligne de mire… mais pas que)
 const LOADING_TIPS = [
-  "On affûte les épées contre Modul'r…",
-  "Modul'r en ligne de mire 🎯…",
-  "Le Dragon Modul'r fait sa sieste (profites-en)…",
-  "Aux Oubliettes, l'ancien BO Modul'r ⚰️…",
-  "Compilation du Contrat Sacré 📜…",
+  "npm install perceval ⚔️…",
+  "Compilation des composants React ⚛️…",
+  "Hydratation du royaume…",
+  "On peaufine l'UI : pixels au carré 🎨…",
+  "Parcours utilisateur (UX) sans friction…",
+  "useState(courage), useEffect(aventure) ⚛️…",
+  "On élimine les warnings de la console 🐛…",
+  "Refactoring du Contrat Sacré 📜…",
+  "Lazy-loading des montures 🐴…",
+  "Tests verts, build qui passe ✅…",
+  "On accessibilise (a11y) les sortilèges ♿…",
+  "Design system : tokens & composants 🎨…",
+  "Responsive : du donjon au mobile 📱…",
   "La Team 10 Positif remet du café ☕…",
-  "On débusque les bugs comme des gobelins 🐛…",
-  "Galopin et la licorne s'échauffent 🦄…",
-  "Merlin recharge ses sortilèges ✨…",
-  "On tire les bières DODO à la taverne 🍺…",
-  "Les Oubliettes s'assombrissent ☠…",
-  "Comptage des moutons, réveil des poules 🐔…",
-  "Plantation des cristaux d'XP 💎…",
-  "Zéro downtime, promis (presque)…",
   "git pull du royaume de Valblanche 🏰…",
+  "Et un petit coup d'œil sur Modul'r 👀…",
 ];
 let _loadPct = 0, _loadTip = LOADING_TIPS[0], _loadTipTimer = null;
 function renderLoad(){
@@ -549,7 +550,7 @@ function renderLoad(){
 }
 (function startLoadTips(){
   let i = 0;
-  _loadTipTimer = setInterval(()=>{ i = (i+1) % LOADING_TIPS.length; _loadTip = LOADING_TIPS[i]; renderLoad(); }, 1700);
+  _loadTipTimer = setInterval(()=>{ i = (i+1) % LOADING_TIPS.length; _loadTip = LOADING_TIPS[i]; renderLoad(); }, 3200);
   renderLoad();
 })();
 // barre de chargement : indique l'avancement réel du téléchargement des modèles 3D
@@ -1770,6 +1771,7 @@ function inKeepOutZone(x, z){
   if(z > 48.5 && z < 61.5) return true;                  // rivière + berges
   if(z < -58 && Math.abs(x) < 32) return true;           // cour du château
   if((x+75)*(x+75) + (z-78)*(z-78) < 260) return true;   // Oubliettes
+  if((x+48)*(x+48) + (z+34)*(z+34) < 64) return true;    // moulin (pas d'herbe/buisson dessus)
   return false;
 }
 function windMaterial(opts, strength=0.25){
@@ -1925,6 +1927,9 @@ let natureSwapped = false;
   for(let i=0;i<64;i++) treeSpots.push([rand(42,98), rand(-48,46)]);       // forêt est
   for(let i=0;i<14;i++) treeSpots.push([rand(-100,-30), rand(-90,-10)]);   // bosquets ouest
   for(let i=0;i<8;i++)  treeSpots.push([rand(-20,30), rand(70,100)]);      // sud
+  // on dégage les arbres trop proches de bâtiments/structures (ex. le moulin)
+  const noTree = [[-48,-34,9]];   // [x, z, rayon]
+  for(let i=treeSpots.length-1;i>=0;i--){ const [tx,tz]=treeSpots[i]; if(noTree.some(([nx,nz,nr])=> (tx-nx)*(tx-nx)+(tz-nz)*(tz-nz) < nr*nr)) treeSpots.splice(i,1); }
   // troncs texturés écorce, légèrement évasés
   const trunkGeo = new THREE.CylinderGeometry(0.22, 0.45, 2.6, 7);
   trunkGeo.translate(0, 1.3, 0);
@@ -3369,6 +3374,17 @@ function placeProp(file, x, z, h, ry){
     scene.add(o);
   }, undefined, ()=>{ console.warn('prop introuvable', file); });
 }
+// assemble une crypte modulaire (mur + toit + porte) : toutes les pièces à la MÊME échelle/position
+function placeCrypt(files, x, z, targetH, ry){
+  gyLoader.load(GYP + files[0], (g)=>{
+    const box = new THREE.Box3().setFromObject(g.scene);
+    const s = targetH / Math.max(0.001, box.max.y - box.min.y);
+    const y = -box.min.y * s;
+    const add = (o)=>{ o.traverse(m=>{ if(m.isMesh || m.isSkinnedMesh){ m.castShadow = true; m.frustumCulled = false; if(m.material) m.material.metalness = 0; } }); o.scale.setScalar(s); o.position.set(x, y, z); o.rotation.y = ry || 0; scene.add(o); };
+    add(g.scene);
+    for(let i=1;i<files.length;i++) gyLoader.load(GYP + files[i], (g2)=> add(g2.scene), undefined, ()=>{});
+  }, undefined, ()=>{ console.warn('crypte introuvable', files[0]); });
+}
 function gyBrazier(x, z){
   placeProp('fire-basket.glb', x, z, 1.2, 0);
   const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0xff9a40, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
@@ -3379,16 +3395,16 @@ function gyBrazier(x, z){
 let _graveyardBuilt = false;
 function buildGraveyard(){
   if(_graveyardBuilt) return; _graveyardBuilt = true;   // chargé au lancement du jeu (pas sur l'écran-titre) → titre plus rapide
-  // PORTE DU DONJON : grande crypte-façade bien visible à l'entrée, encadrée d'obélisques (le portail E est juste devant)
-  placeProp('crypt-large.glb', -71, 75.6, 4.8, 0);      addCollider(-71, 75.6, 1.9);
+  // PORTE DU DONJON : grande crypte (mur + TOIT + porte assemblés) bien visible, encadrée d'obélisques (le portail E est juste devant)
+  placeCrypt(['crypt-large.glb','crypt-large-roof.glb','crypt-large-door.glb'], -71, 75.6, 5.0, 0); addCollider(-71, 75.6, 1.9);
   placeProp('pillar-obelisk.glb', -75.4, 74.6, 3.4, 0);
   placeProp('pillar-obelisk.glb', -66.6, 74.6, 3.4, 0);
   placeProp('candle-multiple.glb', -69, 72, 0.5, 0);
   placeProp('candle-multiple.glb', -73, 72, 0.5, 0);
   gyBrazier(-74, 73);  gyBrazier(-68, 73);              // brasiers de part et d'autre de la porte
-  // cryptes secondaires (avec collision)
-  placeProp('crypt-b.glb', -84, 71, 3.4, 0.7);  addCollider(-84, 71, 1.7);
-  placeProp('crypt-small.glb', -60, 70, 2.6, -0.8); addCollider(-60, 70, 1.3);
+  // cryptes secondaires (avec TOIT, et collision)
+  placeCrypt(['crypt-small.glb','crypt-small-roof.glb'], -84, 71, 3.0, 0.7);  addCollider(-84, 71, 1.7);
+  placeCrypt(['crypt-small.glb','crypt-small-roof.glb'], -60, 70, 3.0, -0.8); addCollider(-60, 70, 1.3);
   // portail en fer + clôtures le long de l'allée d'accès
   placeProp('iron-fence-border-gate.glb', -71, 64.5, 1.7, 0);
   for(let i=0;i<4;i++){ placeProp('iron-fence.glb', -67.5 - i*2.4, 65, 1.2, 0); placeProp('iron-fence.glb', -74.5 - i*2.4, 65, 1.2, 0); }
