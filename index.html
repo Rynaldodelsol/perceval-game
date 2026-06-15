@@ -1664,24 +1664,70 @@ let volcano = null;
   halo.scale.set(90, 62, 1); halo.position.set(VX, topY + 18, VZ); scene.add(halo);
   // panache de fumée : grosses volutes qui montent, dérivent et se dissipent
   const puffs = [];
-  for(let i=0;i<16;i++){
+  for(let i=0;i<18;i++){
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0x6f6862, transparent:true, opacity:0.5, depthWrite:false }));
-    s.userData = { t:i/16, x:rand(-8,8), z:rand(-8,8), spd:rand(0.05,0.09) };
+    s.userData = { t:i/18, x:rand(-8,8), z:rand(-8,8), spd:rand(0.05,0.09) };
     scene.add(s); puffs.push(s);
   }
-  volcano = { x:VX, z:VZ, top:topY, puffs, halo };
+  // braises d'éruption (pool réutilisé) : étincelles incandescentes qui jaillissent puis retombent (fog:false)
+  const embers = [];
+  for(let i=0;i<48;i++){
+    const e = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0xff5a1e, transparent:true, opacity:0, depthWrite:false, fog:false }));
+    e.visible = false; scene.add(e);
+    embers.push({ s:e, life:0, max:1, vx:0, vy:0, vz:0, px:0, py:0, pz:0 });
+  }
+  // flash d'éruption au cratère
+  const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0xff7a2a, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending, fog:false }));
+  flash.scale.set(110, 90, 1); flash.position.set(VX, topY + 18, VZ); scene.add(flash);
+  volcano = { x:VX, z:VZ, top:topY, puffs, halo, embers, flash, eruptT:rand(5,10), erupt:0 };
 }
 function updateVolcano(dt, t){
   if(!volcano) return;
-  for(const s of volcano.puffs){
-    const u = s.userData; u.t += dt*u.spd;
-    if(u.t > 1){ u.t -= 1; u.x = rand(-8,8); u.z = rand(-8,8); }
-    const rise = u.t, sc = 18 + rise*54;
-    s.scale.set(sc, sc, 1);
-    s.position.set(volcano.x + u.x + rise*26, volcano.top + 8 + rise*80, volcano.z + u.z);
-    s.material.opacity = 0.55 * (1 - rise) * Math.min(1, rise*5);   // apparaît puis se dissipe
+  const v = volcano;
+  const night = (typeof nightFactor === 'number') ? nightFactor : 0;
+  const baseGlow = 0.6 + night*0.55;                 // lueur plus forte la nuit
+  // --- cycle d'éruption ---
+  v.eruptT -= dt;
+  if(v.eruptT <= 0 && v.erupt <= 0){
+    v.erupt = 2.6;                                    // durée de l'éruption
+    v.eruptT = rand(12, 19);                          // délai avant la prochaine
+    let launched = 0;
+    for(const e of v.embers){
+      if(e.life > 0) continue;
+      e.px = v.x + rand(-6,6); e.py = v.top + 4; e.pz = v.z + rand(-6,6);
+      const ang = rand(0, 6.283), spread = rand(7, 20);   // fontaine de lave : plus d'étalement, moins haute
+      e.vx = Math.cos(ang)*spread; e.vz = Math.sin(ang)*spread; e.vy = rand(17, 33);
+      e.max = rand(1.7, 3.0); e.life = e.max; e.s.visible = true;
+      if(++launched >= 36) break;
+    }
   }
-  volcano.halo.material.opacity = 0.7 + Math.sin(t*2.1)*0.18;        // lueur du cratère qui palpite
+  if(v.erupt > 0) v.erupt -= dt;
+  const eruptK = Math.max(0, v.erupt/2.6);            // 1 → 0 sur la durée
+  // --- braises : trajectoire balistique + fondu ---
+  for(const e of v.embers){
+    if(e.life <= 0) continue;
+    e.life -= dt; e.vy -= 34*dt;                      // gravité
+    e.px += e.vx*dt; e.py += e.vy*dt; e.pz += e.vz*dt;
+    if(e.py < v.top - 34 || e.life <= 0){ e.life = 0; e.s.visible = false; continue; }
+    const k = e.life/e.max, sc = 9 + (1-k)*7;        // grosses braises, bien visibles depuis le village
+    e.s.position.set(e.px, e.py, e.pz); e.s.scale.set(sc, sc, 1);
+    e.s.material.opacity = Math.min(1, k*1.4) * (0.85 + night*0.15);
+  }
+  // --- flash au cratère pendant l'éruption ---
+  v.flash.material.opacity = eruptK * (0.7 + night*0.3);
+  v.flash.scale.setScalar(110 + eruptK*90);
+  // --- fumée : plus dense et plus haute pendant l'éruption ---
+  for(const s of v.puffs){
+    const u = s.userData; u.t += dt*u.spd*(1 + eruptK*0.9);
+    if(u.t > 1){ u.t -= 1; u.x = rand(-8,8); u.z = rand(-8,8); }
+    const rise = u.t, sc = 18 + rise*(54 + eruptK*44);
+    s.scale.set(sc, sc, 1);
+    s.position.set(v.x + u.x + rise*26, v.top + 8 + rise*80, v.z + u.z);
+    s.material.opacity = (eruptK > 0.1 ? 0.85 : 0.55) * (1 - rise) * Math.min(1, rise*5);
+  }
+  // --- lueur du cratère : palpite, plus forte la nuit, pic à l'éruption ---
+  v.halo.material.opacity = (0.55 + Math.sin(t*2.1)*0.15) * baseGlow + eruptK*0.5;
+  v.halo.scale.set(88 + eruptK*44 + Math.sin(t*2.1)*4, 62 + eruptK*30, 1);
 }
 
 // --- sol : plaine vallonnée aux couleurs variées ---
@@ -7704,6 +7750,8 @@ if(location.search.indexOf('dev=1') >= 0){
     cam(dist, pitch){ if(dist != null) camDist = dist; if(pitch != null) camPitch = pitch; },
     forceStart(){ if(!started){ const cb = document.querySelector('.charBtn'); if(cb) cb.click(); const pb = document.getElementById('playBtn'); if(pb) pb.click(); } },
     get started(){ return started; }, get camYaw(){ return camYaw; },
+    erupt(){ if(volcano){ volcano.eruptT = 0; volcano.erupt = 0; } },
+    get volcano(){ return volcano; },
     player, camera, scene, enemies,
   };
 }
