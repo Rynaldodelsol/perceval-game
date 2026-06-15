@@ -2806,16 +2806,16 @@ const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le jou
   pc.fillStyle = '#f4c81f'; pc.fillRect(0,728,512,40);                   // bande jaune bas
   pc.fillStyle = '#11244e'; pc.font = '800 22px Arial'; pc.fillText('FIÈRE · AUTHENTIQUE · RÉUNIONNAISE',256,748);
   const bannerTex = new THREE.CanvasTexture(bc); bannerTex.encoding = THREE.sRGBEncoding;
-  // panneau DOUBLE-FACE (visible des deux côtés, jamais masqué par back-face culling), bien face au foyer
-  const board = addMesh(scene, new THREE.PlaneGeometry(1.34, 2.0), new THREE.MeshBasicMaterial({ map:bannerTex, side:THREE.DoubleSide }), fx-4.8, 3.25, fz-1.2, false);
-  board.rotation.y = Math.PI/2;
-  const bannerPlanes = [board];
+  // deux panneaux DOS À DOS (simple face) : texte correct des DEUX côtés — le verso reçoit une texture en miroir
+  const flipClone = (t)=>{ const c = t.clone(); c.wrapS = THREE.RepeatWrapping; c.repeat.x = -1; c.offset.x = 1; c.needsUpdate = true; return c; };
+  const boardF = addMesh(scene, new THREE.PlaneGeometry(1.34, 2.0), new THREE.MeshBasicMaterial({ map:bannerTex }), fx-4.8+0.015, 3.25, fz-1.2, false); boardF.rotation.y = Math.PI/2;
+  const boardB = addMesh(scene, new THREE.PlaneGeometry(1.34, 2.0), new THREE.MeshBasicMaterial({ map:flipClone(bannerTex) }), fx-4.8-0.015, 3.25, fz-1.2, false); boardB.rotation.y = -Math.PI/2;
   // on remplace par l'affiche réelle si elle est dans assets/ (sinon on garde l'affiche dessinée)
   (function loadBannerImage(){
     const tl = new THREE.TextureLoader();
-    const apply = (tex)=>{ tex.encoding = THREE.sRGBEncoding; for(const p of bannerPlanes){ p.material.map = tex; p.material.needsUpdate = true; } };
+    const apply = (tex)=>{ tex.encoding = THREE.sRGBEncoding; boardF.material.map = tex; boardF.material.needsUpdate = true; boardB.material.map = flipClone(tex); boardB.material.needsUpdate = true; };
     const candidates = ['assets/affiche-dodo.jpg','assets/affiche-dodo.jpeg','assets/affiche-dodo.png','assets/dodo.jpg','assets/dodo.png'];
-    (function tryNext(i){ if(i >= candidates.length) return; tl.load(candidates[i]+'?v=3', apply, undefined, ()=> tryNext(i+1)); })(0);
+    (function tryNext(i){ if(i >= candidates.length) return; tl.load(candidates[i]+'?v=4', apply, undefined, ()=> tryNext(i+1)); })(0);
   })();
   const gMark = makeSignSprite([{ t:'⚜️ Foyer de la Guilde', big:true }, { t:'Asseyez-vous et récupérez de l\'XP', c:'#ffe9b0' }], '#ffe0a0', 3.0);
   gMark.position.set(fx, 3.6, fz); scene.add(gMark);
