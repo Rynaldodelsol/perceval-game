@@ -581,6 +581,15 @@ function spawnModel(key, targetHeight){
   for(const clip of src.animations) actions[clip.name] = mixer.clipAction(clip);
   return { wrap, obj, mixer, actions, scale:s };
 }
+// trouve les os des jambes pour une pose assise (cuisses à l'horizontale, tibias vers le bas)
+function findSitLegBones(root){
+  const arr = [];
+  root.traverse(o=>{ if(o.isBone){ const n = o.name.toLowerCase();
+    if(n.includes('shin') || n.includes('calf') || n.includes('lowerleg') || n.includes('lowleg') || n.includes('knee')) arr.push({ b:o, x:-1.5 });
+    else if(n.includes('thigh') || n.includes('upleg') || n.includes('upperleg') || (n.includes('leg') && !n.includes('fore'))) arr.push({ b:o, x:1.45 });
+  }});
+  return arr;
+}
 function collectMeshes(obj){
   const arr = [];
   obj.traverse(o=>{ if(o.isMesh || o.isSkinnedMesh){ o.material = o.material.clone(); arr.push(o); } });
@@ -1924,22 +1933,23 @@ function swapNature(){
   }
   // 🍺 PNJ attablés à la taverne (vrais modèles de personnages, comme les joueurs) qui lèvent le coude pour boire
   {
-    const seats = [
+    const seats = [    // 2 PNJ : on laisse une place libre au foyer pour le joueur
       { key:'rogue',     x:GUILD.x-3.6, z:GUILD.z+0.95 },
       { key:'barbarian', x:GUILD.x+3.6, z:GUILD.z+0.95 },
-      { key:'mage',      x:GUILD.x+0.95, z:GUILD.z-3.6 },
     ];
     seats.forEach((s, i)=>{
       const dm = spawnModel(s.key, 1.7);
       if(!dm) return;
-      dm.wrap.position.set(s.x, -0.35, s.z);                          // abaissé : il a l'air assis (le banc/la table cachent les jambes)
+      dm.wrap.position.set(s.x, 0.55, s.z);                           // fesses posées sur l'assise du banc
       dm.wrap.rotation.y = Math.atan2(GUILD.x - s.x, GUILD.z - s.z);  // tourné vers le feu/la table
       scene.add(dm.wrap);
-      makeEnemyAnim(dm);                                              // idle
+      makeEnemyAnim(dm);                                              // idle (haut du corps)
+      // os des jambes → pose assise (cuisses à l'horizontale, tibias vers le bas)
+      const legBones = findSitLegBones(dm.obj);
       // chope tenue dans la main droite
       const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.2, 8), new THREE.MeshStandardMaterial({ color:0x6b4a2c, roughness:0.7 }));
       mug.position.set(0.28, 1.2, 0.32); dm.wrap.add(mug);
-      guildDrinkers.push({ wrap:dm.wrap, mug, mugY:1.2, phase:i*3.3 });
+      guildDrinkers.push({ wrap:dm.wrap, mug, mugY:1.2, phase:i*3.3, legBones });
     });
   }
   // trois essences d'arbres réparties sur les emplacements existants
@@ -2646,7 +2656,8 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
 
 // ==================== TAVERNE DE LA GUILDE (hub social + foyer de repos) ====================
 let guildFire = null, guildDrinkers = [];
-const GUILD = { x:-26, z:23, r:10 };   // foyer : zone de repos (régén PV/mana accélérée)
+const GUILD = { x:-26, z:23, r:10 };          // foyer : zone de repos (régén PV/mana accélérée)
+const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le joueur peut s'asseoir pour boire
 {
   const TX = -26, TZ = 30;
   const wood    = new THREE.MeshStandardMaterial({ map:TEX.wood, normalMap:NTEX.wood, color:0x8a5a34, roughness:0.85 });
@@ -2887,6 +2898,7 @@ function updateBuilding(dt, t){
   if(dungeonCd > 0) dungeonCd = Math.max(0, dungeonCd - dt);   // repos du Gardien
   // buveurs de la taverne : chacun lève le coude pour boire à tour de rôle (~10 s)
   for(const d of guildDrinkers){
+    if(d.legBones) for(const lb of d.legBones) lb.b.rotation.x = lb.x;   // maintient la pose assise (l'idle l'écraserait)
     const cy2 = (t + d.phase) % 10;
     const lift = cy2 < 1.6 ? Math.sin((cy2/1.6)*Math.PI) : 0;   // 0 → 1 → 0 pendant 1,6 s
     d.wrap.rotation.x = -0.34*lift;                              // se penche en arrière pour boire
@@ -3194,7 +3206,7 @@ const player = {
   dead: false, moving: false,
   walkT: 0,
   fishing: false, fishT: 0, fishCount: 0,
-  mount: null,
+  mount: null, tavernSit: false,
   powerCd: 0, buffDmgT: 0, buffSpdT: 0, buffGuardT: 0, buffRegenT: 0, revealT: 0,   // pouvoir de classe + buffs de guilde
 };
 player.group.position.set(0, 0, 22);
@@ -5390,7 +5402,36 @@ function takeRoofCoffee(){
   addFloatText(player.group.position.clone().setY(2.3), '☕ +Café', '#e0b483');
   updateHUD();
 }
+// --- s'asseoir au foyer de la guilde pour boire avec les PNJ (récupère de l'XP) ---
+function sitFoyer(){
+  if(player.tavernSit) return;
+  if(player.fishing) stopFishing();
+  if(player.mount) dismountRide(player.mount);
+  player.tavernSit = true;
+  player.group.position.set(FOYER.x, 0.55, FOYER.z);
+  player.group.rotation.y = Math.atan2(GUILD.x - FOYER.x, GUILD.z - FOYER.z);   // tourné vers le feu
+  for(const k in keys) keys[k] = false;
+  touchMove.active = false; touchMove.x = 0; touchMove.y = 0;
+  player._sitLegs = findSitLegBones(player.group);
+  if(!player.tavernMug){
+    player.tavernMug = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.2, 8), new THREE.MeshStandardMaterial({ color:0x6b4a2c, roughness:0.7 }));
+    player.group.add(player.tavernMug);
+  }
+  player.tavernMug.position.set(0.28, 1.2, 0.32); player.tavernMug.visible = true;
+  SFX.pickup && SFX.pickup();
+  showToast('🍺 Tu trinques avec la guilde ! Tu récupères de l\'XP. (bouge ou E pour te lever)');
+}
+function standFoyer(){
+  if(!player.tavernSit) return;
+  player.tavernSit = false;
+  player._sitLegs = null;                       // l'idle reprend la main sur les jambes
+  player.group.rotation.x = 0;                  // on se redresse
+  if(player.tavernMug) player.tavernMug.visible = false;
+  player.group.position.y = getGroundY(player.group.position.x, player.group.position.z);
+  player.vy = 0; player.onGround = true;
+}
 function interact(){
+  if(player.tavernSit){ standFoyer(); return; }
   if(player.fishing){ stopFishing(); showToast('🎣 Tu remontes ta ligne.'); return; }
   if(player.mount){ dismountRide(player.mount); return; }
   if(player.sitting){ standUp(); return; }
@@ -5420,6 +5461,8 @@ function interact(){
   if(!nearestNpc()){ const fm = nearestFreeMount(3.2); if(fm){ mountRide(fm); return; } }
   // réveiller le Gardien du donjon (portail des Oubliettes)
   if(!nearestNpc() && Math.hypot(player.group.position.x - DUNGEON.x, player.group.position.z - DUNGEON.z) < 3.6){ startDungeon(); return; }
+  // s'asseoir au foyer de la guilde pour boire
+  if(!nearestNpc() && Math.hypot(player.group.position.x - FOYER.x, player.group.position.z - FOYER.z) < 2.2){ sitFoyer(); return; }
   // discuter avec un copain en ligne tout proche
   if(!nearestNpc() && nearestRemote(3.0)){ openChat(); return; }
   if(!nearestNpc()){
@@ -5458,7 +5501,7 @@ function updateDialogue(){
     document.getElementById('dialogue').style.display = 'none';
   }
   // sur le toit / assis / en voiture : on laisse les indices aux gestionnaires dédiés (updateBuilding, etc.)
-  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger)) || player.mount) return;
+  if(player.sitting || playerOnRoof || (delorean && (delorean.driving || delorean.passenger)) || player.mount || player.tavernSit) return;
   const n = nearestNpc();
   const hint = document.getElementById('interactHint');
   const fm = nearestFreeMount(3.2);
@@ -5473,6 +5516,9 @@ function updateDialogue(){
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting && Math.hypot(player.group.position.x - DUNGEON.x, player.group.position.z - DUNGEON.z) < 3.6){
     document.getElementById('interactTxt').textContent = gardienAlive() ? 'Gardien réveillé ⚔️' : (dungeonCd > 0 ? 'Le Gardien se repose…' : 'Réveiller le Gardien ⚔️');
+    hint.style.display = 'block';
+  } else if(!dlgNpc && !chatting && Math.hypot(player.group.position.x - FOYER.x, player.group.position.z - FOYER.z) < 2.2){
+    document.getElementById('interactTxt').textContent = "S'asseoir pour boire 🍺";
     hint.style.display = 'block';
   } else if(!dlgNpc && !chatting && nearRiver()){
     document.getElementById('interactTxt').textContent = 'Pêcher 🎣';
@@ -6024,6 +6070,26 @@ function updatePlayer(dt, t){
       player.group.position.y = getGroundY(player.group.position.x, player.group.position.z);
       if(player.glb && player.attackAnim <= 0) setPlayerAnim('idle');
       if(player.fishT <= 0) finishFishing();
+      return;
+    }
+  }
+  if(player.tavernSit){        // assis au foyer : on boit avec la guilde et on récupère de l'XP (bouger = se lever)
+    const m = moveInput();
+    if(m.has){ standFoyer(); }
+    else {
+      player.moving = false;
+      player.group.position.y = 0.55;
+      if(player.glb && player.attackAnim <= 0) setPlayerAnim('idle');
+      if(player._sitLegs) for(const lb of player._sitLegs) lb.b.rotation.x = lb.x;
+      player.hp = Math.min(player.maxhp, player.hp + 14*dt);
+      player.mana = Math.min(player.maxmana, player.mana + 18*dt);
+      player._restXp = (player._restXp || 0) + dt*3;
+      if(player._restXp >= 1){ const n = Math.floor(player._restXp); player._restXp -= n; addXP(n); }
+      player._drinkT = (player._drinkT || 0) + dt;
+      const cyc = player._drinkT % 6;
+      const lift = cyc < 1.6 ? Math.sin((cyc/1.6)*Math.PI) : 0;
+      player.group.rotation.x = -0.3*lift;                          // se penche pour boire
+      if(player.tavernMug) player.tavernMug.position.y = 1.2 + 0.28*lift;
       return;
     }
   }
