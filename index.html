@@ -354,18 +354,18 @@
   <button id="replayBtn">Rejouer</button>
 </div>
 
-<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/GammaCorrectionShader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/objects/Water.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script src="assets/three/build/three.min.js"></script>
+<script src="assets/three/examples/js/shaders/CopyShader.js"></script>
+<script src="assets/three/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="assets/three/examples/js/shaders/GammaCorrectionShader.js"></script>
+<script src="assets/three/examples/js/shaders/FXAAShader.js"></script>
+<script src="assets/three/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="assets/three/examples/js/postprocessing/RenderPass.js"></script>
+<script src="assets/three/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="assets/three/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="assets/three/examples/js/objects/Water.js"></script>
+<script src="assets/three/examples/js/loaders/GLTFLoader.js"></script>
+<script src="assets/three/examples/js/utils/SkeletonUtils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
@@ -5567,6 +5567,14 @@ addEventListener('keydown', (e)=>{
 });
 addEventListener('keyup', (e)=>{ keys[e.code] = false; });
 addEventListener('contextmenu', (e)=>e.preventDefault());
+// barre d'action cliquable à la souris (desktop) : 1 = attaque, 2 = bouclier, 3 = pouvoir de classe
+{
+  const slotFns = { slot1:()=>tryAttack(), slot2:()=>tryShield(), slot3:()=>tryPower() };
+  for(const id in slotFns){
+    const el = document.getElementById(id);
+    if(el){ el.style.cursor = 'pointer'; el.addEventListener('click', ()=>{ if(started && !player.dead && !gameOver){ initAudio(); slotFns[id](); } }); }
+  }
+}
 // saisie du chat entre copains : Entrée = envoyer (le chat RESTE ouvert), ✕ ou Échap = fermer
 {
   const ci = document.getElementById('chatInput');
