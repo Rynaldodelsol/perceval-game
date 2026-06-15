@@ -1922,6 +1922,26 @@ function swapNature(){
       unicorn.mark = mk;
     }
   }
+  // 🍺 PNJ attablés à la taverne (vrais modèles de personnages, comme les joueurs) qui lèvent le coude pour boire
+  {
+    const seats = [
+      { key:'rogue',     x:GUILD.x-3.6, z:GUILD.z+0.95 },
+      { key:'barbarian', x:GUILD.x+3.6, z:GUILD.z+0.95 },
+      { key:'mage',      x:GUILD.x+0.95, z:GUILD.z-3.6 },
+    ];
+    seats.forEach((s, i)=>{
+      const dm = spawnModel(s.key, 1.7);
+      if(!dm) return;
+      dm.wrap.position.set(s.x, -0.35, s.z);                          // abaissé : il a l'air assis (le banc/la table cachent les jambes)
+      dm.wrap.rotation.y = Math.atan2(GUILD.x - s.x, GUILD.z - s.z);  // tourné vers le feu/la table
+      scene.add(dm.wrap);
+      makeEnemyAnim(dm);                                              // idle
+      // chope tenue dans la main droite
+      const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.2, 8), new THREE.MeshStandardMaterial({ color:0x6b4a2c, roughness:0.7 }));
+      mug.position.set(0.28, 1.2, 0.32); dm.wrap.add(mug);
+      guildDrinkers.push({ wrap:dm.wrap, mug, mugY:1.2, phase:i*3.3 });
+    });
+  }
   // trois essences d'arbres réparties sur les emplacements existants
   const lots = [[],[],[]];
   treeSpots.forEach((s, i)=>lots[i%3].push(s));
@@ -2286,7 +2306,9 @@ function makeSignSprite(lines, color='#ffe9a0', scale=4.2){
   const n = lines.length, lh = 220/n;
   for(let i=0;i<n;i++){
     const L = lines[i];
-    ctx.font = '700 ' + (L.big ? 58 : 40) + 'px "Segoe UI", system-ui, sans-serif';
+    let fs = L.big ? 58 : 40;
+    ctx.font = '700 ' + fs + 'px "Segoe UI", system-ui, sans-serif';
+    while(ctx.measureText(L.t).width > 488 && fs > 14){ fs -= 2; ctx.font = '700 ' + fs + 'px "Segoe UI", system-ui, sans-serif'; }  // tient dans le panneau
     ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(22,28,70,0.92)';
     ctx.strokeText(L.t, 256, 30 + lh*(i+0.5));
     ctx.fillStyle = L.c || color; ctx.fillText(L.t, 256, 30 + lh*(i+0.5));
@@ -2623,7 +2645,7 @@ let loftChairs = [], roofPizzas = [], roofCoffee = null, towerSignSprite = null,
 }
 
 // ==================== TAVERNE DE LA GUILDE (hub social + foyer de repos) ====================
-let guildFire = null;
+let guildFire = null, guildDrinkers = [];
 const GUILD = { x:-26, z:23, r:10 };   // foyer : zone de repos (régén PV/mana accélérée)
 {
   const TX = -26, TZ = 30;
@@ -2657,24 +2679,13 @@ const GUILD = { x:-26, z:23, r:10 };   // foyer : zone de repos (régén PV/mana
   fl2.position.set(fx, 0.9, fz); scene.add(fl2);
   const fireLight = new THREE.PointLight(0xff9a3a, 1.4, 16, 2); fireLight.position.set(fx, 1.5, fz); scene.add(fireLight);
   guildFire = { flame, fl2, light:fireLight };
-  // un PNJ attablé en train de boire une chope
-  function addDrinker(tg, tint){
-    const skin = mat(0xe7b58a), tunic = mat(tint), dark = mat(0x4a3320);
-    bx(tg, 0.52, 0.64, 0.34, tunic, 0, 1.0, 0.92);                       // torse assis sur le banc
-    addMesh(tg, new THREE.SphereGeometry(0.21, 12, 10), skin, 0, 1.46, 0.92);   // tête
-    bx(tg, 0.15, 0.36, 0.15, tunic, 0.27, 1.06, 0.80);                  // bras qui lève la chope
-    cy(tg, 0.08, 0.08, 0.16, 8, dark, 0.31, 1.30, 0.66);               // chope près de la bouche
-    cy(tg, 0.08, 0.08, 0.13, 8, dark, -0.45, 0.99, 0.05);             // chope posée sur la table
-  }
-  // tables + bancs autour du feu (aucune devant la porte) + buveurs attablés
-  const tint = [0x8a5a34, 0x4f7a44, 0x8a3030];
-  [[-3.6, 0, 0], [3.6, 0, 0], [0, -3.6, Math.PI/2]].forEach(([bxp, bzp, ry], i)=>{
+  // tables + bancs autour du feu (aucune devant la porte) ; les buveurs (vrais modèles) sont ajoutés dans swapNature
+  [[-3.6, 0, 0], [3.6, 0, 0], [0, -3.6, Math.PI/2]].forEach(([bxp, bzp, ry])=>{
     const tg = new THREE.Group(); tg.position.set(fx+bxp, 0, fz+bzp); tg.rotation.y = ry; scene.add(tg);
     bx(tg, 1.9, 0.16, 0.95, wood, 0, 0.9, 0);
     for(const lxp of [-0.75, 0.75]) bx(tg, 0.16, 0.9, 0.16, woodD, lxp, 0.45, 0);
     bx(tg, 2.1, 0.14, 0.42, wood, 0, 0.5, 0.95);
     for(const lxp of [-0.8, 0.8]) bx(tg, 0.12, 0.5, 0.12, woodD, lxp, 0.25, 0.95);
-    addDrinker(tg, tint[i % tint.length]);
   });
   // bannière de guilde
   cy(scene, 0.08, 0.08, 4.0, 6, woodD, fx-4.8, 2.0, fz-1.2);
@@ -2874,6 +2885,13 @@ function updateBuilding(dt, t){
     guildFire.light.intensity = 1.2 + Math.sin(t*11)*0.4;
   }
   if(dungeonCd > 0) dungeonCd = Math.max(0, dungeonCd - dt);   // repos du Gardien
+  // buveurs de la taverne : chacun lève le coude pour boire à tour de rôle (~10 s)
+  for(const d of guildDrinkers){
+    const cy2 = (t + d.phase) % 10;
+    const lift = cy2 < 1.6 ? Math.sin((cy2/1.6)*Math.PI) : 0;   // 0 → 1 → 0 pendant 1,6 s
+    d.wrap.rotation.x = -0.34*lift;                              // se penche en arrière pour boire
+    d.mug.position.y = d.mugY + 0.28*lift;                      // la chope monte vers la bouche
+  }
   if(towerCallBtn) towerCallBtn.material.emissiveIntensity = 1.0 + Math.sin(t*3)*0.6;   // bouton d'appel qui pulse
   if(towerSignSprite) towerSignSprite.position.y = 3.4 + Math.sin(t*1.6)*0.12;          // enseigne qui flotte
   // pizzas mangées : réapparition après 25 s (le four maison tourne)
