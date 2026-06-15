@@ -1663,15 +1663,28 @@ let xpCrystal = null;          // { group, base, ready, cd } — récompense au 
   xpCrystal = { group:cg, gem, glow, baseY: top.h + 1.5, x:top.x, z:top.z, top:top.h, ready:true, cd:0 };
 }
 
-// --- chemins (décals clairs) ---
+// --- chemins : ruban qui ÉPOUSE le relief, ~6 cm au-dessus de l'herbe (sinon scintillement / z-fighting) ---
 function addPath(x1,z1,x2,z2,w=3.4){
   const dx = x2-x1, dz = z2-z1;
-  const len = Math.sqrt(dx*dx+dz*dz);
-  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, len),
-    new THREE.MeshLambertMaterial({ color:0xe7dcc3, polygonOffset:true, polygonOffsetFactor:-1 }));
-  p.rotation.x = -Math.PI/2;
-  p.rotation.z = -Math.atan2(dx, dz);
-  p.position.set((x1+x2)/2, 0.02, (z1+z2)/2);
+  const len = Math.hypot(dx, dz);
+  const ux = dx/len, uz = dz/len;        // direction du chemin
+  const px = -uz, pz = ux;               // perpendiculaire (sens de la largeur)
+  const seg = Math.max(2, Math.round(len/2));   // un anneau de sommets tous les ~2 m
+  const LIFT = 0.06;                      // hauteur au-dessus du sol
+  const positions = [], indices = [];
+  for(let i=0;i<=seg;i++){
+    const t = i/seg, cx = x1+dx*t, cz = z1+dz*t;
+    for(let s=-1;s<=1;s+=2){
+      const wx = cx + px*(w/2)*s, wz = cz + pz*(w/2)*s;
+      positions.push(wx, terrainH(wx, wz) + LIFT, wz);
+    }
+  }
+  for(let i=0;i<seg;i++){ const a=i*2; indices.push(a, a+2, a+1,  a+1, a+2, a+3); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  const p = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color:0xe7dcc3, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-1 }));
   p.receiveShadow = true;
   scene.add(p);
 }
@@ -3401,7 +3414,7 @@ function placeProp(file, x, z, h, ry){
     const box = new THREE.Box3().setFromObject(o);
     const s = h / Math.max(0.001, box.max.y - box.min.y);
     o.scale.setScalar(s);
-    o.position.set(x, -box.min.y*s, z);
+    o.position.set(x, terrainH(x, z) - box.min.y*s, z);   // posé sur le relief du sol (plus de flottement / enfoncement)
     o.rotation.y = ry || 0;
     scene.add(o);
   }, undefined, ()=>{ console.warn('prop introuvable', file); });
@@ -3418,10 +3431,11 @@ function placeCrypt(files, x, z, targetH, ry){
   }, undefined, ()=>{ console.warn('crypte introuvable', files[0]); });
 }
 function gyBrazier(x, z){
+  const gy = terrainH(x, z);
   placeProp('fire-basket.glb', x, z, 1.2, 0);
   const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0xff9a40, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
-  flame.position.set(x, 1.35, z); flame.scale.set(0.7, 1.05, 1); scene.add(flame);
-  const light = new THREE.PointLight(0xff8a3a, 1.0, 13, 2); light.position.set(x, 1.7, z); scene.add(light);
+  flame.position.set(x, gy + 1.35, z); flame.scale.set(0.7, 1.05, 1); scene.add(flame);
+  const light = new THREE.PointLight(0xff8a3a, 1.0, 13, 2); light.position.set(x, gy + 1.7, z); scene.add(light);
   gyFires.push({ flame, light, phase:rand(0,6) });
 }
 let _graveyardBuilt = false;
@@ -3457,6 +3471,22 @@ function buildGraveyard(){
   placeProp('debris.glb', -73.5, 69, 0.4, 1.0);
   placeProp('shovel-dirt.glb', -64.5, 73.5, 0.95, 0.4);
   placeProp('lantern-candle.glb', -71, 63.5, 1.1, 0);
+  // --- ambiance renforcée (assets Kenney jusque-là inutilisés) ---
+  // lampadaires anciens qui encadrent l'entrée de l'allée
+  placeProp('lightpost-single.glb', -76, 63, 2.5, 0.2);
+  placeProp('lightpost-single.glb', -66, 63, 2.5, -0.2);
+  // citrouilles d'Halloween dispersées
+  placeProp('pumpkin-tall-carved.glb', -64, 68, 0.85, 0.6);
+  placeProp('pumpkin-carved.glb',      -77, 69, 0.55, 2.1);
+  placeProp('pumpkin.glb',             -69.5, 66, 0.45, 1.2);
+  placeProp('pumpkin-carved.glb',      -82.5, 73.5, 0.55, 4.0);
+  // croix de bois inclinées + banc abîmé + urnes + troncs morts
+  placeProp('cross-wood.glb',     -65, 72, 1.3, 0.18);
+  placeProp('cross-wood.glb',     -79, 75, 1.3, -0.25);
+  placeProp('bench-damaged.glb',  -63, 75.5, 0.7, -0.5);
+  placeProp('urn-square.glb',     -78, 70.5, 0.7, 0);
+  placeProp('trunk-long.glb',     -86, 76.5, 0.5, 0.8);
+  placeProp('trunk.glb',          -61.5, 67, 0.6, 1.4);
 }
 function updateOubliettes(dt, t){
   for(const f of gyFires){ const fl = 1 + Math.sin(t*12 + f.phase)*0.22; f.flame.scale.set(0.7*fl, 1.05*fl, 1); f.light.intensity = 0.9 + Math.sin(t*15 + f.phase)*0.3; }
