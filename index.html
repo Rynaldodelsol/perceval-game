@@ -1634,6 +1634,56 @@ const lampGlows = [], lampLights = [];   // s'allument la nuit
   }
 }
 
+// --- VOLCAN : le Piton de la Fournaise, immense et fumant (clin d'œil à La Réunion, fief de Perceval) ---
+let volcano = null;
+{
+  const VX = 158, VZ = -132, H = 118, baseR = 104, topR = 30, sink = 22;
+  const cy0 = H/2 - sink, topY = H - sink;            // centre du cône / altitude du cratère
+  const rockMat = new THREE.MeshStandardMaterial({ color:0x382f33, roughness:0.98, flatShading:true });
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(topR, baseR, H, 40, 1), rockMat);
+  cone.position.set(VX, cy0, VZ); cone.frustumCulled = false; scene.add(cone);
+  // anneau de cendres sombres au sommet
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(topR*1.05, topR*2.3, H*0.22, 40, 1),
+    new THREE.MeshStandardMaterial({ color:0x2a2329, roughness:1, flatShading:true }));
+  cap.position.set(VX, topY - H*0.11, VZ); scene.add(cap);
+  // coulées de lave incandescentes sur les flancs (fog:false → elles percent la brume)
+  const lavaMat = new THREE.MeshBasicMaterial({ color:0xff5a1e, fog:false });
+  for(const ang of [0.3, 1.5, 2.7, 3.9, 5.2]){
+    const flow = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 3.0, H*0.72, 6), lavaMat);
+    const rr = baseR*0.34;
+    flow.position.set(VX + Math.sin(ang)*rr, cy0 + H*0.04, VZ + Math.cos(ang)*rr);
+    flow.rotation.z = Math.sin(ang + Math.PI)*0.30; flow.rotation.x = Math.cos(ang)*0.30;
+    scene.add(flow);
+  }
+  // cratère incandescent + halo additif (ignore la brume → beacon visible de loin)
+  const crater = new THREE.Mesh(new THREE.CircleGeometry(topR*0.95, 28),
+    new THREE.MeshBasicMaterial({ color:0xff8a2a, fog:false }));
+  crater.rotation.x = -Math.PI/2; crater.position.set(VX, topY + 0.6, VZ); scene.add(crater);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0xff5a1e, transparent:true,
+    opacity:0.8, depthWrite:false, blending:THREE.AdditiveBlending, fog:false }));
+  halo.scale.set(90, 62, 1); halo.position.set(VX, topY + 18, VZ); scene.add(halo);
+  // panache de fumée : grosses volutes qui montent, dérivent et se dissipent
+  const puffs = [];
+  for(let i=0;i<16;i++){
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:softTex, color:0x6f6862, transparent:true, opacity:0.5, depthWrite:false }));
+    s.userData = { t:i/16, x:rand(-8,8), z:rand(-8,8), spd:rand(0.05,0.09) };
+    scene.add(s); puffs.push(s);
+  }
+  volcano = { x:VX, z:VZ, top:topY, puffs, halo };
+}
+function updateVolcano(dt, t){
+  if(!volcano) return;
+  for(const s of volcano.puffs){
+    const u = s.userData; u.t += dt*u.spd;
+    if(u.t > 1){ u.t -= 1; u.x = rand(-8,8); u.z = rand(-8,8); }
+    const rise = u.t, sc = 18 + rise*54;
+    s.scale.set(sc, sc, 1);
+    s.position.set(volcano.x + u.x + rise*26, volcano.top + 8 + rise*80, volcano.z + u.z);
+    s.material.opacity = 0.55 * (1 - rise) * Math.min(1, rise*5);   // apparaît puis se dissipe
+  }
+  volcano.halo.material.opacity = 0.7 + Math.sin(t*2.1)*0.18;        // lueur du cratère qui palpite
+}
+
 // --- sol : plaine vallonnée aux couleurs variées ---
 {
   const geo = new THREE.PlaneGeometry(224, 224, 72, 72);
@@ -7597,6 +7647,7 @@ function animate(){
   updateFountain(dt);
   updateChimneys(dt);
   updateOubliettes(dt, t);
+  updateVolcano(dt, t);
   updateButterflies(dt, t);
   updateBirds(dt, t);
   updatePuffs(dt);
