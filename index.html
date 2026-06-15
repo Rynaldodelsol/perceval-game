@@ -1651,9 +1651,9 @@ let windmillHub = null;
     for(const z of [49.4, 51.4, 53.4]) for(const sx of [-0.75, 0.75]) cy(scene, 0.08, 0.08, 1.0, 6, woodD, X+sx, -0.1, z);  // pilotis
     for(const sx of [-0.85, 0.85]) cy(scene, 0.1, 0.1, 0.9, 8, woodD, X+sx, 0.85, 53.6);   // bittes d'amarrage
   })();
-  // --- MOULIN À VENT (champ est) ---
+  // --- MOULIN À VENT (champ ouvert, à l'ouest, hors des arbres) ---
   (function windmill(){
-    const X = 64, Z = -24;
+    const X = -48, Z = -34;
     cy(scene, 1.5, 2.2, 5.4, 12, mat(0xe8dcc0), X, 2.7, Z);                          // tour conique
     cy(scene, 1.65, 1.7, 0.4, 12, woodD, X, 5.2, Z);                                 // corniche
     cn(scene, 1.85, 1.7, 12, mat(0x7a2f2a), X, 6.25, Z);                             // toit conique
@@ -1666,6 +1666,7 @@ let windmillHub = null;
       for(let k=1;k<=5;k++) bx(bg, 0.7, 0.12, 0.04, mat(0xe9e3d2), 0.22, 0.45*k, 0.03);  // toile (lattes)
     }
     windmillHub = hub;
+    addCollider(X, Z, 2.2);                                                          // on ne traverse pas le moulin
   })();
   // --- PUITS (près de la place) ---
   (function well(){
@@ -1676,6 +1677,7 @@ let windmillHub = null;
     cn(scene, 1.05, 0.9, 4, mat(0x7a2f2a), X, 2.85, Z);                              // toit pyramidal
     const ax = cy(scene, 0.05, 0.05, 1.0, 6, woodD, X, 2.3, Z); ax.rotation.z = Math.PI/2;  // axe
     cy(scene, 0.2, 0.17, 0.28, 8, woodD, X, 1.6, Z);                                 // seau
+    addCollider(X, Z, 1.15);                                                         // on ne traverse pas le puits
   })();
   // --- ÉTALS DE MARCHÉ (sur la place) ---
   function stall(X, Z, aw){
@@ -1688,6 +1690,7 @@ let windmillHub = null;
       bx(scene, 0.5, 0.18, 0.5, woodD, X+fx, 1.06, Z+0.1);
       for(let k=0;k<5;k++) addMesh(scene, new THREE.SphereGeometry(0.08, 8, 6), mat(fc), X+fx+rand(-0.17,0.17), 1.22, Z+0.1+rand(-0.17,0.17));
     }
+    addCollider(X, Z, 1.25);                                                         // on ne traverse pas l'étal
   }
   stall(7, 19, mat(0xc23b2b)); stall(-7, 19, mat(0x2f7a44)); stall(10, 9, mat(0x2a59a8));
   // --- LAMPADAIRES le long des chemins ---
@@ -2486,19 +2489,24 @@ function addFloorPlane(parent, w, d, material, x, y, z){
 }
 // écran de code du loft (animé : le texte défile) — redessiné dans updateBuilding
 const CODE_LINES = [
-  'const Perceval = require("./team10")',
-  'async function deploy() {',
-  '  await goPerceval.build()',
-  '  const bo = await Modulr.fetch()',
-  '  if (bo.bug) bo.fix()   // encore lui…',
-  '  return "Contrat Sacré ✓"',
-  '}',
-  'app.listen(80, ()=> log("BO up"))',
-  '// Team 10 Positif — zéro downtime',
-  'while (coffee.isEmpty) refill()',
-  '$ git commit -m "ship it 🚀"',
-  '$ git push origin main',
-  'export default Perceval',
+  '// Team 10 Positif — prod stable… si si',
+  'while (!cafe) { motivation-- }',
+  "if (caMarche) neTouchePlus()  // règle d'or",
+  'const bug = "feature"   // assumé',
+  'try { deployVendredi17h() }',
+  'catch (e) { onVerraLundi() }',
+  'git commit -m "fix"',
+  'git commit -m "fix du fix"',
+  'git commit -m "vrai fix juré 🤞"',
+  'npm install courage --save',
+  "// 99 bugs Modul'r dans le code…",
+  '// …patch… 117 bugs dans le code',
+  'console.log("ça marche chez moi 🤷")',
+  'sudo rm -rf /downtime',
+  'perceval.sauveLeContratSacre()',
+  'return 42   // la vraie réponse',
+  '/* ne lisez pas ce code 👀 */',
+  '$ git push origin main   // 🚀',
 ];
 function drawLoftScreen(){
   if(!loftScreen) return;
