@@ -2964,8 +2964,10 @@ const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le jou
     for(const lxp of [-0.8, 0.8]) bx(tg, 0.12, 0.5, 0.12, woodD, lxp, 0.25, 0.95);
     setTable(tg);
   });
-  // bannière de guilde
-  cy(scene, 0.08, 0.08, 4.0, 6, woodD, fx-4.8, 2.0, fz-1.2);
+  // bannière de guilde — poteau décalé sur le côté (bord gauche) pour NE PAS traverser l'affiche
+  const SP_X = fx-4.8, SP_Z = fz-1.2 - 0.80;            // poteau au bord gauche de l'affiche
+  cy(scene, 0.07, 0.07, 4.4, 8, woodD, SP_X, 2.2, SP_Z);
+  for(const by of [3.95, 2.55]) bx(scene, 0.10, 0.07, 0.80, woodD, SP_X, by, fz-1.2 - 0.40);  // bras de fixation poteau→affiche
   // AFFICHE DODO recréée au plus proche (l'image n'arrive pas comme fichier lisible) — lisible des deux côtés
   const bc = document.createElement('canvas'); bc.width = 512; bc.height = 768;
   const pc = bc.getContext('2d');
