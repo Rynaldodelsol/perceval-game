@@ -109,13 +109,34 @@
   .barTxt { position:absolute; inset:0; font-size:10px; text-align:center; line-height:14px; color:#fff; text-shadow:0 1px 2px #000; }
 
   /* Barre d'action */
-  #actionbar { position:absolute; bottom:26px; left:50%; transform:translateX(-50%);
-    display:flex; gap:10px; padding:8px; }
-  .slot { width:56px; height:56px; border-radius:12px; background:rgba(15,20,55,0.85);
-    border:2px solid #4C53BD; position:relative; display:flex; align-items:center; justify-content:center;
-    font-size:26px; }
-  .slot .key { position:absolute; top:2px; left:5px; font-size:10px; color:#cdd3ff; font-weight:700; }
-  .slot .cd { position:absolute; left:0; bottom:0; width:100%; height:0%; background:rgba(10,12,35,0.82); border-radius:0 0 9px 9px; }
+  #actionbar { position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+    display:flex; gap:14px; padding:11px 16px; border-radius:22px;
+    background:linear-gradient(180deg, rgba(22,28,64,0.5), rgba(10,14,38,0.62));
+    -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
+    box-shadow:0 10px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07); }
+  .slot { width:62px; height:62px; border-radius:17px; position:relative; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:29px;
+    background:linear-gradient(158deg, rgba(64,74,158,0.6), rgba(17,21,52,0.94));
+    border:1.5px solid rgba(150,160,235,0.42);
+    box-shadow:0 5px 16px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -7px 15px rgba(0,0,0,0.34);
+    transition:transform .12s ease, box-shadow .16s ease, border-color .16s ease;
+    text-shadow:0 2px 6px rgba(0,0,0,0.6); -webkit-user-select:none; user-select:none; }
+  .slot::before { content:''; position:absolute; left:0; right:0; top:0; height:48%; border-radius:16px 16px 40% 40%;
+    background:linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0)); pointer-events:none; }
+  .slot:hover { transform:translateY(-3px); border-color:rgba(190,200,255,0.85); }
+  .slot:active { transform:translateY(-1px) scale(0.95); }
+  /* accents colorés par compétence (lueur permanente discrète + halo au survol) */
+  #slot1 { border-color:rgba(255,124,112,0.55); box-shadow:0 5px 16px rgba(0,0,0,0.42), 0 0 10px rgba(255,90,80,0.28), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -7px 15px rgba(0,0,0,0.34); }
+  #slot1:hover { box-shadow:0 9px 24px rgba(0,0,0,0.5), 0 0 20px rgba(255,92,80,0.7), inset 0 1px 0 rgba(255,255,255,0.2); }
+  #slot2 { border-color:rgba(96,176,255,0.55); box-shadow:0 5px 16px rgba(0,0,0,0.42), 0 0 10px rgba(70,150,255,0.28), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -7px 15px rgba(0,0,0,0.34); }
+  #slot2:hover { box-shadow:0 9px 24px rgba(0,0,0,0.5), 0 0 20px rgba(72,150,255,0.7), inset 0 1px 0 rgba(255,255,255,0.2); }
+  #slot3 { border-color:rgba(255,208,96,0.62); box-shadow:0 5px 16px rgba(0,0,0,0.42), 0 0 12px rgba(255,196,70,0.32), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -7px 15px rgba(0,0,0,0.34); }
+  #slot3:hover { box-shadow:0 9px 24px rgba(0,0,0,0.5), 0 0 22px rgba(255,196,70,0.78), inset 0 1px 0 rgba(255,255,255,0.2); }
+  .slot .key { position:absolute; top:-8px; left:-8px; min-width:19px; height:19px; padding:0 4px;
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;
+    color:#101535; background:linear-gradient(180deg,#ffffff,#cdd3ff);
+    border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.7); }
+  .slot .cd { position:absolute; left:0; bottom:0; width:100%; height:0%; background:rgba(8,10,28,0.74); border-radius:0 0 15px 15px; transition:height .08s linear; }
   .slot .cdTxt { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     font-size:18px; font-weight:800; color:#fff; text-shadow:0 1px 3px #000; visibility:hidden; }
 
@@ -1663,35 +1684,43 @@ let xpCrystal = null;          // { group, base, ready, cd } — récompense au 
   xpCrystal = { group:cg, gem, glow, baseY: top.h + 1.5, x:top.x, z:top.z, top:top.h, ready:true, cd:0 };
 }
 
-// --- chemins : ruban qui ÉPOUSE le relief, ~6 cm au-dessus de l'herbe (sinon scintillement / z-fighting) ---
-function addPath(x1,z1,x2,z2,w=3.4){
-  const dx = x2-x1, dz = z2-z1;
-  const len = Math.hypot(dx, dz);
-  const ux = dx/len, uz = dz/len;        // direction du chemin
-  const px = -uz, pz = ux;               // perpendiculaire (sens de la largeur)
-  const seg = Math.max(2, Math.round(len/2));   // un anneau de sommets tous les ~2 m
-  const LIFT = 0.06;                      // hauteur au-dessus du sol
+// --- chemins : rubans qui ÉPOUSENT le relief, au-dessus de l'herbe (anti-scintillement),
+//     avec une bordure terreuse plus large pour adoucir la transition route/herbe ---
+const PATHS = [
+  [0, 14, 0, -64, 3.4],     // village -> château
+  [0, 16, -40, 55, 3.4],    // village -> pont (passe à l'est de la taverne)
+  [-40, 60, -70, 72, 3.4],  // pont -> Oubliettes
+  [2, 16, 48, 4, 3.4],      // village -> forêt
+];
+function distToSeg(x, z, x1, z1, x2, z2){
+  const dx = x2-x1, dz = z2-z1, L2 = dx*dx + dz*dz;
+  let t = L2 ? ((x-x1)*dx + (z-z1)*dz)/L2 : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(x - (x1+dx*t), z - (z1+dz*t));
+}
+// true si (x,z) est sur une route (avec marge) — utilisé pour empêcher l'herbe/les fleurs d'y pousser
+function onPath(x, z, margin=0){
+  for(const s of PATHS){ if(distToSeg(x, z, s[0], s[1], s[2], s[3]) < s[4]/2 + margin) return true; }
+  return false;
+}
+function pathRibbon(x1, z1, x2, z2, w, color, lift, offset){
+  const dx = x2-x1, dz = z2-z1, len = Math.hypot(dx, dz);
+  const ux = dx/len, uz = dz/len, px = -uz, pz = ux;
+  const seg = Math.max(2, Math.round(len/2));
   const positions = [], indices = [];
-  for(let i=0;i<=seg;i++){
-    const t = i/seg, cx = x1+dx*t, cz = z1+dz*t;
-    for(let s=-1;s<=1;s+=2){
-      const wx = cx + px*(w/2)*s, wz = cz + pz*(w/2)*s;
-      positions.push(wx, terrainH(wx, wz) + LIFT, wz);
-    }
-  }
-  for(let i=0;i<seg;i++){ const a=i*2; indices.push(a, a+2, a+1,  a+1, a+2, a+3); }
+  for(let i=0;i<=seg;i++){ const t = i/seg, cx = x1+dx*t, cz = z1+dz*t;
+    for(let s=-1;s<=1;s+=2){ const wx = cx + px*(w/2)*s, wz = cz + pz*(w/2)*s; positions.push(wx, terrainH(wx, wz) + lift, wz); } }
+  for(let i=0;i<seg;i++){ const a = i*2; indices.push(a, a+2, a+1,  a+1, a+2, a+3); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  const p = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color:0xe7dcc3, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-1 }));
-  p.receiveShadow = true;
-  scene.add(p);
+  g.setIndex(indices); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:offset }));
+  m.receiveShadow = true; scene.add(m);
 }
-addPath(0, 14, 0, -64);      // village -> château
-addPath(0, 16, -40, 55);     // village -> pont, d'un seul tenant (passe à l'est de la taverne, ne la traverse pas)
-addPath(-40, 60, -70, 72);   // pont -> Oubliettes
-addPath(2, 16, 48, 4);       // village -> forêt
+function addPath(x1, z1, x2, z2, w=3.4){
+  pathRibbon(x1, z1, x2, z2, w + 1.1, 0xb6a781, 0.05, -0.6);  // bordure terreuse (adoucit le bord)
+  pathRibbon(x1, z1, x2, z2, w,       0xe7dcc3, 0.08, -1.2);  // route claire par-dessus
+}
+for(const s of PATHS) addPath(s[0], s[1], s[2], s[3], s[4]);
 
 // --- clôtures en bois (sautables) : on saute par-dessus pour entrer ---
 function buildFence(x1, z1, x2, z2){
@@ -1858,7 +1887,7 @@ function windMaterial(opts, strength=0.25){
   let placed = 0, guard = 0;
   while(placed < N && guard++ < N*30){
     const x = rand(-105,105), z = rand(-105,105);
-    if(inKeepOutZone(x,z)) continue;
+    if(inKeepOutZone(x,z) || onPath(x,z,0.6)) continue;
     p.set(x, 0, z); q.setFromAxisAngle(V3(0,1,0), rand(0,Math.PI));
     const sc = rand(0.5, 1.0); s.set(sc*1.35, sc*rand(0.55,0.85), sc*1.35);
     m4.compose(p, q, s);
@@ -1885,7 +1914,7 @@ function windMaterial(opts, strength=0.25){
   let placed = 0, guard = 0;
   while(placed < N && guard++ < N*30){
     const x = rand(-100,100), z = rand(-100,100);
-    if(inKeepOutZone(x,z)) continue;
+    if(inKeepOutZone(x,z) || onPath(x,z,0.6)) continue;
     q.setFromAxisAngle(V3(0,1,0), rand(0,Math.PI*2));
     const sc = rand(0.85, 1.5);
     m4.compose(V3(x,0,z), q, V3(sc,sc,sc));
@@ -2038,7 +2067,7 @@ let natureSwapped = false;
   const rockMat = fmat(0xb9b4a6);
   for(let i=0;i<40;i++){
     const x = rand(-102,102), z = rand(-102,102);
-    if(inKeepOutZone(x,z)) continue;
+    if(inKeepOutZone(x,z) || onPath(x,z,0.6)) continue;
     if(Math.random() < 0.55){
       const b = new THREE.Mesh(blobGeo(rand(0.5,1.0), 1, 0.3, i*2.3), bushMat);
       b.position.set(x, 0.3, z);
@@ -3438,6 +3467,53 @@ function gyBrazier(x, z){
   const light = new THREE.PointLight(0xff8a3a, 1.0, 13, 2); light.position.set(x, gy + 1.7, z); scene.add(light);
   gyFires.push({ flame, light, phase:rand(0,6) });
 }
+// ===== Petits fantômes décoratifs du cimetière (invincibles) =====
+// Ils errent près des cryptes ; quand le joueur approche du cimetière, ils foncent vers lui,
+// puis tournent autour de lui tant qu'il reste à proximité, et reviennent errer quand il s'éloigne.
+const GHOST_CENTER = { x:-71, z:73 };
+const gyGhosts = [];
+function buildGhosts(){
+  const homes = [[-78,70],[-64,71.5],[-74,76.5],[-66.5,68],[-83,73]];
+  gyLoader.load(GYP + 'character-ghost.glb', (g)=>{
+    homes.forEach((h)=>{
+      const o = THREE.SkeletonUtils.clone(g.scene);
+      o.traverse(m=>{ if(m.isMesh || m.isSkinnedMesh){ m.castShadow = false; m.frustumCulled = false;
+        if(m.material){ m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0.6; m.material.depthWrite = false; } } });
+      const box = new THREE.Box3().setFromObject(o);
+      const s = 1.0 / Math.max(0.001, box.max.y - box.min.y);   // hauteur cible ~1 m
+      o.scale.setScalar(s); o.position.y = -box.min.y * s;
+      const wrap = new THREE.Group(); wrap.add(o); wrap.position.set(h[0], 0, h[1]); scene.add(wrap);
+      let mixer = null;
+      if(g.animations && g.animations.length){ mixer = new THREE.AnimationMixer(o); mixer.clipAction(g.animations[0]).play(); }
+      gyGhosts.push({ wrap, mixer, home:V3(h[0],0,h[1]), x:h[0], z:h[1], phase:rand(0,6.28), ang:rand(0,6.28), orbit:rand(2.0,3.0) });
+    });
+  }, undefined, ()=>{ console.warn('character-ghost introuvable'); });
+}
+function updateGhosts(dt, t){
+  if(!gyGhosts.length || !started) return;
+  const px = player.group.position.x, pz = player.group.position.z;
+  const nearCrypt = Math.hypot(px - GHOST_CENTER.x, pz - GHOST_CENTER.z) < 17;   // joueur proche du cimetière
+  for(const gh of gyGhosts){
+    if(gh.mixer) gh.mixer.update(dt);
+    let tx, tz, speed;
+    const dpl = Math.hypot(px - gh.x, pz - gh.z);
+    if(nearCrypt && dpl < 3.4){              // tourne autour du joueur
+      gh.ang += dt * 1.7;
+      tx = px + Math.cos(gh.ang) * gh.orbit; tz = pz + Math.sin(gh.ang) * gh.orbit; speed = 6.5;
+    } else if(nearCrypt){                    // fonce vers le joueur
+      tx = px; tz = pz; speed = 3.6;
+    } else {                                 // erre (va-et-vient) autour de son point d'origine
+      gh.ang += dt * 0.5;
+      tx = gh.home.x + Math.cos(gh.ang + gh.phase) * 3.0; tz = gh.home.z + Math.sin(gh.ang * 0.7 + gh.phase) * 3.0; speed = 1.7;
+    }
+    const dx = tx - gh.x, dz = tz - gh.z, d = Math.hypot(dx, dz) || 1;
+    const step = Math.min(d, speed * dt);
+    gh.x += dx / d * step; gh.z += dz / d * step;
+    const fy = terrainH(gh.x, gh.z) + 1.15 + Math.sin(t * 2 + gh.phase) * 0.18;   // flotte + léger bobbing
+    gh.wrap.position.set(gh.x, fy, gh.z);
+    if(d > 0.05) gh.wrap.rotation.y = Math.atan2(dx, dz);
+  }
+}
 let _graveyardBuilt = false;
 function buildGraveyard(){
   if(_graveyardBuilt) return; _graveyardBuilt = true;   // chargé au lancement du jeu (pas sur l'écran-titre) → titre plus rapide
@@ -3487,8 +3563,10 @@ function buildGraveyard(){
   placeProp('urn-square.glb',     -78, 70.5, 0.7, 0);
   placeProp('trunk-long.glb',     -86, 76.5, 0.5, 0.8);
   placeProp('trunk.glb',          -61.5, 67, 0.6, 1.4);
+  buildGhosts();   // petits fantômes décoratifs
 }
 function updateOubliettes(dt, t){
+  updateGhosts(dt, t);
   for(const f of gyFires){ const fl = 1 + Math.sin(t*12 + f.phase)*0.22; f.flame.scale.set(0.7*fl, 1.05*fl, 1); f.light.intensity = 0.9 + Math.sin(t*15 + f.phase)*0.3; }
   for(const f of torchFlames){
     const fl = 1 + Math.sin(t*11 + f.phase)*0.18 + Math.sin(t*23 + f.phase*2)*0.1;
