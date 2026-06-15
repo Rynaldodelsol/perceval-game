@@ -2253,10 +2253,7 @@ function swapNature(){
       makeEnemyAnim(dm);                                              // idle (haut du corps)
       // os des jambes → pose assise (cuisses à l'horizontale, tibias vers le bas)
       const legBones = findSitLegBones(dm.obj);
-      // chope tenue dans la main droite
-      const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.2, 8), new THREE.MeshStandardMaterial({ color:0x6b4a2c, roughness:0.7 }));
-      mug.position.set(0.28, 1.2, 0.32); dm.wrap.add(mug);
-      guildDrinkers.push({ wrap:dm.wrap, mug, mugY:1.2, phase:i*3.3, legBones });
+      guildDrinkers.push({ wrap:dm.wrap, phase:i*3.3, legBones });
     });
   }
   // 🚣 BARQUE avec un pêcheur (vrai modèle) qui navigue sur la rivière
@@ -3348,13 +3345,9 @@ function updateBuilding(dt, t){
   }
   if(dungeonCd > 0) dungeonCd = Math.max(0, dungeonCd - dt);   // repos du Gardien
   if(windmillHub) windmillHub.rotation.z += dt*0.5;            // les ailes du moulin tournent
-  // buveurs de la taverne : chacun lève le coude pour boire à tour de rôle (~10 s)
+  // PNJ attablés à la taverne : on maintient juste la pose assise (plus de chope devant le visage)
   for(const d of guildDrinkers){
     if(d.legBones) for(const lb of d.legBones) lb.b.rotation.x = lb.x;   // maintient la pose assise (l'idle l'écraserait)
-    const cy2 = (t + d.phase) % 10;
-    const lift = cy2 < 1.6 ? Math.sin((cy2/1.6)*Math.PI) : 0;   // 0 → 1 → 0 pendant 1,6 s
-    d.wrap.rotation.x = -0.34*lift;                              // se penche en arrière pour boire
-    d.mug.position.y = d.mugY + 0.28*lift;                      // la chope monte vers la bouche
   }
   if(towerCallBtn) towerCallBtn.material.emissiveIntensity = 1.0 + Math.sin(t*3)*0.6;   // bouton d'appel qui pulse
   if(towerSignSprite) towerSignSprite.position.y = 3.4 + Math.sin(t*1.6)*0.12;          // enseigne qui flotte
