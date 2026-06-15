@@ -2749,28 +2749,53 @@ const FOYER = { x:-26 + 0.95, z:23 - 3.6 };   // place libre au foyer où le jou
   });
   // bannière de guilde
   cy(scene, 0.08, 0.08, 4.0, 6, woodD, fx-4.8, 2.0, fz-1.2);
-  // AFFICHE DODO (recréée façon promo « bière de la Réunion ») — lisible des deux côtés
-  const bc = document.createElement('canvas'); bc.width = 512; bc.height = 740;
-  const bctx = bc.getContext('2d');
-  const grd = bctx.createLinearGradient(0,0,0,740); grd.addColorStop(0,'#2095e2'); grd.addColorStop(1,'#1262b4');
-  bctx.fillStyle = grd; bctx.fillRect(0,0,512,740);
-  bctx.fillStyle = 'rgba(255,238,150,0.55)'; bctx.beginPath(); bctx.arc(256,60,95,0,7); bctx.fill();   // soleil
-  bctx.textAlign = 'center'; bctx.textBaseline = 'middle';
-  bctx.lineWidth = 14; bctx.strokeStyle = '#f4c81f'; bctx.fillStyle = '#ffffff';
-  bctx.font = '900 150px "Segoe UI", Arial, sans-serif';
-  bctx.strokeText('DODO', 256, 165); bctx.fillText('DODO', 256, 165);          // DODO
-  bctx.fillStyle = '#e2261c'; bctx.fillRect(54,250,404,72);                     // bandeau rouge
-  bctx.fillStyle = '#fff'; bctx.font = '800 30px "Segoe UI", Arial, sans-serif';
-  bctx.fillText('LA BIÈRE DE LA RÉUNION', 256, 286);
-  bctx.lineWidth = 16; bctx.strokeStyle = '#ffffff'; bctx.fillStyle = '#e2261c';
-  bctx.font = '900 230px "Segoe UI", Arial, sans-serif';
-  bctx.strokeText('2€', 256, 470); bctx.fillText('2€', 256, 470);              // 2€
-  bctx.save(); bctx.translate(256,605); bctx.rotate(-0.05); bctx.fillStyle = '#11244e'; bctx.fillRect(-160,-36,320,72); bctx.restore();
-  bctx.fillStyle = '#fff'; bctx.font = '800 52px "Segoe UI", Arial, sans-serif'; bctx.fillText('PROMO', 256, 605);
-  bctx.fillStyle = '#f4c81f'; bctx.fillRect(0,680,512,60);                      // bande jaune bas
-  bctx.fillStyle = '#11244e'; bctx.font = '800 24px "Segoe UI", Arial, sans-serif';
-  bctx.fillText('FIÈRE · AUTHENTIQUE · RÉUNIONNAISE', 256, 710);
-  bctx.font = '78px "Segoe UI", Arial, sans-serif'; bctx.fillText('🍺', 430, 165);
+  // AFFICHE DODO recréée au plus proche (l'image n'arrive pas comme fichier lisible) — lisible des deux côtés
+  const bc = document.createElement('canvas'); bc.width = 512; bc.height = 768;
+  const pc = bc.getContext('2d');
+  pc.textAlign = 'center'; pc.textBaseline = 'middle';
+  const g1 = pc.createLinearGradient(0,0,0,768); g1.addColorStop(0,'#1f93e2'); g1.addColorStop(1,'#0f5bad');
+  pc.fillStyle = g1; pc.fillRect(0,0,512,768);
+  const sg = pc.createRadialGradient(256,70,8,256,70,150); sg.addColorStop(0,'rgba(255,250,205,0.95)'); sg.addColorStop(1,'rgba(255,250,205,0)');
+  pc.fillStyle = sg; pc.fillRect(0,0,512,260);
+  pc.save(); pc.translate(256,70); pc.strokeStyle = 'rgba(255,250,210,0.5)'; pc.lineWidth = 4;
+  for(let i=0;i<12;i++){ pc.rotate(Math.PI/6); pc.beginPath(); pc.moveTo(0,42); pc.lineTo(0,150); pc.stroke(); } pc.restore();
+  pc.strokeStyle = '#3a9a2e'; pc.lineWidth = 8; pc.lineCap = 'round';   // palmes
+  for(const [ox,dir] of [[18,1],[494,-1]]) for(let i=0;i<5;i++){ pc.beginPath(); pc.moveTo(ox,8); pc.quadraticCurveTo(ox+dir*(40+i*10),18+i*14, ox+dir*(20+i*22),58+i*20); pc.stroke(); }
+  pc.lineCap = 'butt';
+  pc.font = '900 138px "Arial Black", Arial, sans-serif';                // DODO
+  pc.lineWidth = 18; pc.strokeStyle = '#11244e'; pc.strokeText('DODO',250,150);
+  pc.lineWidth = 10; pc.strokeStyle = '#f4c81f'; pc.strokeText('DODO',250,150);
+  pc.fillStyle = '#fff'; pc.fillText('DODO',250,150);
+  pc.save(); pc.translate(245,252); pc.rotate(-0.04); pc.fillStyle = '#e0241b'; pc.fillRect(-215,-46,430,92); pc.restore();   // bandeau rouge
+  pc.fillStyle = '#fff'; pc.font = '800 32px Arial, sans-serif'; pc.fillText('LA BOISSON LOCALE',245,235);
+  pc.fillText('DE',150,275); pc.fillStyle = '#f4c81f'; pc.fillText('LA RÉUNION',290,275);
+  pc.fillStyle = '#f4c81f'; pc.beginPath(); pc.ellipse(205,455,168,150,0,0,7); pc.fill();    // splash jaune
+  pc.font = '900 220px "Arial Black", Arial, sans-serif';               // 2€
+  pc.lineWidth = 20; pc.strokeStyle = '#11244e'; pc.strokeText('2€',195,450);
+  pc.lineWidth = 10; pc.strokeStyle = '#fff'; pc.strokeText('2€',195,450);
+  pc.fillStyle = '#e0241b'; pc.fillText('2€',195,450);
+  pc.save(); pc.translate(210,595); pc.rotate(-0.05); pc.fillStyle = '#11244e'; pc.fillRect(-150,-34,300,68); pc.restore();   // PROMO
+  pc.fillStyle = '#fff'; pc.font = '800 50px Arial, sans-serif'; pc.fillText('PROMO',210,595);
+  (function bottle(){                                                    // bouteille DODO à droite
+    const X = 410, Y = 480;
+    pc.fillStyle = '#c8861e';
+    pc.beginPath(); pc.moveTo(X-46,Y-80); pc.lineTo(X+46,Y-80); pc.lineTo(X+46,Y+150); pc.quadraticCurveTo(X+46,Y+178,X+18,Y+178); pc.lineTo(X-18,Y+178); pc.quadraticCurveTo(X-46,Y+178,X-46,Y+150); pc.closePath(); pc.fill();
+    pc.fillRect(X-15,Y-150,30,75);                                       // col
+    pc.fillStyle = '#1466b8'; pc.fillRect(X-17,Y-166,34,22);            // capsule
+    pc.beginPath(); pc.ellipse(X,Y+55,44,62,0,0,7); pc.fill();          // étiquette
+    pc.fillStyle = '#fff'; pc.font = '800 26px Arial'; pc.fillText('DODO',X,Y+50);
+    pc.fillStyle = '#f4c81f'; pc.font = '13px Arial'; pc.fillText('LA RÉUNION',X,Y+80);
+  })();
+  (function hibiscus(){                                                  // hibiscus bas-gauche
+    const HX = 66, HY = 706;
+    pc.fillStyle = '#fff';
+    for(let i=0;i<5;i++){ pc.save(); pc.translate(HX,HY); pc.rotate(i*Math.PI*2/5); pc.beginPath(); pc.ellipse(0,-26,16,26,0,0,7); pc.fill(); pc.restore(); }
+    pc.fillStyle = '#e0241b'; pc.beginPath(); pc.arc(HX,HY,12,0,7); pc.fill();
+    pc.fillStyle = '#f4c81f'; pc.beginPath(); pc.arc(HX,HY-3,5,0,7); pc.fill();
+  })();
+  pc.fillStyle = '#2a5a86'; pc.beginPath(); pc.moveTo(150,724); pc.lineTo(232,652); pc.lineTo(322,724); pc.fill();   // montagne
+  pc.fillStyle = '#f4c81f'; pc.fillRect(0,728,512,40);                   // bande jaune bas
+  pc.fillStyle = '#11244e'; pc.font = '800 22px Arial'; pc.fillText('FIÈRE · AUTHENTIQUE · RÉUNIONNAISE',256,748);
   const bannerTex = new THREE.CanvasTexture(bc); bannerTex.encoding = THREE.sRGBEncoding;
   bx(scene, 0.12, 2.0, 1.4, new THREE.MeshStandardMaterial({ color:0x11244e, roughness:0.6 }), fx-4.8, 3.2, fz-1.2);   // support
   for(const [dx, ry] of [[0.075, -Math.PI/2], [-0.075, Math.PI/2]]){
