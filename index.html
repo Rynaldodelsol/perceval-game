@@ -7,19 +7,21 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Perceval : la quête du Contrat Sacré</title>
+<title>Perceval : la quête du Graal</title>
 <!-- ===== Aperçu du lien (Open Graph + Twitter Card) : miniature affichée quand on partage le lien ===== -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Perceval">
-<meta property="og:title" content="Perceval : la quête du Contrat Sacré">
-<meta property="og:description" content="Embarque dans l'aventure 3D du royaume de Perceval : explore le village, galope sur la licorne, conduis la DeLorean, pêche, grimpe le parcours… et récupère le Contrat Sacré !">
+<meta property="og:title" content="Perceval : la quête du Graal">
+<meta property="og:description" content="Embarque dans l'aventure 3D du royaume de Perceval : explore le village, galope sur la licorne, conduis la DeLorean, pêche, grimpe le parcours… et récupère le Graal !">
 <meta property="og:url" content="https://rynaldodelsol.github.io/perceval-game/">
 <meta property="og:image" content="https://rynaldodelsol.github.io/perceval-game/assets/preview.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Perceval : la quête du Graal">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Perceval : la quête du Contrat Sacré">
-<meta name="twitter:description" content="Aventure 3D : licorne, DeLorean, pêche, parcours d'agilité… récupère le Contrat Sacré !">
+<meta name="twitter:image:alt" content="Perceval : la quête du Graal">
+<meta name="twitter:title" content="Perceval : la quête du Graal">
+<meta name="twitter:description" content="Aventure 3D : licorne, DeLorean, pêche, parcours d'agilité… récupère le Graal !">
 <meta name="twitter:image" content="https://rynaldodelsol.github.io/perceval-game/assets/preview.jpg">
 <style>
   /* ==================== STYLES GÉNÉRAUX ==================== */
@@ -298,7 +300,7 @@
 <!-- ==================== ÉCRAN TITRE ==================== -->
 <div id="title">
   <h1>⚔️ Perceval</h1>
-  <h2>la quête du Contrat Sacré</h2>
+  <h2>la quête du Graal</h2>
   <div id="charSelect" class="panel" style="display:none">
     <div class="csTitle">Choisis ton personnage</div>
     <div id="charRow"></div>
@@ -383,13 +385,13 @@
 <div id="dragonScreen" class="overlayScreen">
   <h1>🐉 Le Dragon Modul'r des Oubliettes est vaincu !</h1>
   <div class="slogan">« Jetez aux oubliettes ce que vous pensiez savoir des assurances »</div>
-  <p>Le Contrat Sacré est entre vos mains. Rapportez-le au château pour achever votre quête.</p>
+  <p>Le Graal est entre vos mains. Rapportez-le au château pour achever votre quête.</p>
   <button id="dragonBtn">Continuer</button>
 </div>
 
 <div id="victoryScreen" class="overlayScreen">
   <h1>👑 Victoire !</h1>
-  <div class="slogan" style="font-size:24px;color:#ffd44d;font-weight:800;margin-top:8px;">Le Contrat Sacré est rapporté au château.</div>
+  <div class="slogan" style="font-size:24px;color:#ffd44d;font-weight:800;margin-top:8px;">Le Graal est rapporté au château.</div>
   <p>« Jetez aux oubliettes ce que vous pensiez savoir des assurances. »<br>Le royaume est protégé, et cette fois, tout est écrit en grandes lignes.</p>
   <button id="replayBtn">Rejouer</button>
 </div>
@@ -410,7 +412,7 @@
 <script>
 'use strict';
 /* ============================================================
-   PERCEVAL : LA QUÊTE DU CONTRAT SACRÉ
+   PERCEVAL : LA QUÊTE DU GRAAL
    Un action-RPG façon WoW, en un seul fichier.
    Sections : AUDIO · MOTEUR · MONDE · JOUEUR · PNJ · ENNEMIS ·
               QUÊTES · ENTRÉES · HUD · BOUCLE PRINCIPALE
@@ -574,7 +576,7 @@ const LOADING_TIPS = [
   "Parcours utilisateur (UX) sans friction…",
   "useState(courage), useEffect(aventure) ⚛️…",
   "On élimine les warnings de la console 🐛…",
-  "Refactoring du Contrat Sacré 📜…",
+  "Refactoring de la quête du Graal 🏆…",
   "Lazy-loading des montures 🐴…",
   "Tests verts, build qui passe ✅…",
   "On accessibilise (a11y) les sortilèges ♿…",
@@ -2615,7 +2617,7 @@ const CODE_LINES = [
   '// …patch… 117 bugs dans le code',
   'console.log("ça marche chez moi 🤷")',
   'sudo rm -rf /downtime',
-  'perceval.sauveLeContratSacre()',
+  'perceval.recupereLeGraal()',
   'return 42   // la vraie réponse',
   '/* ne lisez pas ce code 👀 */',
   '$ git push origin main   // 🚀',
@@ -5265,7 +5267,7 @@ function onGardienSlain(){
 }
 
 /* ============================================================
-   QUÊTES — la chaîne du Contrat Sacré
+   QUÊTES — la chaîne du Graal
    ============================================================ */
 const quests = [
   { titre:'Parle à Merlin',
@@ -5280,13 +5282,13 @@ const quests = [
   { titre:'Le Golem du péage',
     desc:'Le Golem Modul\'r de la Franchise Cachée bloque le pont du sud. Pour une fois, faites-LUI payer.',
     type:'kill', target:'golem', goal:1, xp:220 },
-  { titre:'Le Contrat Sacré',
-    desc:'Entrez dans les Oubliettes, vainquez le Dragon Modul\'r, puis rapportez le Contrat Sacré au château.',
+  { titre:'Le Graal',
+    desc:'Entrez dans les Oubliettes, vainquez le Dragon Modul\'r, puis rapportez le Graal au château.',
     type:'dragon', goal:1, xp:420 },
 ];
 let qi = 0;            // index de la quête courante
 let qProgress = 0;     // progression
-let contractInHand = false;
+let graalInHand = false;
 let gameOver = false;
 
 const crystals = [];
@@ -5354,7 +5356,7 @@ function onEnemyKilled(type){
   }
 }
 function onDragonSlain(){
-  contractInHand = true;
+  graalInHand = true;
   SFX.victory();
   setTimeout(()=>{
     document.getElementById('dragonScreen').style.display = 'flex';
@@ -5362,7 +5364,7 @@ function onDragonSlain(){
   updateQuestUI();
 }
 function checkCastleReturn(){
-  if(qi===4 && contractInHand && !gameOver){
+  if(qi===4 && graalInHand && !gameOver){
     const d = Math.hypot(player.group.position.x - 0, player.group.position.z - (-66));
     if(d < 14){
       gameOver = true;
@@ -5377,10 +5379,10 @@ function updateQuestUI(done=false){
   document.getElementById('questTitle').textContent = q.titre;
   let obj = q.desc, prog = '';
   if(qi===4){
-    obj = contractInHand
-      ? 'Le Contrat Sacré est en votre possession ! Rapportez-le au château, au nord.'
+    obj = graalInHand
+      ? 'Le Graal est en votre possession ! Rapportez-le au château, au nord.'
       : q.desc;
-    prog = contractInHand ? 'Contrat récupéré ✓' : 'Dragon : ' + (done?'vaincu':'à vaincre');
+    prog = graalInHand ? 'Graal récupéré ✓' : 'Dragon : ' + (done?'vaincu':'à vaincre');
   } else if(q.type==='talk'){
     prog = done ? 'Terminé ✓' : 'Parlez à Merlin';
   } else {
@@ -7197,7 +7199,7 @@ function broadcastQuest(){
   const now = performance.now();
   if(now - mpQuestSend < 1000) return;
   mpQuestSend = now;
-  mpSend('quest', { qi, qP:qProgress, ch:contractInHand, go:gameOver });
+  mpSend('quest', { qi, qP:qProgress, ch:graalInHand, go:gameOver });
 }
 function onQuestState(w){
   if(coopHost() || !w) return;
@@ -7211,12 +7213,12 @@ function onQuestState(w){
       const flash = document.getElementById('lvlFlash'); if(flash){ flash.style.opacity='1'; setTimeout(()=>flash.style.opacity='0', 600); }
       burst(player.group.position.clone().setY(1.0), 0xffd700, 30, 5, 0.2, 1.0, 2);
     }
-    qi = w.qi; qProgress = w.qP || 0; contractInHand = !!w.ch;
+    qi = w.qi; qProgress = w.qP || 0; graalInHand = !!w.ch;
     if(quests[qi] && quests[qi].type === 'collect' && crystals.length === 0) spawnCrystals();
     updateQuestUI(); updateMarkers();
   } else {
     if(typeof w.qP === 'number') qProgress = w.qP;
-    contractInHand = !!w.ch;
+    graalInHand = !!w.ch;
     updateQuestUI();
   }
   if(w.go) gameOver = true;
@@ -7420,7 +7422,7 @@ function startGame(){
   const WELCOMES = [
     'Bienvenue à Valblanche, ' + shown + ' !',
     'En selle, ' + shown + ' — la Team 10 Positif compte sur toi ⚔️',
-    'Salut ' + shown + ' ! Le Contrat Sacré n\'attend que toi 📜',
+    'Salut ' + shown + ' ! Le Graal n\'attend que toi 🏆',
     'Te voilà, ' + shown + '. Modul\'r tremble déjà 👀',
     'Prêt(e), ' + shown + ' ? Le royaume vient de finir son build ✅',
     'Ah, ' + shown + ' ! Café servi ☕, quête chargée — c\'est parti.',
@@ -7481,7 +7483,7 @@ document.getElementById('respawnBtn').addEventListener('click', ()=>{
 document.getElementById('dragonBtn').addEventListener('click', ()=>{
   document.getElementById('dragonScreen').style.display = 'none';
   updateQuestUI();
-  showToast('📜 Rapportez le Contrat Sacré au château !');
+  showToast('🏆 Rapportez le Graal au château !');
 });
 document.getElementById('replayBtn').addEventListener('click', ()=>location.reload());
 
