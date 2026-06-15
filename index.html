@@ -263,7 +263,11 @@
     #charSelect { margin-top:0; }
     #charRow { flex-wrap:wrap; justify-content:center; }
     .charBtn { padding:6px 9px; }
-    #loadWrap { position:static !important; margin-top:8px; }
+    /* la barre de chargement reste centrée en bas (pas en haut à gauche) ; elle est masquée une fois chargé */
+    #loadWrap { bottom:4vh; }
+    /* en jeu : le journal de quêtes remonte tout en haut, à gauche de la mini-carte (sinon il tombe au milieu de l'écran) */
+    #questPanel { top:10px; right:114px; left:auto; width:min(196px, 38vw); }
+    #questBody { max-height:42vh; overflow-y:auto; }
   }
 </style>
 </head>
@@ -597,17 +601,13 @@ function setLoadProgress(loaded, total){
 })();
 const assetsPromise = (async()=>{
   const loader = new THREE.GLTFLoader();
-  const defs = {
+  // CORE : indispensable pour démarrer (héros jouables + décor du village + monture) → bloque le bouton Jouer
+  const core = {
     knight:      'assets/Knight.glb',
     mage:        'assets/Mage.glb',
     barbarian:   'assets/Barbarian.glb',
     rogue:       'assets/Rogue.glb',
     rogueHooded: 'assets/Rogue_Hooded.glb',
-    skelMinion:  'assets/Skeleton_Minion.glb',
-    skelMage:    'assets/Skeleton_Mage.glb',
-    skelWarrior: 'assets/Skeleton_Warrior.glb',
-    skelRogue:   'assets/Skeleton_Rogue.glb',
-    dragon:      'assets/Dragon.glb',
     horse:       'assets/Horse.glb',
     tree1:       'assets/Tree_Birch.glb',
     tree2:       'assets/Tree_Round.glb',
@@ -615,17 +615,28 @@ const assetsPromise = (async()=>{
     rock1:       'assets/Rock_Large.glb',
     bush1:       'assets/Bush.glb',
   };
-  let loaded = 0; const total = Object.keys(defs).length;
+  // DIFFÉRÉ : ennemis du donjon — ils n'apparaissent qu'à partir de la 1re quête (loin, vers le pont),
+  // donc on les charge EN ARRIÈRE-PLAN pendant que le joueur explore le village (démarrage ~2× plus rapide).
+  const deferred = {
+    skelMinion:  'assets/Skeleton_Minion.glb',
+    skelMage:    'assets/Skeleton_Mage.glb',
+    skelWarrior: 'assets/Skeleton_Warrior.glb',
+    dragon:      'assets/Dragon.glb',
+  };
+  const loadOne = (k, url)=> new Promise((res)=>{
+    loader.load(url, (g)=>{ ASSETS[k] = g; res(); }, undefined,
+      (e)=>{ console.warn('Asset introuvable (repli procédural) :', url); res(); });
+  });
+  let loaded = 0; const total = Object.keys(core).length;
   setLoadProgress(0, total);
-  const loads = Promise.all(Object.entries(defs).map(([k, url])=>new Promise((res)=>{
-    const done = ()=>{ loaded++; setLoadProgress(loaded, total); res(); };
-    loader.load(url, (g)=>{ ASSETS[k] = g; done(); }, undefined,
-      (e)=>{ console.warn('Asset introuvable (repli procédural) :', url); done(); });
-  })));
-  // garde-fou : si un téléchargement reste bloqué, on démarre quand même au bout de 20 s (replis procéduraux)
-  await Promise.race([ loads, new Promise(res=>setTimeout(res, 60000)) ]);   // filet de sécurité allongé : laisse le temps aux modèles 3D de charger (sinon persos en « blocs »)
+  const coreLoads = Promise.all(Object.entries(core).map(([k, url])=>
+    loadOne(k, url).then(()=>{ loaded++; setLoadProgress(loaded, total); })));
+  // garde-fou : on démarre quand même au bout de 45 s si un téléchargement reste bloqué (replis procéduraux)
+  await Promise.race([ coreLoads, new Promise(res=>setTimeout(res, 45000)) ]);
   assetsReady = true;
   setLoadProgress(total, total);
+  // les ennemis se téléchargent tranquillement APRÈS, sans bloquer le joueur
+  Object.entries(deferred).forEach(([k, url])=> loadOne(k, url));
 })();
 // clone un modèle riggé, le met à l'échelle (hauteur cible) et prépare son mixer
 function spawnModel(key, targetHeight){
@@ -7446,6 +7457,16 @@ function animate(){
 }
 updateQuestUI();
 animate();
+// Hook de debug (uniquement avec ?dev=1 dans l'URL) : utilisé par les captures automatiques
+// pour se positionner dans le monde. Sans effet sur le jeu normal.
+if(location.search.indexOf('dev=1') >= 0){
+  window.__dev = {
+    tp(x, z, yaw){ if(player && player.group){ player.group.position.set(x, player.group.position.y, z); } if(yaw != null){ camYaw = yaw; } },
+    forceStart(){ if(!started){ const cb = document.querySelector('.charBtn'); if(cb) cb.click(); const pb = document.getElementById('playBtn'); if(pb) pb.click(); } },
+    get started(){ return started; }, get camYaw(){ return camYaw; },
+    player, camera, scene, enemies,
+  };
+}
 </script>
 </body>
 </html>
