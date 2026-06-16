@@ -7397,35 +7397,23 @@ function showChatBubble(group, text){
 }
 function fadeOutChatMsg(m){
   if(!m || m.classList.contains('out')) return;
-  m.classList.add('out');                                   // remonte + s'efface
+  m.classList.add('out');                                   // remonte vers le haut + s'efface
   setTimeout(()=>{ if(m.parentNode) m.parentNode.removeChild(m); }, 520);
-}
-function gradeChatLog(){
-  const log = document.getElementById('chatLog'); if(!log) return;
-  const msgs = Array.from(log.querySelectorAll('.cmsg:not(.out)'));
-  const n = msgs.length;                                    // les plus anciens (en haut) sont plus fondus
-  msgs.forEach((m, i)=>{ const ageFromNew = n - 1 - i; m.style.opacity = Math.max(0.18, 1 - ageFromNew*0.2).toFixed(2); });
 }
 function pushChatLog(name, text){
   const log = document.getElementById('chatLog'); if(!log) return;
   const d = document.createElement('div'); d.className = 'cmsg';
-  d.dataset.born = '' + performance.now();                  // pour garantir ≥ 6 s à l'écran
   d.innerHTML = '<b>' + name.replace(/[<>&]/g,'') + ' :</b> ' + text.replace(/[<>&]/g,'');
   log.appendChild(d);
-  gradeChatLog();                                           // dégradé d'opacité du plus ancien au plus récent
   pruneChatLog();
-  // chaque message reste affiché (≥ 6 s garanties), puis s'efface tout seul même sans nouveau message
-  setTimeout(()=>{ fadeOutChatMsg(d); }, 9000);
+  // AUCUNE disparition automatique : le fil reste figé et lisible tant que personne ne parle.
 }
-// au-delà de 5 messages, le plus ancien remonte en fondu — mais seulement s'il a vécu ≥ 6 s
+// fenêtre de chat permanente : on garde TOUJOURS les 5 derniers messages, pleinement lisibles.
+// Quand un 6ᵉ arrive, le plus ancien remonte et part — sinon rien ne bouge.
 function pruneChatLog(){
   const log = document.getElementById('chatLog'); if(!log) return;
-  const now = performance.now();
   let live = Array.from(log.querySelectorAll('.cmsg:not(.out)'));
-  while(live.length > 5 && (now - (+live[0].dataset.born) >= 6000 || live.length > 8)){
-    fadeOutChatMsg(live[0]);
-    live = Array.from(log.querySelectorAll('.cmsg:not(.out)'));
-  }
+  while(live.length > 5){ fadeOutChatMsg(live[0]); live.shift(); }
 }
 function onChat(c){
   if(!c || c.id === MY_ID) return;
