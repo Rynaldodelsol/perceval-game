@@ -519,6 +519,7 @@ function noiseBurst(dur=0.12, vol=0.1, delay=0){
 }
 const SFX = {
   swing(){ noiseBurst(0.12, 0.07); tone(620, 0.13, 'sine', 0.05, 0, 180); },
+  tennis(){ tone(940, 0.05, 'square', 0.08, 0, 1500); noiseBurst(0.05, 0.05); },   // « pock » de raquette
   hit(){ tone(160, 0.1, 'square', 0.13, 0, 70); noiseBurst(0.06, 0.08); },
   hurt(){ tone(120, 0.22, 'sawtooth', 0.12, 0, 60); },
   pickup(){ tone(880, 0.12, 'sine', 0.14); tone(1320, 0.18, 'sine', 0.1, 0.08); },
@@ -3950,7 +3951,7 @@ function upgradePlayerModel(){
   player.group.add(m.obj);
   player.cape = null;            // la cape procédurale est remplacée par le modèle sculpté
   m.obj.traverse(o=>{ if((o.isMesh||o.isSkinnedMesh) && hero.id === 'Ray' && o.name === 'Barbarian_Hat') o.visible = false; }); // Ray chauve
-  graftSwordShield(m.obj);       // tout héros apparaît avec épée + écu Perceval
+  graftSwordShield(m.obj, hero.id);       // épée+écu (ou raquette pour Michel)
   if(hero.id === 'Agathe') recolorHeadBlonde(m.obj);
   // greffe de visage pour la ressemblance (membres de l'équipe)
   if(hero.look){
@@ -4366,6 +4367,14 @@ function buildFaceFeatures(look){
     const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.012, 0.012), frame);
     bridge.position.set(0, 0.03, 0.145); f.add(bridge);
   }
+  if(look.headband){
+    // bandeau de sport blanc + petite pastille bleue (Michel le tennisman)
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.024, 8, 22),
+      new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.85 }));
+    band.rotation.x = Math.PI/2 - 0.12; band.position.set(0, 0.135, 0.0); f.add(band);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 6), mat(0x2b6fd2));
+    dot.position.set(0, 0.155, 0.155); f.add(dot);
+  }
   return f;
 }
 // équipement conservé par PNJ (tout le reste des armes du pack est masqué)
@@ -4378,7 +4387,7 @@ const GEAR_RX = /sword|axe|knife|crossbow|shield|throwable|mug|spellbook|wand|st
 /* ==================== ROSTER JOUABLE (chacun prend son personnage) ==================== */
 // rôle court affiché sous chaque personnage à l'écran de choix
 const HERO_ROLE = {
-  Perceval:'Chevalier', Guillaume:'PO & CEO', Merlin:'Enchanteur', Agathe:'Chasseuse',
+  Perceval:'Chevalier', Michel:'Tennisman', Guillaume:'PO & CEO', Merlin:'Enchanteur', Agathe:'Chasseuse',
   Jojo:'Forgeron', Roro:'Capitaine', Mathias:'Cavalier', Antoine:'Aubergiste', Bobby:'Éclaireur', Ray:'Barde',
 };
 // Merlin est exclu : c'est le donneur de quêtes, il reste PNJ
@@ -4387,7 +4396,9 @@ let _heroRoster = null;
 function heroRoster(){
   if(_heroRoster) return _heroRoster;
   const list = [{ id:'Perceval', name:'Perceval', role:HERO_ROLE.Perceval,
-    body:'knight', look:null, gear:['1H_Sword','Badge_Shield'], brand:true }];
+    body:'knight', look:null, gear:['1H_Sword','Badge_Shield'], brand:true },
+    { id:'Michel', name:'Michel', role:HERO_ROLE.Michel,
+      body:'rogue', look:{ hair:'cap', headband:true }, gear:[], racket:true }];
   for(const sh of HERO_ORDER){
     if(sh === 'Perceval') continue;
     const def = NPC_DEFS.find(d=>d.short === sh);
@@ -4443,13 +4454,36 @@ function buildHeroShield(){
   addMesh(g, new THREE.CylinderGeometry(0.21, 0.21, 0.05, 18), new THREE.MeshStandardMaterial({ color:0x8a6a44, roughness:0.8 }), 0, 0, -0.02, false).rotation.x = Math.PI/2;
   return g;
 }
-// greffe épée (main droite) + écu (main gauche) sur les slots KayKit, et masque les armes d'origine
-function graftSwordShield(rootObj){
+// raquette de tennis greffée dans la main droite (arme de Michel)
+function buildTennisRacket(){
+  const g = new THREE.Group();
+  const grip   = new THREE.MeshStandardMaterial({ color:0x202227, roughness:0.7 });
+  const frame  = new THREE.MeshStandardMaterial({ color:0x2bd24b, metalness:0.3, roughness:0.4 });   // cadre vert vif
+  const strMat = new THREE.MeshBasicMaterial({ color:0xf4f4f4, transparent:true, opacity:0.45, side:THREE.DoubleSide });
+  addMesh(g, new THREE.CylinderGeometry(0.018, 0.021, 0.34, 8), grip, 0, 0.0, 0, false);   // manche
+  for(const sx of [-0.05, 0.05]){                                                            // gorge en V
+    const arm = addMesh(g, new THREE.CylinderGeometry(0.012, 0.012, 0.16, 6), frame, sx*0.6, 0.24, 0, false);
+    arm.rotation.z = sx > 0 ? 0.5 : -0.5;
+  }
+  const head = addMesh(g, new THREE.TorusGeometry(0.135, 0.018, 8, 26), frame, 0, 0.44, 0, false);  // tamis ovale
+  head.scale.set(0.82, 1, 0.82);
+  const strings = addMesh(g, new THREE.CircleGeometry(0.125, 22), strMat, 0, 0.44, 0, false);       // cordage
+  strings.scale.set(0.82, 1, 1);
+  return g;
+}
+// greffe l'arme du héros : épée+écu par défaut, raquette pour Michel ; masque les armes d'origine
+function graftSwordShield(rootObj, heroId){
   let hr = null, hl = null;
   rootObj.traverse(o=>{
     if(o.isBone){ if(o.name === 'handslotr') hr = o; else if(o.name === 'handslotl') hl = o; }
     else if((o.isMesh || o.isSkinnedMesh) && GEAR_RX.test(o.name)) o.visible = false;   // pas de double arme
   });
+  const def = heroId ? getHeroDef(heroId) : null;
+  if(def && def.racket){
+    // Michel : raquette en main droite, pas d'écu
+    if(hr){ const rk = buildTennisRacket(); rk.scale.setScalar(2.4); rk.rotation.set(0, 0, Math.PI/2); rk.position.set(0, 0, 0); hr.add(rk); }
+    return;
+  }
   // épée main droite : lame bien verticale, pointe vers le ciel (rotation calée sur l'os KayKit)
   if(hr){ const s = buildHeroSword(); s.scale.setScalar(2.4); s.rotation.set(0, 0, Math.PI/2); s.position.set(0, 0, 0); hr.add(s); }
   // écu main gauche : vertical, face tournée vers l'avant, ramené devant le personnage (garde)
@@ -5982,6 +6016,7 @@ function moveInput(){
 function tryAttack(){
   if(delorean.driving) return;
   if(player.attackCd > 0 || player.dead) return;
+  if(chosenChar === 'Michel'){ serveTennisBall(); return; }   // Michel tire des balles de tennis
   player.attackCd = 0.5;
   player.attackAnim = player.glb ? 0.5 : 0.32;
   if(player.glb) setPlayerAnim('attack', true);
@@ -6020,11 +6055,61 @@ function tryShield(){
   burst(player.group.position.clone().setY(1.2), BLEU_CLAIR, 20, 4, 0.16, 0.7, 1);
 }
 
+// --- balles de tennis de Michel : projectiles qui foncent et tuent les ennemis ---
+const tennisBalls = [];
+const TENNIS_GEO = new THREE.SphereGeometry(0.13, 12, 10);
+const TENNIS_MAT = new THREE.MeshStandardMaterial({ color:0xc6ff2e, emissive:0x6a8a14, emissiveIntensity:0.35, roughness:0.6 });
+function serveTennisBall(){
+  player.attackCd = 0.4;
+  player.attackAnim = player.glb ? 0.5 : 0.32;
+  if(player.glb) setPlayerAnim('attack', true);
+  SFX.tennis();
+  const facing = V3(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
+  // vise l'ennemi le plus proche devant (sinon tout droit)
+  let target = null, bd = 30;
+  for(const e of enemies){
+    if(!e.alive) continue;
+    const to = V3().subVectors(e.group.position, player.group.position).setY(0);
+    const d = to.length();
+    if(d < bd && to.clone().normalize().angleTo(facing) < 0.95){ bd = d; target = e; }
+  }
+  const origin = player.group.position.clone().setY(1.35).addScaledVector(facing, 0.55);
+  const dir = target ? V3().subVectors(target.group.position.clone().setY(1.05), origin).normalize() : facing.clone();
+  const m = new THREE.Mesh(TENNIS_GEO, TENNIS_MAT);
+  m.position.copy(origin); scene.add(m);
+  tennisBalls.push({ mesh:m, vel:dir.multiplyScalar(32), life:1.6, dmg:playerDamage(), spin:rand(10,18) });
+  shake(0.05, 0.04);
+}
+function updateTennisBalls(dt){
+  for(let i=tennisBalls.length-1;i>=0;i--){
+    const b = tennisBalls[i];
+    b.life -= dt;
+    b.mesh.position.addScaledVector(b.vel, dt);
+    b.mesh.rotation.x += dt*b.spin; b.mesh.rotation.y += dt*b.spin*0.6;
+    let done = b.life <= 0;
+    if(!done){
+      for(const e of enemies){
+        if(!e.alive) continue;
+        const r = (e.type==='golem'||e.type==='gardien'||e.type==='dragon') ? 2.4 : 1.2;
+        const dx = e.group.position.x - b.mesh.position.x, dz = e.group.position.z - b.mesh.position.z;
+        const dy = (e.group.position.y + 1.0) - b.mesh.position.y;
+        if(dx*dx+dz*dz < r*r && Math.abs(dy) < 1.8){
+          damageEnemy(e, b.dmg);
+          burst(b.mesh.position.clone(), 0xc6ff2e, 9, 3, 0.12, 0.4, 2);
+          done = true; break;
+        }
+      }
+    }
+    if(done){ scene.remove(b.mesh); tennisBalls.splice(i,1); }
+  }
+}
+
 /* ==================== POUVOIRS DE CLASSE (touche 3) — chacun aide la guilde ==================== */
 // effets : 'shield' (bouclier absorbant), 'heal' (PV instantanés), 'dmg' (+dégâts), 'spd' (+vitesse),
 //          'guard' (-dégâts subis), 'regen' (régén PV/mana accélérée), 'reveal' (ennemis sur mini-carte)
 const POWERS = {
   Perceval:  { name:'Bouclier Sacré',          icon:'🛡️', role:'PROTECTION', desc:'bulle qui encaisse les coups (toi + alliés, 5s)', effects:['shield'],      dur:5,  mana:35, cd:14, color:0x8fd0ff, radius:12 },
+  Michel:    { name:'Service Canon',           icon:'🎾', role:'SMASH',      desc:'+35% dégâts ET +35% vitesse (équipe, 16s)',       effects:['dmg','spd'],   dur:16, mana:30, cd:20, color:0xc6ff2e, radius:13 },
   Guillaume: { name:'Ordre de mission',        icon:'📣', role:'BOOST',      desc:'+30% dégâts ET +40% vitesse (équipe, 18s)',       effects:['dmg','spd'],   dur:18, mana:30, cd:22, color:0xffd44d, radius:14 },
   Agathe:    { name:'Vague de soin',           icon:'💚', role:'SOIN',       desc:'rend ~45 PV à toi + alliés proches',              effects:['heal'],        dur:0,  mana:35, cd:14, color:0x8fe89a, radius:12 },
   Jojo:      { name:'Affûtage',                icon:'🔨', role:'DÉGÂTS',     desc:"+30% de dégâts d'attaque (équipe, 20s)",          effects:['dmg'],         dur:20, mana:30, cd:18, color:0xff8a3a, radius:12 },
@@ -7142,7 +7227,7 @@ function buildHeroModel(charId){
   const m = spawnModel(hero.body, 1.92);
   if(!m) return null;
   m.obj.traverse(o=>{ if((o.isMesh||o.isSkinnedMesh) && hero.id === 'Ray' && o.name === 'Barbarian_Hat') o.visible = false; });
-  graftSwordShield(m.obj);       // les autres joueurs aussi : épée + écu
+  graftSwordShield(m.obj, hero.id);       // les autres joueurs aussi : épée+écu (ou raquette pour Michel)
   if(hero.id === 'Agathe') recolorHeadBlonde(m.obj);
   if(hero.look){
     let hb = null; m.obj.traverse(o=>{ if(!hb && (o.name||'').toLowerCase().includes('head')) hb = o; });
@@ -7694,6 +7779,7 @@ function animate(){
       if(enemies[i].removed) enemies.splice(i,1);
     }
     updateProjectiles(dt);
+    updateTennisBalls(dt);
     updateCrystals(dt, t);
     updateSlashes(dt);
     broadcastSelf();            // envoie ma position aux autres joueurs
