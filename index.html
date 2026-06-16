@@ -87,9 +87,6 @@
   .charBtn.taken .cbRole::after { content:' · pris'; color:#ff9a9a; }
   .charBtn .cbName { font-size:15px; font-weight:800; }
   .charBtn .cbRole { font-size:10px; color:#cdd3ff; margin-top:2px; }
-  #pseudo { margin-top:12px; width:min(280px, 80%); padding:9px 14px; border-radius:999px; border:2px solid rgba(255,255,255,0.35);
-    background:rgba(15,20,55,0.5); color:#fff; font-family:inherit; font-size:14px; text-align:center; outline:none; }
-  #pseudo::placeholder { color:#aab2e8; }
 
   /* ==================== HUD ==================== */
   .panel { background:rgba(40,53,129,0.78); border-radius:14px; color:#fff;
@@ -336,7 +333,6 @@
   <div id="charSelect" class="panel" style="display:none">
     <div class="csTitle">Choisis ton personnage</div>
     <div id="charRow"></div>
-    <input id="pseudo" maxlength="16" placeholder="Ton pseudo (optionnel)" autocomplete="off">
   </div>
   <div class="controls" style="display:none">
     <b>ZQSD / WASD</b> : se déplacer &nbsp;·&nbsp; <b>Espace</b> : saut (parcours de rochers ➜ cristal d'XP)<br>
@@ -7636,8 +7632,6 @@ document.getElementById('playBtn').addEventListener('click', ()=>{
     });
     row.appendChild(b);
   });
-  const ps = document.getElementById('pseudo');
-  if(ps) ps.addEventListener('input', e=>{ chosenPseudo = e.target.value; trackMe(); });
   initMultiplayer();                     // connexion lobby dès l'écran-titre : qui est déjà là, quel perso
 })();
 document.getElementById('respawnBtn').addEventListener('click', ()=>{
