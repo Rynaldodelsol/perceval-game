@@ -5229,6 +5229,10 @@ function updateEnemy(e, dt, t){
     return;
   }
   const pos = e.group.position;
+  // COOP — si je suis un simple client, je ne dois posséder QUE des ennemis miroirs.
+  // Un ennemi local (non-miroir) côté client est un orphelin (transition d'hôte / brève fenêtre solo
+  // au moment de rejoindre) : on le retire pour ne pas simuler un ennemi que les autres ne voient pas.
+  if(!coopHost() && !e.remote){ scene.remove(e.group); e.removed = true; return; }
   // COOP — non-hôte : ennemi MIROIR, pas d'IA, on suit la position diffusée par l'hôte
   if(e.remote && !coopHost()){
     if(e.flashT > 0){ e.flashT -= dt; for(const m of e.bodyMeshes) m.material.emissive && m.material.emissive.setHex(0x883333); }
@@ -6803,7 +6807,7 @@ function lightningStrike(intensity){
 }
 const weather = { state:'clear', timer: rand(38, 80), intensity:0, target:0, lightTimer:0 };
 function updateWeather(dt){
-  const host = !mpChannel || iAmHost();   // l'hôte décide la météo ; les autres la reçoivent (synchro)
+  const host = coopHost();   // l'hôte (même autorité que les ennemis) décide la météo ; les autres la reçoivent
   if(host){
     weather.timer -= dt;
     if(weather.timer <= 0){
@@ -7245,7 +7249,8 @@ function spawnRemote(data){
   label.position.y = 2.45; g.add(label);
   scene.add(g);
   return { group:g, anim:built.anim, char:data.char, name:(data.name||data.char||'Joueur'),
-           target:V3(data.x, 0, data.z), ry:data.ry||0, moving:!!data.mv, last:performance.now(), bubble:null, bubbleT:0 };
+           target:V3(data.x, 0, data.z), ry:data.ry||0, moving:!!data.mv, last:performance.now(),
+           t:data.t||0, started:!!data.st, bubble:null, bubbleT:0 };
 }
 function onRemoteData(data){
   if(!data || data.id === MY_ID || !started) return;
@@ -7255,6 +7260,7 @@ function onRemoteData(data){
     scene.remove(r.group); r = spawnRemote(data); if(r) remotePlayers[data.id] = r; return;
   }
   r.target.set(data.x, 0, data.z); r.ty = (data.y != null) ? data.y : null; r.ry = data.ry || 0; r.moving = !!data.mv; r.last = performance.now();
+  r.t = data.t || 0; r.started = !!data.st;     // ancienneté + en-jeu (élection de l'hôte unique des ennemis)
 }
 function removeRemote(id){ const r = remotePlayers[id]; if(r){ scene.remove(r.group); delete remotePlayers[id]; } if(delorean && delorean.net.ownerId === id) delorean.net.ownerId = null; for(const m of mounts){ if(m.net.ownerId === id) m.net.ownerId = null; } }
 function updateRemotePlayers(dt){
@@ -7337,12 +7343,12 @@ function refreshPresence(){
 
 /* ---- synchro de l'heure, de la météo et des éclairs (l'hôte décide, les autres suivent) ---- */
 function onWorldState(w){
-  if(!w || iAmHost()) return;        // je ne suis pas l'hôte : j'adopte son monde
+  if(!w || coopHost()) return;       // je ne suis pas l'hôte : j'adopte son monde
   if(typeof w.dayTime === 'number') dayTime = w.dayTime;
   if(w.ws){ weather.state = w.ws; weather.target = w.wt; weather.timer = w.wtimer; }
 }
 function broadcastWorld(){
-  if(!iAmHost()) return;
+  if(!coopHost()) return;
   const now = performance.now();
   if(now - mpWorldSend < 1200) return;
   mpWorldSend = now;
@@ -7353,7 +7359,29 @@ function broadcastWorld(){
 let mpEnemySend = 0, mpQuestSend = 0, lastEnemySnap = 0;
 const netEnemies = {};   // id -> ennemi miroir (côté non-hôte)
 // autorité coop = je suis l'hôte OU aucun hôte ne diffuse depuis 4 s (hôte planté → je reprends la main, jamais de quête bloquée)
-function coopHost(){ return iAmHost() || (performance.now() - lastEnemySnap > 4000); }
+// AUTORITÉ sur les ennemis : il faut UN SEUL hôte à la fois, sinon chaque joueur simule
+// ses propres ennemis → invisibles pour les autres et impossibles à tuer (le bug constaté).
+// On élit l'hôte d'après les BROADCASTS d'état des joueurs ('p', reçus ~12/s) plutôt que la
+// présence Supabase, car les broadcasts arrivent de façon fiable (on voit bien les autres bouger)
+// alors que la présence peut, elle, ne pas se synchroniser. Règle déterministe et identique
+// pour tous : l'hôte est le joueur EN JEU le plus ancien (à défaut, le plus ancien ; égalité → plus petit id).
+function coopHost(){
+  if(!mpChannel) return true;                 // hors-ligne : j'ai l'autorité
+  const now = performance.now();
+  let bestId = MY_ID, bestT = mpJoinT, bestStarted = !!started, anyPeer = false;
+  for(const id in remotePlayers){
+    const r = remotePlayers[id];
+    if(now - r.last > 5000) continue;          // pair silencieux depuis >5 s → ignoré
+    anyPeer = true;
+    const t = r.t || 0, st = !!r.started;
+    if((st && !bestStarted) ||
+       (st === bestStarted && (t < bestT || (t === bestT && id < bestId)))){
+      bestT = t; bestStarted = st; bestId = id;
+    }
+  }
+  if(!anyPeer) return true;                     // aucun pair actif autour → je suis l'autorité
+  return bestId === MY_ID;                      // sinon : un seul hôte, le plus ancien joueur actif
+}
 // joueur le plus proche d'une position (héros local OU copain en ligne) — pour l'IA des ennemis (hôte)
 function nearestPlayer(pos){
   let bestId = MY_ID, bestPos = player.group.position;
@@ -7558,7 +7586,7 @@ function connectMultiplayer(){
     mpChannel.on('broadcast', { event:'buff' },  ({ payload })=> onBuff(payload));
     mpChannel.on('broadcast', { event:'dungeon' }, ({ payload })=> onDungeon(payload));
     mpChannel.on('broadcast', { event:'chat' },  ({ payload })=> onChat(payload));
-    mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!iAmHost() && payload) lightningStrike(payload.i || 0.7); });
+    mpChannel.on('broadcast', { event:'light' }, ({ payload })=>{ if(!coopHost() && payload) lightningStrike(payload.i || 0.7); });
     mpChannel.on('broadcast', { event:'enemies' }, ({ payload })=> onEnemiesSnapshot(payload));   // coop : snapshot ennemis (hôte→clients)
     mpChannel.on('broadcast', { event:'hit' },      ({ payload })=> onHit(payload));               // coop : coup d'un client → hôte
     mpChannel.on('broadcast', { event:'hurt' },     ({ payload })=> onHurt(payload));              // coop : un ennemi me frappe (hôte→cible)
@@ -7626,7 +7654,8 @@ function broadcastSelf(){
   const p = player.group.position;
   mpSend('p', {
     id:MY_ID, name:(chosenPseudo && chosenPseudo.trim()) || chosenChar, char:chosenChar,
-    x:+p.x.toFixed(2), y:+p.y.toFixed(2), z:+p.z.toFixed(2), ry:+player.group.rotation.y.toFixed(2), mv:!!player.moving
+    x:+p.x.toFixed(2), y:+p.y.toFixed(2), z:+p.z.toFixed(2), ry:+player.group.rotation.y.toFixed(2), mv:!!player.moving,
+    t:mpJoinT, st:!!started      // ancienneté + en-jeu : sert à élire l'unique hôte des ennemis (cf. coopHost)
   });
   // ma bulle de chat locale s'efface au bout de quelques secondes
   if(player._bubT > 0){ player._bubT -= 0.08; if(player._bubT <= 0 && player.group.userData._bub){ player.group.remove(player.group.userData._bub); player.group.userData._bub = null; } }
