@@ -4739,7 +4739,7 @@ function updateDelorean(dt, t){
     setHint('Descendre de la DeLorean');
     // je diffuse en continu que je tiens le volant : les autres me voient rouler et ne peuvent pas entrer
     const now = performance.now();
-    if(now - mpCarSend > 120){ mpCarSend = now; mpSend('car', { id:MY_ID, state:'claim' }); }
+    if(peersAround() && now - mpCarSend > 200){ mpCarSend = now; mpSend('car', { id:MY_ID, state:'claim' }); }
   } else if(delorean.net.ownerId && delorean.net.ownerId !== MY_ID && remotePlayers[delorean.net.ownerId]){
     // un autre joueur conduit : la voiture suit son avatar (déjà lissé) — bien visible, avec roues + traînées
     const r = remotePlayers[delorean.net.ownerId];
@@ -5810,7 +5810,7 @@ function updateMount(m, dt, t){
     player.group.rotation.y = m.heading;
     if(player.glb) setPlayerAnim('idle');
     if(m.sparkle && Math.abs(m.speed) > 4 && Math.random() < 0.25) burst(V3(wrap.position.x, 0.3, wrap.position.z), m.sparkle, 8, 2.5, 0.12, 0.6, 1);
-    if(performance.now() - m._send > 120){ m._send = performance.now(); mpSend('mount', { id:MY_ID, key:m.key, state:'claim' }); }
+    if(peersAround() && performance.now() - m._send > 200){ m._send = performance.now(); mpSend('mount', { id:MY_ID, key:m.key, state:'claim' }); }
   } else if(m.net.ownerId && m.net.ownerId !== MY_ID && remotePlayers[m.net.ownerId]){
     // un autre joueur la monte : la monture suit son avatar
     const r = remotePlayers[m.net.ownerId];
@@ -7254,6 +7254,7 @@ function spawnRemote(data){
 }
 function onRemoteData(data){
   if(!data || data.id === MY_ID || !started) return;
+  lastPeerMsg = performance.now();      // un pair est actif → on (ré)active les diffusions complètes
   let r = remotePlayers[data.id];
   if(!r){ r = spawnRemote(data); if(r) remotePlayers[data.id] = r; return; }
   if(data.char && data.char !== r.char){    // le joueur a changé de personnage → on reconstruit
@@ -7348,15 +7349,22 @@ function onWorldState(w){
   if(w.ws){ weather.state = w.ws; weather.target = w.wt; weather.timer = w.wtimer; }
 }
 function broadcastWorld(){
-  if(!coopHost()) return;
+  if(!coopHost() || !peersAround()) return;
   const now = performance.now();
-  if(now - mpWorldSend < 1200) return;
+  if(now - mpWorldSend < 2000) return;
   mpWorldSend = now;
   mpSend('world', { dayTime:+dayTime.toFixed(4), ws:weather.state, wt:+weather.target.toFixed(2), wtimer:+weather.timer.toFixed(1) });
 }
 
 // ====================== COOP GUILDE : ennemis & quêtes partagés (autorité hôte) ======================
-let mpEnemySend = 0, mpQuestSend = 0, lastEnemySnap = 0;
+let mpEnemySend = 0, mpQuestSend = 0, lastEnemySnap = 0, lastPeerMsg = 0;
+// Y a-t-il un autre joueur ACTIF autour ? (sert à couper les diffusions quand on joue seul → économie de quota Supabase).
+// Détection robuste : un message de pair reçu récemment OU une présence partagée non vide.
+function peersAround(){
+  if(performance.now() - lastPeerMsg < 8000) return true;
+  for(const id in mpPresence){ if(id !== MY_ID) return true; }
+  return false;
+}
 const netEnemies = {};   // id -> ennemi miroir (côté non-hôte)
 // autorité coop = je suis l'hôte OU aucun hôte ne diffuse depuis 4 s (hôte planté → je reprends la main, jamais de quête bloquée)
 // AUTORITÉ sur les ennemis : il faut UN SEUL hôte à la fois, sinon chaque joueur simule
@@ -7371,7 +7379,7 @@ function coopHost(){
   let bestId = MY_ID, bestT = mpJoinT, bestStarted = !!started, anyPeer = false;
   for(const id in remotePlayers){
     const r = remotePlayers[id];
-    if(now - r.last > 5000) continue;          // pair silencieux depuis >5 s → ignoré
+    if(now - r.last > 8000) continue;          // pair silencieux depuis >8 s → ignoré
     anyPeer = true;
     const t = r.t || 0, st = !!r.started;
     if((st && !bestStarted) ||
@@ -7406,11 +7414,11 @@ function spawnEnemyByType(type, x, z){
   if(type==='dragon')  return buildDragon(x, z);
   return null;
 }
-// l'hôte diffuse l'état des ennemis (~9/s)
+// l'hôte diffuse l'état des ennemis (~5/s) — uniquement s'il y a quelqu'un pour les recevoir
 function broadcastEnemies(){
-  if(!coopHost() || !mpChannel) return;
+  if(!coopHost() || !mpChannel || !peersAround()) return;
   const now = performance.now();
-  if(now - mpEnemySend < 110) return;
+  if(now - mpEnemySend < 200) return;
   mpEnemySend = now;
   const s = [];
   for(const e of enemies){
@@ -7461,9 +7469,9 @@ function onHit(d){
 }
 // quête partagée : l'hôte diffuse l'état (~1/s), les clients adoptent
 function broadcastQuest(){
-  if(!coopHost() || !mpChannel) return;
+  if(!coopHost() || !mpChannel || !peersAround()) return;
   const now = performance.now();
-  if(now - mpQuestSend < 1000) return;
+  if(now - mpQuestSend < 2000) return;
   mpQuestSend = now;
   mpSend('quest', { qi, qP:qProgress, ch:graalInHand, go:gameOver });
 }
@@ -7649,7 +7657,10 @@ setInterval(()=>{
 function broadcastSelf(){
   if(!mpChannel || mpAway) return;
   const now = performance.now();
-  if(now - mpLastSend < 80) return;          // ~12 envois / seconde
+  // ÉCONOMIE DE QUOTA : seul → un simple battement de cœur toutes les 4 s (découverte des pairs).
+  // Avec des pairs autour → cadence normale : rapide en mouvement, plus lente à l'arrêt.
+  const interval = peersAround() ? (player.moving ? 140 : 700) : 4000;
+  if(now - mpLastSend < interval) return;
   mpLastSend = now;
   const p = player.group.position;
   mpSend('p', {
